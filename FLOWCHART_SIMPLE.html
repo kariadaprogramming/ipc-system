@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IPC School System - Flowchart Sederhana</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 40px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding-bottom: 20px;
+            border-bottom: 3px solid #667eea;
+        }
+        
+        .header h1 {
+            color: #667eea;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            color: #666;
+            font-size: 1.2em;
+        }
+        
+        .role-section {
+            margin: 40px 0;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        
+        .role-superadmin {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+            color: white;
+        }
+        
+        .role-guru {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+        }
+        
+        .role-siswa {
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+            color: white;
+        }
+        
+        .role-section h2 {
+            font-size: 2em;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .diagram-container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .features {
+            background: rgba(255,255,255,0.2);
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        
+        .features h3 {
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+        
+        .features ul {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .features li {
+            padding: 8px 0;
+            padding-left: 25px;
+            position: relative;
+        }
+        
+        .features li::before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            font-weight: bold;
+        }
+        
+        .print-btn {
+            display: block;
+            margin: 30px auto;
+            padding: 15px 40px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .print-btn:hover {
+            background: #764ba2;
+            transform: translateY(-2px);
+        }
+        
+        @media print {
+            body {
+                background: white !important;
+                padding: 0;
+            }
+            .container {
+                box-shadow: none;
+            }
+            .print-btn {
+                display: none;
+            }
+            .role-section {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎓 IPC School System</h1>
+            <p>Flowchart Sederhana - Bahasa Indonesia</p>
+        </div>
+
+        <!-- SUPERADMIN -->
+        <div class="role-section role-superadmin">
+            <h2>👑 SUPERADMIN</h2>
+            <div class="diagram-container">
+                <pre class="mermaid">
+flowchart TD
+    A([Login Superadmin]) --> B[Dashboard]
+    B --> C{Pilih Menu}
+    
+    C -->|Kelola Akun| D[Kelola Akun]
+    C -->|Wali Kelas| E[Wali Kelas]
+    C -->|Approvals| F[Approvals V2]
+    C -->|Input Access| G[Input Access]
+    C -->|Laporan| H[Laporan Cetak]
+    C -->|Logs| I[Logs]
+    C -->|Profile| J[Profile]
+    
+    D --> D1[Buat Akun Guru]
+    D --> D2[Buat Akun Siswa]
+    D --> D3[Edit Akun]
+    D --> D4[Hapus Akun]
+    
+    E --> E1[Assign Wali Kelas]
+    E --> E2[Hapus Wali Kelas]
+    
+    F --> F1[Approve Data]
+    F --> F2[Reject Data]
+    
+    G --> G1[Enable Input]
+    G --> G2[Disable Input]
+    
+    H --> H1[Export Excel]
+    H --> H2[Export PDF]
+    H --> H3[Export Word]
+                </pre>
+            </div>
+            
+            <div class="features">
+                <h3>📋 Fitur yang Bisa Diakses:</h3>
+                <ul>
+                    <li>Kelola semua akun (Guru dan Siswa)</li>
+                    <li>Assign Wali Kelas ke setiap kelas</li>
+                    <li>Approve/Reject semua data yang masuk</li>
+                    <li>Kontrol akses input data (Enable/Disable)</li>
+                    <li>Cetak laporan (Excel, PDF, Word)</li>
+                    <li>Lihat semua log aktivitas sistem</li>
+                    <li>Edit profile sendiri</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- GURU -->
+        <div class="role-section role-guru">
+            <h2>👨‍🏫 GURU / PEMBINA</h2>
+            <div class="diagram-container">
+                <pre class="mermaid">
+flowchart TD
+    A([Login Guru]) --> B[Dashboard]
+    B --> C{Pilih Menu}
+    
+    C -->|Kelola Siswa| D[Kelola Siswa]
+    C -->|Input Prestasi| E[Input Prestasi]
+    C -->|Input Organisasi| F[Input Organisasi]
+    C -->|Input Event| G[Input Event]
+    C -->|Input Pelanggaran| H[Input Pelanggaran]
+    C -->|Input Perilaku| I[Input Perilaku]
+    C -->|Approvals| J[Pembina Approvals]
+    C -->|Wali Kelas| K[Wali Kelas Panel]
+    C -->|Laporan| L[Laporan Cetak]
+    C -->|Profile| M[Profile]
+    
+    D --> D1[Buat Akun Siswa]
+    D --> D2[Edit Data Siswa]
+    D --> D3[Hapus Siswa]
+    
+    E --> E1[Isi Form Prestasi]
+    E --> E2[Upload Bukti]
+    E --> E3[Submit]
+    
+    F --> F1[Isi Form Organisasi]
+    F --> F2[Upload Bukti]
+    F --> F3[Submit]
+    
+    G --> G1[Isi Form Event]
+    G --> G2[Upload Bukti]
+    G --> G3[Submit]
+    
+    H --> H1[Isi Form Pelanggaran]
+    H --> H2[Upload Bukti]
+    H --> H3[Submit]
+    
+    I --> I1[Isi Form Perilaku]
+    I --> I2[Upload Bukti]
+    I --> I3[Submit]
+    
+    J --> J1[Review Request]
+    J --> J2[Approve/Reject]
+                </pre>
+            </div>
+            
+            <div class="features">
+                <h3>📋 Fitur yang Bisa Diakses:</h3>
+                <ul>
+                    <li>Kelola akun siswa (Buat, Edit, Hapus)</li>
+                    <li>Input data Prestasi (Lomba, Juara, dll)</li>
+                    <li>Input data Organisasi (OSIS, Pramuka, dll)</li>
+                    <li>Input data Event (Kegiatan sekolah)</li>
+                    <li>Input data Pelanggaran (Poin pengurangan)</li>
+                    <li>Input data Perilaku (Poin penambahan)</li>
+                    <li>Approve/Reject request siswa</li>
+                    <li>Panel Wali Kelas (jika di-assign)</li>
+                    <li>Cetak laporan</li>
+                    <li>Edit profile sendiri</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- SISWA -->
+        <div class="role-section role-siswa">
+            <h2>👨‍🎓 SISWA</h2>
+            <div class="diagram-container">
+                <pre class="mermaid">
+flowchart TD
+    A([Login Siswa]) --> B[Dashboard]
+    B --> C{Pilih Menu}
+    
+    C -->|Dashboard| D[View IPC]
+    C -->|Leaderboard| E[Leaderboard]
+    C -->|Histori| F[Histori IPC]
+    C -->|Notifikasi| G[Notifikasi]
+    C -->|Profile| H[Profile]
+    
+    D --> D1[Lihat Skor IPC]
+    D --> D2[Lihat Perubahan Terbaru]
+    
+    E --> E1[Ranking Akademik]
+    E --> E2[Ranking Non-Akademik]
+    E --> E3[Cari Siswa Lain]
+    
+    F --> F1[Lihat Semua Perubahan]
+    F --> F2[Filter Berdasarkan Tipe]
+    
+    G --> G1[Lihat Notifikasi]
+    G --> G2[Tandai Sudah Dibaca]
+    
+    H --> H1[Lihat Biodata]
+    H --> H2[Request Update Biodata]
+    H --> H3[Update Foto]
+    H --> H4[Ganti Password]
+    
+    H2 --> H2A[Isi Form Update]
+    H2A --> H2B[Submit ke Pembina]
+    H2B --> H2C[Tunggu Approval]
+                </pre>
+            </div>
+            
+            <div class="features">
+                <h3>📋 Fitur yang Bisa Diakses:</h3>
+                <ul>
+                    <li>Lihat skor IPC sendiri (Real-time)</li>
+                    <li>Lihat Leaderboard (Ranking siswa)</li>
+                    <li>Lihat histori perubahan IPC</li>
+                    <li>Lihat notifikasi (Perubahan IPC, Approval)</li>
+                    <li>Request update biodata (Pending approval)</li>
+                    <li>Update foto profile</li>
+                    <li>Ganti password</li>
+                    <li>TIDAK BISA input data (Hanya Guru/Superadmin)</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- ALUR KERJA SISTEM -->
+        <div class="role-section" style="background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); color: #333;">
+            <h2>🔄 ALUR KERJA SISTEM</h2>
+            <div class="diagram-container">
+                <pre class="mermaid">
+flowchart TD
+    A([Mulai]) --> B{Login}
+    B -->|Superadmin| C[Dashboard Superadmin]
+    B -->|Guru| D[Dashboard Guru]
+    B -->|Siswa| E[Dashboard Siswa]
+    
+    D --> F[Input Data Siswa]
+    F --> G[Upload Bukti]
+    G --> H[Submit]
+    
+    H --> I[Status: Pending]
+    I --> J{Approval Pembina}
+    
+    J -->|Approve| K[Status: Pembina Approved]
+    J -->|Reject| L[Status: Rejected]
+    
+    K --> M{Approval Superadmin}
+    M -->|Approve| N[Status: Approved]
+    M -->|Reject| L
+    
+    N --> O[Update IPC Siswa]
+    O --> P[Buat Histori]
+    P --> Q[Kirim Notifikasi ke Siswa]
+    
+    E --> R[Lihat IPC]
+    R --> S[Lihat Notifikasi]
+    
+    L --> T[Kirim Alasan ke Guru]
+                </pre>
+            </div>
+            
+            <div class="features">
+                <h3>📋 Penjelasan Alur:</h3>
+                <ul>
+                    <li>Guru input data siswa → Status Pending</li>
+                    <li>Pembina review → Approve/Reject</li>
+                    <li>Superadmin review final → Approve/Reject</li>
+                    <li>Jika Approved: IPC siswa di-update</li>
+                    <li>Siswa menerima notifikasi perubahan</li>
+                    <li>Siswa bisa lihat histori perubahan</li>
+                </ul>
+            </div>
+        </div>
+
+        <button class="print-btn" onclick="window.print()">🖨️ Cetak / Simpan PDF</button>
+    </div>
+
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            securityLevel: 'loose',
+            flowchart: {
+                useMaxWidth: true,
+                htmlLabels: true,
+                curve: 'basis'
+            }
+        });
+    </script>
+</body>
+</html>

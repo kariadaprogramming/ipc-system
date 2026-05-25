@@ -1,0 +1,182 @@
+const express = require('express');
+const router = express.Router();
+const { auth } = require('../middleware/auth');
+const db = require('../config/database');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
+// Configure multer for avatar uploads
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        const uploadDir = path.join(__dirname, '../uploads/avatars');
+        if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+        }
+        cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, 'avatar-' + req.user.id + '-' + uniqueSuffix + path.extname(file.originalname));
+    }
+});
+
+const upload = multer({
+    storage: storage,
+    limits: {
+        fileSize: 5 * 1024 * 1024 // 5MB limit
+    },
+    fileFilter: (req, file, cb) => {
+        const allowedTypes = /jpeg|jpg|png|gif|webp/;
+        const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+        const mimetype = allowedTypes.test(file.mimetype);
+        
+        if (mimetype && extname) {
+            return cb(null, true);
+        } else {
+            cb(new Error('Only image files (jpeg, jpg, png, gif, webp) are allowed'));
+        }
+    }
+});
+
+// Get user profile
+router.get('/', auth, async (req, res) => {
+    try {
+        const [user] = await db.query(
+            'SELECT id, nama, nis, nisn, nip, role, kelas, jurusan, grha, wali_kelas, ipc_total, ipc_awal, alamat, no_hp, jabatan, foto, created_at FROM users WHERE id = ?',
+            [req.user.id]
+        );
+
+        if (user.length === 0) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        res.json(user[0]);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Upload avatar
+router.post('/avatar', auth, upload.single('avatar'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ message: 'No file uploaded' });
+        }
+
+        const avatarPath = '/uploads/avatars/' + req.file.filename;
+
+        // Delete old avatar if exists
+        const [user] = await db.query('SELECT foto FROM users WHERE id = ?', [req.user.id]);
+        if (user.length > 0 && user[0].foto) {
+            const oldAvatarPath = path.join(__dirname, '..', user[0].foto);
+            if (fs.existsSync(oldAvatarPath)) {
+                fs.unlinkSync(oldAvatarPath);
+            }
+        }
+
+        // Update user avatar in database
+        await db.query(
+            'UPDATE users SET foto = ? WHERE id = ?',
+            [avatarPath, req.user.id]
+        );
+
+        res.json({ message: 'Avatar uploaded successfully', avatarPath });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Delete avatar
+router.delete('/avatar', auth, async (req, res) => {
+    try {
+        const [user] = await db.query('SELECT foto FROM users WHERE id = ?', [req.user.id]);
+        
+        if (user.length > 0 && user[0].foto) {
+            const oldAvatarPath = path.join(__dirname, '..', user[0].foto);
+            if (fs.existsSync(oldAvatarPath)) {
+                fs.unlinkSync(oldAvatarPath);
+            }
+        }
+
+        await db.query(
+            'UPDATE users SET foto = NULL WHERE id = ?',
+            [req.user.id]
+        );
+
+        res.json({ message: 'Avatar deleted successfully' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Get user IPC history
+router.get('/ipc-history', auth, async (req, res) => {
+    try {
+        const [history] = await db.query(
+            'SELECT * FROM ipc_history WHERE user_id = ? ORDER BY created_at DESC',
+            [req.user.id]
+        );
+        res.json(history);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Get user's approved data summary
+router.get('/summary', auth, async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        const [prestasi] = await db.query(
+            'SELECT * FROM prestasi WHERE user_id = ? AND status = ?',
+            [userId, 'approved']
+        );
+
+        const [organisasi] = await db.query(
+            'SELECT * FROM organisasi WHERE user_id = ? AND status = ?',
+            [userId, 'approved']
+        );
+
+        const [event] = await db.query(
+            'SELECT * FROM event WHERE user_id = ? AND status = ?',
+            [userId, 'approved']
+        );
+
+        const [pelanggaran] = await db.query(
+            'SELECT * FROM pelanggaran WHERE user_id = ? AND status = ?',
+            [userId, 'approved']
+        );
+
+        const [perilaku] = await db.query(
+            'SELECT * FROM perilaku WHERE user_id = ? AND status = ?',
+            [userId, 'approved']
+        );
+
+        const akademikCount = prestasi.filter(p => p.jenis === 'akademik').length;
+        const nonakademikCount = prestasi.filter(p => p.jenis === 'nonakademik').length;
+
+        res.json({
+            total_prestasi_akademik: akademikCount,
+            total_prestasi_nonakademik: nonakademikCount,
+            total_organisasi: organisasi.length,
+            total_event: event.length,
+            total_pelanggaran: pelanggaran.length,
+            total_perilaku: perilaku.length,
+            prestasi,
+            organisasi,
+            event,
+            pelanggaran,
+            perilaku
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+module.exports = router;

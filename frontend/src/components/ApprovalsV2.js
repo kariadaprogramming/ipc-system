@@ -1,0 +1,451 @@
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+
+function ApprovalsV2() {
+  const [activeTab, setActiveTab] = useState('prestasi');
+  const [approvals, setApprovals] = useState({
+    prestasi: [],
+    event: [],
+    organisasi: [],
+    siswa: [],
+    biodata: [],
+    student_creation: []
+  });
+  const [loading, setLoading] = useState(true);
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [notes, setNotes] = useState('');
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    fetchApprovals();
+  }, []);
+
+  const fetchApprovals = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const [approvalsRes, biodataRes, studentCreationRes] = await Promise.all([
+        axios.get('/approvals-v2/all', {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        axios.get('/users/biodata-approvals', {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        axios.get('/users/student-creation-approvals', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+      ]);
+      setApprovals({
+        ...approvalsRes.data,
+        biodata: biodataRes.data || [],
+        student_creation: studentCreationRes.data || []
+      });
+    } catch (error) {
+      console.error('Error fetching approvals:', error);
+      setMessage('Gagal memuat data approvals');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleApprove = async (type, id) => {
+    try {
+      const token = localStorage.getItem('token');
+      
+      if (type === 'biodata') {
+        await axios.put(`/users/biodata-approvals/${id}`, {
+          status: 'approved',
+          notes: notes || 'Disetujui'
+        }, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      } else if (type === 'student_creation') {
+        await axios.put(`/users/student-creation-approvals/${id}`, {
+          status: 'approved',
+          notes: notes || 'Disetujui'
+        }, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      } else {
+        await axios.put(`/approvals-v2/superadmin/${type}/${id}`, {
+          status: 'approved',
+          notes: notes || 'Disetujui'
+        }, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      }
+      
+      const typeLabels = {
+        biodata: 'Update biodata',
+        student_creation: 'Pembuatan akun siswa',
+        prestasi: 'Prestasi',
+        event: 'Event',
+        organisasi: 'Organisasi',
+        siswa: 'Data siswa'
+      };
+      setMessage(`${typeLabels[type] || type} berhasil disetujui!`);
+      setSelectedItem(null);
+      setNotes('');
+      fetchApprovals();
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Gagal menyetujui');
+    }
+  };
+
+  const handleReject = async (type, id) => {
+    try {
+      const token = localStorage.getItem('token');
+      
+      if (type === 'biodata') {
+        await axios.put(`/users/biodata-approvals/${id}`, {
+          status: 'rejected',
+          notes: notes || 'Ditolak'
+        }, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      } else if (type === 'student_creation') {
+        await axios.put(`/users/student-creation-approvals/${id}`, {
+          status: 'rejected',
+          notes: notes || 'Ditolak'
+        }, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      } else {
+        await axios.put(`/approvals-v2/superadmin/${type}/${id}`, {
+          status: 'rejected',
+          notes: notes || 'Ditolak'
+        }, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      }
+      
+      const typeLabels = {
+        biodata: 'Update biodata',
+        student_creation: 'Pembuatan akun siswa',
+        prestasi: 'Prestasi',
+        event: 'Event',
+        organisasi: 'Organisasi',
+        siswa: 'Data siswa'
+      };
+      setMessage(`${typeLabels[type] || type} ditolak`);
+      setSelectedItem(null);
+      setNotes('');
+      fetchApprovals();
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Gagal menolak');
+    }
+  };
+
+  const getStatusBadge = (pembinaStatus, superadminStatus) => {
+    if (pembinaStatus === 'rejected' || superadminStatus === 'rejected') {
+      return <span className="badge badge-danger">Ditolak</span>;
+    }
+    if (pembinaStatus === 'pending') {
+      return <span className="badge badge-warning">Menunggu Pembina</span>;
+    }
+    if (pembinaStatus === 'approved' && superadminStatus === 'pending') {
+      return <span className="badge badge-info">Menunggu SuperAdmin</span>;
+    }
+    if (superadminStatus === 'approved') {
+      return <span className="badge badge-success">Disetujui</span>;
+    }
+    return <span className="badge badge-secondary">Pending</span>;
+  };
+
+  const renderTable = (data, type) => {
+    if (data.length === 0) {
+      return <p className="text-muted">Tidak ada pengajuan {type}</p>;
+    }
+
+    const columns = {
+      prestasi: ['Nama', 'NIS', 'Lomba', 'Juara', 'Pembina', 'Foto', 'Status', 'Aksi'],
+      event: ['Nama', 'NIS', 'Event', 'Tingkat', 'Pembina', 'Foto', 'Status', 'Aksi'],
+      organisasi: ['Nama', 'NIS', 'Organisasi', 'Jabatan', 'Pembina', 'Foto', 'Status', 'Aksi'],
+      siswa: ['Nama', 'NIS', 'NISN', 'Kelas', 'Dibuat Oleh', 'Status', 'Aksi'],
+      biodata: ['Siswa', 'NIS Lama', 'NIS Baru', 'Perubahan', 'Diajukan Oleh', 'Status', 'Aksi'],
+      student_creation: ['Nama', 'NIS', 'NISN', 'Kelas', 'Diajukan Oleh', 'Status', 'Aksi']
+    };
+
+    const getPhotoUrl = (path) => {
+      if (!path) return null;
+      // If it's already a full URL (http/https or Google Drive), use as-is
+      if (path.startsWith('http://') || path.startsWith('https://')) {
+        return path;
+      }
+      // If it's a full local Windows path, extract just the filename
+      let cleanPath = path;
+      if (path.includes('\\') || path.includes(':')) {
+        // Extract filename from full path
+        cleanPath = path.split('\\').pop();
+        cleanPath = `/uploads/approvals/${cleanPath}`;
+      } else if (!path.startsWith('/')) {
+        // If it's a relative path without leading slash, add it
+        cleanPath = `/${path}`;
+      }
+      return `http://localhost:5000${cleanPath}`;
+    };
+
+    return (
+      <table className="table">
+        <thead>
+          <tr>
+            {columns[type].map(col => <th key={col}>{col}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {data.map(item => (
+            <tr key={item.id}>
+              <td>{item.nama}</td>
+              <td>{item.nis}</td>
+              {type === 'prestasi' && (
+                <>
+                  <td>{item.nama_lomba}</td>
+                  <td>{item.juara}</td>
+                </>
+              )}
+              {type === 'event' && (
+                <>
+                  <td>{item.nama_event}</td>
+                  <td>{item.tingkat}</td>
+                </>
+              )}
+              {type === 'organisasi' && (
+                <>
+                  <td>{item.kategori_organisasi}</td>
+                  <td>{item.jabatan_organisasi}</td>
+                </>
+              )}
+              {type === 'siswa' && (
+                <>
+                  <td>{item.nisn}</td>
+                  <td>{item.kelas}</td>
+                </>
+              )}
+              {type === 'biodata' && (
+                <>
+                  <td>{item.student_name}</td>
+                  <td>{item.nis_lama}</td>
+                  <td>{item.nis_baru}</td>
+                  <td>
+                    <small>
+                      {item.nama_baru !== item.nama_lama && <div>Nama: {item.nama_lama} → {item.nama_baru}</div>}
+                      {item.kelas_baru !== item.kelas_lama && <div>Kelas: {item.kelas_lama} → {item.kelas_baru}</div>}
+                      {item.jurusan_baru !== item.jurusan_lama && <div>Jurusan: {item.jurusan_lama} → {item.jurusan_baru}</div>}
+                      {item.grha_baru !== item.grha_lama && <div>Grha: {item.grha_lama} → {item.grha_baru}</div>}
+                    </small>
+                  </td>
+                  <td>{item.requested_by_name}</td>
+                  <td>
+                    {item.superadmin_status === 'pending' ? (
+                      <span className="badge badge-warning">⏳ Menunggu</span>
+                    ) : item.superadmin_status === 'approved' ? (
+                      <span className="badge badge-success">✅ Disetujui</span>
+                    ) : (
+                      <span className="badge badge-danger">❌ Ditolak</span>
+                    )}
+                  </td>
+                </>
+              )}
+              {type === 'student_creation' && (
+                <>
+                  <td>{item.nama}</td>
+                  <td>{item.nis}</td>
+                  <td>{item.nisn}</td>
+                  <td>{item.kelas}</td>
+                  <td>{item.requested_by_name}</td>
+                  <td>
+                    {item.superadmin_status === 'pending' ? (
+                      <span className="badge badge-warning">⏳ Menunggu</span>
+                    ) : item.superadmin_status === 'approved' ? (
+                      <span className="badge badge-success">✅ Disetujui</span>
+                    ) : (
+                      <span className="badge badge-danger">❌ Ditolak</span>
+                    )}
+                  </td>
+                </>
+              )}
+              {type !== 'siswa' && type !== 'biodata' && type !== 'student_creation' && (
+                <td>
+                  <div>
+                    <strong>{item.pembina_name || item.pembina || '-'}</strong>
+                    {item.pembina_foto && (
+                      <div style={{ marginTop: '5px' }}>
+                        <img 
+                          src={getPhotoUrl(item.pembina_foto)} 
+                          alt="Foto Pembina" 
+                          style={{ width: '50px', height: '50px', objectFit: 'cover', borderRadius: '5px', cursor: 'pointer' }}
+                          onClick={() => window.open(getPhotoUrl(item.pembina_foto), '_blank')}
+                          title="Klik untuk memperbesar"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </td>
+              )}
+              {type === 'siswa' && <td>{item.created_by_name || '-'}</td>}
+              {type !== 'siswa' && type !== 'biodata' && type !== 'student_creation' && (
+                <td>
+                  {item.foto_path ? (
+                    <div>
+                      <img 
+                        src={getPhotoUrl(item.foto_path)} 
+                        alt="Foto Bukti" 
+                        style={{ width: '60px', height: '60px', objectFit: 'cover', borderRadius: '5px', cursor: 'pointer' }}
+                        onClick={() => window.open(getPhotoUrl(item.foto_path), '_blank')}
+                        title="Klik untuk memperbesar"
+                      />
+                      <div style={{ marginTop: '5px' }}>
+                        <a href={getPhotoUrl(item.foto_path)} download target="_blank" rel="noopener noreferrer">
+                          <button className="btn btn-sm btn-primary" style={{ padding: '2px 6px', fontSize: '10px' }}>
+                            ⬇️ Download
+                          </button>
+                        </a>
+                      </div>
+                    </div>
+                  ) : (
+                    <span className="text-muted">-</span>
+                  )}
+                </td>
+              )}
+              {type !== 'biodata' && type !== 'student_creation' && <td>{getStatusBadge(item.pembina_status, item.superadmin_status)}</td>}
+              <td>
+                {type === 'biodata' || type === 'student_creation' ? (
+                  item.superadmin_status === 'approved' ? (
+                    <span className="badge badge-success">✅ Disetujui</span>
+                  ) : item.superadmin_status === 'rejected' ? (
+                    <span className="badge badge-danger">❌ Ditolak</span>
+                  ) : (
+                    <>
+                      <button 
+                        className="btn btn-success" 
+                        onClick={() => setSelectedItem({ ...item, type, id: item.id })} 
+                        style={{ marginRight: '5px', padding: '6px 12px', fontSize: '13px' }}
+                      >
+                        ✅ Setuju
+                      </button>
+                      <button 
+                        className="btn btn-danger" 
+                        onClick={() => setSelectedItem({ ...item, type, id: item.id, action: 'reject' })} 
+                        style={{ padding: '6px 12px', fontSize: '13px' }}
+                      >
+                        ❌ Tolak
+                      </button>
+                    </>
+                  )
+                ) : (
+                  item.superadmin_status === 'approved' ? (
+                    <span className="badge badge-success">✅ Disetujui</span>
+                  ) : item.superadmin_status === 'rejected' ? (
+                    <span className="badge badge-danger">❌ Ditolak</span>
+                  ) : (
+                    <>
+                      {type !== 'siswa' && item.pembina_status === 'pending' ? (
+                        <span className="text-muted" style={{ fontSize: '12px' }}>⏳ Menunggu Pembina</span>
+                      ) : (
+                        <>
+                          <button 
+                            className="btn btn-success" 
+                            onClick={() => setSelectedItem({ ...item, type })} 
+                            style={{ marginRight: '5px', padding: '6px 12px', fontSize: '13px' }}
+                          >
+                            ✅ Setuju
+                          </button>
+                          <button 
+                            className="btn btn-danger" 
+                            onClick={() => setSelectedItem({ ...item, type, action: 'reject' })} 
+                            style={{ padding: '6px 12px', fontSize: '13px' }}
+                          >
+                            ❌ Tolak
+                          </button>
+                        </>
+                      )}
+                    </>
+                  )
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    );
+  };
+
+  if (loading) {
+    return <div className="loading"><div className="spinner"></div></div>;
+  }
+
+  const tabs = [
+    { key: 'prestasi', label: 'Prestasi', count: approvals.prestasi.length },
+    { key: 'event', label: 'Event', count: approvals.event.length },
+    { key: 'organisasi', label: 'Organisasi', count: approvals.organisasi.length },
+    { key: 'siswa', label: 'Data Siswa', count: approvals.siswa.length },
+    { key: 'biodata', label: 'Update Biodata', count: approvals.biodata?.length || 0 },
+    { key: 'student_creation', label: 'Buat Akun Siswa', count: approvals.student_creation?.length || 0 }
+  ];
+
+  return (
+    <div>
+      <h2>Approvals</h2>
+      {message && <div className="alert alert-info">{message}</div>}
+
+      <div className="tabs" style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+        {tabs.map(tab => (
+          <button
+            key={tab.key}
+            className={`btn ${activeTab === tab.key ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setActiveTab(tab.key)}
+          >
+            {tab.label}
+            {tab.count > 0 && (
+              <span className="badge badge-danger" style={{ marginLeft: '5px' }}>{tab.count}</span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      <div className="card">
+        {renderTable(approvals[activeTab], activeTab)}
+      </div>
+
+      {selectedItem && (
+        <div className="modal" style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div className="card" style={{ width: '500px', maxWidth: '90%' }}>
+            <h3>
+              {selectedItem.action === 'reject' ? 'Tolak Pengajuan' : 'Setujui Pengajuan'}
+            </h3>
+            <div className="form-group">
+              <label>Catatan:</label>
+              <textarea
+                className="form-control"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Tambahkan catatan (opsional)"
+                rows="3"
+              />
+            </div>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              {selectedItem.action === 'reject' ? (
+                <button className="btn btn-danger" onClick={() => handleReject(selectedItem.type, selectedItem.id)}>Tolak</button>
+              ) : (
+                <button className="btn btn-success" onClick={() => handleApprove(selectedItem.type, selectedItem.id)}>Setujui</button>
+              )}
+              <button className="btn btn-secondary" onClick={() => { setSelectedItem(null); setNotes(''); }}>Batal</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default ApprovalsV2;

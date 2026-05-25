@@ -1,0 +1,236 @@
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
+import Login from './components/Login';
+import Dashboard from './components/Dashboard';
+import Navbar from './components/Navbar';
+import InputPrestasi from './components/InputPrestasi';
+import InputOrganisasi from './components/InputOrganisasi';
+import InputEvent from './components/InputEvent';
+import InputPelanggaran from './components/InputPelanggaran';
+import InputPerilaku from './components/InputPerilaku';
+import KelolaAkun from './components/KelolaAkun';
+import KelolaSiswa from './components/KelolaSiswa';
+import IzinAkun from './components/IzinAkun';
+import Leaderboard from './components/Leaderboard';
+import Profile from './components/Profile';
+import Logs from './components/Logs';
+import WaliKelas from './components/WaliKelas';
+import TeacherWaliKelas from './components/TeacherWaliKelas';
+// import Approvals from './components/Approvals'; // Old approvals component
+import ApprovalsV2 from './components/ApprovalsV2';
+import PembinaApprovals from './components/PembinaApprovals';
+import DriveViewer from './components/DriveViewer';
+import Notifications from './components/Notifications';
+import LaporanCetak from './components/LaporanCetak';
+import PWAInstallPrompt from './components/PWAInstallPrompt';
+import axios from 'axios';
+import API_BASE_URL from './config';
+
+axios.defaults.baseURL = API_BASE_URL;
+
+function ProtectedRoute({ children, allowedRoles }) {
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(null);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const userData = localStorage.getItem('user');
+    
+    console.log('ProtectedRoute - Token:', token);
+    console.log('ProtectedRoute - UserData:', userData);
+    
+    if (!token || !userData) {
+      console.log('Redirecting to login - no token or user data');
+      navigate('/login');
+      return;
+    }
+
+    const parsedUser = JSON.parse(userData);
+    console.log('ProtectedRoute - ParsedUser:', parsedUser);
+    
+    if (allowedRoles && !allowedRoles.includes(parsedUser.role)) {
+      console.log('Redirecting to dashboard - role not allowed');
+      navigate('/dashboard');
+      return;
+    }
+
+    // Use stored user data immediately, then fetch fresh data in background
+    setUser(parsedUser);
+    setLoading(false);
+
+    // Fetch fresh user data from server to get latest wali_kelas status (background)
+    const fetchFreshUserData = async () => {
+      try {
+        const response = await axios.get('/profile', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        // Merge fresh data with existing user data
+        const freshUser = { ...parsedUser, ...response.data };
+        console.log('ProtectedRoute - FreshUser:', freshUser);
+        
+        // Update localStorage with fresh data
+        localStorage.setItem('user', JSON.stringify(freshUser));
+        setUser(freshUser);
+      } catch (error) {
+        console.error('Error fetching fresh user data:', error);
+        // Keep using stored data if fetch fails
+      }
+    };
+
+    fetchFreshUserData();
+  }, [navigate, allowedRoles]);
+
+  if (loading) {
+    return <div className="loading"><div className="spinner"></div></div>;
+  }
+
+  return children(user);
+}
+
+function App() {
+  return (
+    <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/" element={
+          <ProtectedRoute>
+            {(user) => <MainLayout user={user}><Dashboard /></MainLayout>}
+          </ProtectedRoute>
+        } />
+        <Route path="/dashboard" element={
+          <ProtectedRoute>
+            {(user) => <MainLayout user={user}><Dashboard /></MainLayout>}
+          </ProtectedRoute>
+        } />
+        <Route path="/input-prestasi" element={
+          <ProtectedRoute>
+            {(user) => <MainLayout user={user}><InputPrestasi /></MainLayout>}
+          </ProtectedRoute>
+        } />
+        <Route path="/input-organisasi" element={
+          <ProtectedRoute>
+            {(user) => <MainLayout user={user}><InputOrganisasi /></MainLayout>}
+          </ProtectedRoute>
+        } />
+        <Route path="/input-event" element={
+          <ProtectedRoute>
+            {(user) => <MainLayout user={user}><InputEvent /></MainLayout>}
+          </ProtectedRoute>
+        } />
+        <Route path="/input-pelanggaran" element={
+          <ProtectedRoute>
+            {(user) => <MainLayout user={user}><InputPelanggaran /></MainLayout>}
+          </ProtectedRoute>
+        } />
+        <Route path="/input-perilaku" element={
+          <ProtectedRoute>
+            {(user) => <MainLayout user={user}><InputPerilaku /></MainLayout>}
+          </ProtectedRoute>
+        } />
+        <Route path="/leaderboard" element={
+          <ProtectedRoute>
+            {(user) => <MainLayout user={user}><Leaderboard /></MainLayout>}
+          </ProtectedRoute>
+        } />
+        <Route path="/profile" element={
+          <ProtectedRoute>
+            {(user) => <MainLayout user={user}><Profile /></MainLayout>}
+          </ProtectedRoute>
+        } />
+        <Route path="/kelola-akun" element={
+          <ProtectedRoute allowedRoles={['superadmin']}>
+            {(user) => <MainLayout user={user}><KelolaAkun /></MainLayout>}
+          </ProtectedRoute>
+        } />
+        <Route path="/kelola-siswa" element={
+          <ProtectedRoute allowedRoles={['guru']}>
+            {(user) => <MainLayout user={user}><KelolaSiswa /></MainLayout>}
+          </ProtectedRoute>
+        } />
+        <Route path="/izin-akun" element={
+          <ProtectedRoute allowedRoles={['superadmin']}>
+            {(user) => <MainLayout user={user}><IzinAkun /></MainLayout>}
+          </ProtectedRoute>
+        } />
+        <Route path="/logs" element={
+          <ProtectedRoute allowedRoles={['superadmin']}>
+            {(user) => <MainLayout user={user}><Logs /></MainLayout>}
+          </ProtectedRoute>
+        } />
+        <Route path="/wali-kelas" element={
+          <ProtectedRoute allowedRoles={['superadmin']}>
+            {(user) => <MainLayout user={user}><WaliKelas /></MainLayout>}
+          </ProtectedRoute>
+        } />
+        <Route path="/wali-kelas-guru" element={
+          <ProtectedRoute allowedRoles={['guru']}>
+            {(user) => <MainLayout user={user}><TeacherWaliKelas /></MainLayout>}
+          </ProtectedRoute>
+        } />
+        <Route path="/approvals" element={
+          <ProtectedRoute allowedRoles={['superadmin']}>
+            {(user) => <MainLayout user={user}><ApprovalsV2 /></MainLayout>}
+          </ProtectedRoute>
+        } />
+        <Route path="/pembina-approvals" element={
+          <ProtectedRoute allowedRoles={['guru']}>
+            {(user) => <MainLayout user={user}><PembinaApprovals /></MainLayout>}
+          </ProtectedRoute>
+        } />
+        <Route path="/drive-viewer" element={
+          <ProtectedRoute allowedRoles={['superadmin']}>
+            {(user) => <MainLayout user={user}><DriveViewer /></MainLayout>}
+          </ProtectedRoute>
+        } />
+        <Route path="/notifications" element={
+          <ProtectedRoute allowedRoles={['siswa', 'guru']}>
+            {(user) => <MainLayout user={user}><Notifications /></MainLayout>}
+          </ProtectedRoute>
+        } />
+        <Route path="/laporan-cetak" element={
+          <ProtectedRoute allowedRoles={['superadmin', 'guru']}>
+            {(user) => <MainLayout user={user}><LaporanCetak user={user} /></MainLayout>}
+          </ProtectedRoute>
+        } />
+      </Routes>
+      <PWAInstallPrompt />
+    </Router>
+  );
+}
+
+function MainLayout({ user, children }) {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    window.location.href = '/login';
+  };
+
+  const toggleMobileMenu = () => {
+    setIsMobileMenuOpen(prev => {
+      console.log('toggleMobileMenu called, current state:', prev, 'new state:', !prev);
+      return !prev;
+    });
+  };
+
+  console.log('MainLayout - User:', user, 'MobileMenuOpen:', isMobileMenuOpen);
+
+  return (
+    <div className="main-layout">
+      <button className="mobile-menu-toggle" onClick={toggleMobileMenu}>
+        {isMobileMenuOpen ? '✕' : '☰'}
+      </button>
+      <Navbar user={user} onLogout={handleLogout} isMobileMenuOpen={isMobileMenuOpen} toggleMobileMenu={toggleMobileMenu} />
+      <div className="content">
+        <div className="container">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default App;

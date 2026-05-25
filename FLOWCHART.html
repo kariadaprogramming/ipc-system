@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IPC School System - Flowchart Diagram</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+            line-height: 1.6;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .section {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .section h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+        }
+        
+        .section h3 {
+            color: #764ba2;
+            margin: 20px 0 15px 0;
+        }
+        
+        .diagram-container {
+            background: #fafafa;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            overflow-x: auto;
+        }
+        
+        .legend {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin: 20px 0;
+            padding: 15px;
+            background: #f0f0f0;
+            border-radius: 8px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+        }
+        
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        
+        .warning-box {
+            background: #fff3e0;
+            border-left: 4px solid #ff9800;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        
+        .success-box {
+            background: #e8f5e9;
+            border-left: 4px solid #4caf50;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        th {
+            background: #667eea;
+            color: white;
+        }
+        
+        tr:hover {
+            background: #f5f5f5;
+        }
+        
+        .role-badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: bold;
+        }
+        
+        .role-superadmin {
+            background: #ff5722;
+            color: white;
+        }
+        
+        .role-guru {
+            background: #2196f3;
+            color: white;
+        }
+        
+        .role-siswa {
+            background: #4caf50;
+            color: white;
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            margin: 10px 5px;
+            transition: background 0.3s;
+        }
+        
+        .btn:hover {
+            background: #764ba2;
+        }
+        
+        @media print {
+            .header {
+                background: #667eea !important;
+                -webkit-print-color-adjust: exact;
+            }
+            .section {
+                break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎓 IPC School System</h1>
+        <p>Flowchart & System Documentation</p>
+        <p style="font-size: 0.9em; margin-top: 10px;">
+            <a href="DOCUMENTATION.md" class="btn">📄 Dokumentasi Lengkap</a>
+            <a href="REQUIREMENTS.md" class="btn">📦 Requirements</a>
+        </p>
+    </div>
+
+    <div class="container">
+        <!-- System Overview -->
+        <div class="section">
+            <h2>📊 System Overview</h2>
+            
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #ff5722;"></div>
+                    <span><span class="role-badge role-superadmin">Superadmin</span> - Full Access</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #2196f3;"></div>
+                    <span><span class="role-badge role-guru">Guru/Pembina</span> - Input & Approval</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #4caf50;"></div>
+                    <span><span class="role-badge role-siswa">Siswa</span> - View Only</span>
+                </div>
+            </div>
+
+            <div class="diagram-container">
+                <pre class="mermaid">
+flowchart TD
+    Start([User Access]) --> Login{Login Page}
+    
+    Login -->|Superadmin| SA[Superadmin Dashboard]
+    Login -->|Guru| GU[Guru Dashboard]
+    Login -->|Siswa| SI[Siswa Dashboard]
+    
+    SA --> SA1[👥 Kelola Akun]
+    SA --> SA2[👨‍🏫 Wali Kelas]
+    SA --> SA3[✅ Approvals]
+    SA --> SA4[🔒 Input Access]
+    SA --> SA5[📊 Laporan]
+    SA --> SA6[📝 Logs]
+    
+    GU --> GU1[👨‍🎓 Kelola Siswa]
+    GU --> GU2[🏆 Input Prestasi]
+    GU --> GU3[🤝 Input Organisasi]
+    GU --> GU4[🎯 Input Event]
+    GU --> GU5[⚠️ Input Pelanggaran]
+    GU --> GU6[⭐ Input Perilaku]
+    GU --> GU7[✅ Pembina Approvals]
+    GU --> GU8[📋 Wali Kelas Panel]
+    
+    SI --> SI1[📈 My IPC Score]
+    SI --> SI2[🏆 Leaderboard]
+    SI --> SI3[📜 History]
+    SI --> SI4[🔔 Notifications]
+    SI --> SI5[👤 Profile]
+    
+    GU2 --> Submit[Submit for Approval]
+    GU3 --> Submit
+    GU4 --> Submit
+    GU5 --> Submit
+    GU6 --> Submit
+    
+    Submit --> Pending{Pending Status}
+    Pending -->|Guru Check| GU7
+    Pending -->|Auto/Superadmin| SA3
+    
+    SA3 --> Approved[✅ Approved]
+    SA3 --> Rejected[❌ Rejected]
+    
+    Approved --> Update[Update IPC]
+    Update --> Notify[Send Notification]
+    Update --> History[Create History]
+                </pre>
+            </div>
+        </div>
+
+        <!-- Superadmin Flow -->
+        <div class="section">
+            <h2>👑 Superadmin Workflow</h2>
+            <h3>Full System Control</h3>
+            
+            <div class="success-box">
+                <strong>Access Level:</strong> Full system access including user management, approvals, and system settings.
+            </div>
+
+            <div class="diagram-container">
+                <pre class="mermaid">
+flowchart LR
+    A[Login as Superadmin] --> B[Dashboard]
+    
+    B --> C[User Management]
+    C --> C1[Create Guru Account]
+    C --> C2[Create Siswa Account]
+    C --> C3[Edit Any Account]
+    C --> C4[Delete Account]
+    C --> C5[Manage Permissions]
+    
+    B --> D[Wali Kelas]
+    D --> D1[Assign Wali Kelas]
+    D --> D2[View Class Stats]
+    D --> D3[Remove Assignment]
+    
+    B --> E[Approvals V2]
+    E --> E1[View All Pending]
+    E --> E2[Approve/Reject]
+    E --> E3[Bulk Actions]
+    E --> E4[View History]
+    
+    B --> F[Input Access Control]
+    F --> F1[Global Enable/Disable]
+    F --> F2[Role-based Access]
+    F --> F3[Individual Permissions]
+    
+    B --> G[Reports]
+    G --> G1[View All Data]
+    G --> G2[Export Excel]
+    G --> G3[Export PDF]
+    G --> G4[Export Word]
+    
+    B --> H[System Logs]
+    H --> H1[Activity Logs]
+    H --> H2[Security Logs]
+    H --> H3[Export Logs]
+                </pre>
+            </div>
+
+            <table>
+                <tr>
+                    <th>Menu</th>
+                    <th>Function</th>
+                    <th>Description</th>
+                </tr>
+                <tr>
+                    <td>Kelola Akun</td>
+                    <td>User Management</td>
+                    <td>CRUD operations for all users</td>
+                </tr>
+                <tr>
+                    <td>Wali Kelas</td>
+                    <td>Homeroom Management</td>
+                    <td>Assign teachers to classes</td>
+                </tr>
+                <tr>
+                    <td>Approvals V2</td>
+                    <td>Data Approval</td>
+                    <td>Approve/reject all submissions</td>
+                </tr>
+                <tr>
+                    <td>Input Access</td>
+                    <td>Access Control</td>
+                    <td>Control who can input data</td>
+                </tr>
+                <tr>
+                    <td>Laporan Cetak</td>
+                    <td>Reports</td>
+                    <td>Generate and export reports</td>
+                </tr>
+                <tr>
+                    <td>Logs</td>
+                    <td>Activity Monitoring</td>
+                    <td>View all system activities</td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- Guru Flow -->
+        <div class="section">
+            <h2>👨‍🏫 Guru/Pembina Workflow</h2>
+            <h3>Data Input & First-Level Approval</h3>
+            
+            <div class="info-box">
+                <strong>Access Level:</strong> Input student data, manage assigned students, and first-level approval.
+            </div>
+
+            <div class="diagram-container">
+                <pre class="mermaid">
+flowchart TD
+    A[Guru Login] --> B[Guru Dashboard]
+    
+    B --> C[Manage Students]
+    C --> C1[Create Siswa Account]
+    C --> C2[Edit Student Data]
+    C --> C3[View Student List]
+    
+    B --> D[Input Data]
+    D --> D1[🏆 Prestasi]
+    D --> D2[🤝 Organisasi]
+    D --> D3[🎯 Event]
+    D --> D4[⚠️ Pelanggaran]
+    D --> D5[⭐ Perilaku]
+    
+    D1 --> InputForm[Fill Form]
+    D2 --> InputForm
+    D3 --> InputForm
+    D4 --> InputForm
+    D5 --> InputForm
+    
+    InputForm --> Upload[Upload Bukti]
+    Upload --> Submit[Submit]
+    
+    Submit --> Pending{Pending Status}
+    
+    Pending -->|Self Check| E[Pembina Approvals]
+    Pending -->|Direct| F[Auto to Superadmin]
+    
+    E --> E1[Review Request]
+    E --> E2[Approve/Reject]
+    E --> E3[Add Notes]
+    
+    B --> G[Class Management]
+    G --> G1[Wali Kelas Panel]
+    G --> G2[View Class Stats]
+    G --> G3[Print Reports]
+    
+    B --> H[Reports]
+    H --> H1[View Reports]
+    H --> H2[Export Data]
+                </pre>
+            </div>
+
+            <table>
+                <tr>
+                    <th>Input Type</th>
+                    <th>IPC Effect</th>
+                    <th>Requires Proof</th>
+                </tr>
+                <tr>
+                    <td>Prestasi</td>
+                    <td>+ Points</td>
+                    <td>Yes</td>
+                </tr>
+                <tr>
+                    <td>Organisasi</td>
+                    <td>+ Points</td>
+                    <td>Yes</td>
+                </tr>
+                <tr>
+                    <td>Event</td>
+                    <td>+ Points</td>
+                    <td>Yes</td>
+                </tr>
+                <tr>
+                    <td>Pelanggaran</td>
+                    <td>- Points</td>
+                    <td>Yes</td>
+                </tr>
+                <tr>
+                    <td>Perilaku</td>
+                    <td>+/- Points</td>
+                    <td>Yes</td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- Siswa Flow -->
+        <div class="section">
+            <h2>👨‍🎓 Siswa Workflow</h2>
+            <h3>View & Monitor Only</h3>
+            
+            <div class="warning-box">
+                <strong>Access Level:</strong> View-only access. Cannot input data. Can request biodata updates (pending approval).
+            </div>
+
+            <div class="diagram-container">
+                <pre class="mermaid">
+flowchart LR
+    A[Siswa Login] --> B[Dashboard]
+    
+    B --> C[View IPC]
+    C --> C1[Current Score]
+    C --> C2[IPC History]
+    C --> C3[Score Changes]
+    
+    B --> D[Leaderboard]
+    D --> D1[Academic Rank]
+    D --> D2[Non-Academic Rank]
+    D --> D3[Search Students]
+    
+    B --> E[History]
+    E --> E1[All Changes]
+    E --> E2[Filter by Type]
+    E --> E3[View Details]
+    
+    B --> F[Notifications]
+    F --> F1[IPC Changes]
+    F --> F2[Approval Updates]
+    F --> F3[Mark as Read]
+    
+    B --> G[Profile]
+    G --> G1[View Biodata]
+    G --> G2[Update Avatar]
+    G --> G3[Request Update]
+    G --> G4[Change Password]
+    
+    G3 --> R[Request Form]
+    R --> S[Submit to Pembina]
+    S --> T{Wait Approval}
+    T -->|Approved| U[Data Updated]
+    T -->|Rejected| V[See Reason]
+                </pre>
+            </div>
+
+            <table>
+                <tr>
+                    <th>Feature</th>
+                    <th>Access</th>
+                    <th>Notes</th>
+                </tr>
+                <tr>
+                    <td>View IPC</td>
+                    <td>✅ Yes</td>
+                    <td>Real-time score display</td>
+                </tr>
+                <tr>
+                    <td>Leaderboard</td>
+                    <td>✅ Yes</td>
+                    <td>Academic & non-academic</td>
+                </tr>
+                <tr>
+                    <td>Input Data</td>
+                    <td>❌ No</td>
+                    <td>Only teachers can input</td>
+                </tr>
+                <tr>
+                    <td>Request Update</td>
+                    <td>✅ Yes</td>
+                    <td>Pending approval</td>
+                </tr>
+                <tr>
+                    <td>View History</td>
+                    <td>✅ Yes</td>
+                    <td>Own history only</td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- Approval Workflow -->
+        <div class="section">
+            <h2>✅ Approval Workflow</h2>
+            <h3>2-Level Approval System</h3>
+            
+            <div class="diagram-container">
+                <pre class="mermaid">
+flowchart TD
+    A[Data Input] -->|Submit| B[Status: Pending]
+    
+    B --> C{Approval Level 1}
+    C -->|Pembina/Guru| D[Review Data]
+    C -->|Auto-approve| E[Skip to Level 2]
+    
+    D --> F{Decision}
+    F -->|Approve| G[Status: Pembina Approved]
+    F -->|Reject| H[Status: Rejected]
+    F -->|Need Review| B
+    
+    G --> I{Approval Level 2}
+    I -->|Superadmin| J[Final Review]
+    I -->|Auto-approve| K[Auto Approve]
+    
+    J --> L{Final Decision}
+    L -->|Approve| M[Status: Approved]
+    L -->|Reject| N[Status: Rejected]
+    
+    K --> M
+    M --> O[Apply Changes]
+    O --> P[Update IPC]
+    P --> Q[Create History]
+    Q --> R[Notify User]
+    
+    H --> S[Notify with Reason]
+    N --> S
+                </pre>
+            </div>
+
+            <div class="info-box">
+                <strong>Approval Timeline:</strong>
+                <ul>
+                    <li>Level 1 (Pembina): Immediate or within 24 hours</li>
+                    <li>Level 2 (Superadmin): Within 48 hours</li>
+                    <li>Auto-approval: For trusted users or low-point changes</li>
+                    <li>Rejected requests can be resubmitted with corrections</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- IPC Calculation -->
+        <div class="section">
+            <h2>📈 IPC Calculation Flow</h2>
+            
+            <div class="diagram-container">
+                <pre class="mermaid">
+flowchart TD
+    Start([Base IPC]) --> Base[80 Points]
+    
+    Base --> Input{Input Types}
+    
+    Input -->|Prestasi| P[Calculate Points]
+    Input -->|Organisasi| O[Calculate Points]
+    Input -->|Event| E[Calculate Points]
+    Input -->|Pelanggaran| Pel[Calculate Points]
+    Input -->|Perilaku| Per[Calculate Points]
+    
+    P --> Sum[Sum All Points]
+    O --> Sum
+    E --> Sum
+    Pel --> Sum
+    Per --> Sum
+    
+    Sum --> Total[Total IPC]
+    Total --> Check{Range Check}
+    
+    Check -->|&lt; 0| Min[Set to 0]
+    Check -->|&gt; 100| Max[Set to 100]
+    Check -->|0-100| Valid[Valid IPC]
+    
+    Min --> Save
+    Max --> Save
+    Valid --> Save[Save to Database]
+    
+    Save --> Log[Create History Log]
+    Log --> Notify[Send Notification]
+    Notify --> Update[Update Leaderboard]
+                </pre>
+            </div>
+
+            <div class="success-box">
+                <strong>IPC Range:</strong> 0 - 100 points<br>
+                <strong>Base Score:</strong> 80 points<br>
+                <strong>Minimum:</strong> 0 (floor)<br>
+                <strong>Maximum:</strong> 100 (ceiling)
+            </div>
+        </div>
+
+        <!-- Database Schema -->
+        <div class="section">
+            <h2>🗄️ Database Schema Overview</h2>
+            
+            <div class="diagram-container">
+                <pre class="mermaid">
+erDiagram
+    USERS ||--o{ PRESTASI : has
+    USERS ||--o{ ORGANISASI : has
+    USERS ||--o{ EVENT : has
+    USERS ||--o{ PELANGGARAN : has
+    USERS ||--o{ PERILAKU : has
+    USERS ||--o{ IPC_HISTORY : tracks
+    USERS ||--o{ APPROVALS : submits
+    USERS ||--o{ PERMISSIONS : has
+    
+    USERS {
+        int id PK
+        string nama
+        string nis
+        string nisn
+        string nip
+        string password
+        enum role
+        string kelas
+        enum jurusan
+        string grha
+        int ipc_total
+        int ipc_awal
+        string foto
+    }
+    
+    PRESTASI {
+        int id PK
+        int user_id FK
+        string nama_lomba
+        enum jenis
+        enum tingkat
+        int peringkat
+        int point
+        string foto
+        enum status
+    }
+    
+    IPC_HISTORY {
+        int id PK
+        int user_id FK
+        int ipc_sebelum
+        int ipc_sesudah
+        string keterangan
+        timestamp created_at
+    }
+    
+    APPROVALS {
+        int id PK
+        int user_id FK
+        enum jenis
+        string data
+        enum pembina_status
+        enum superadmin_status
+        text rejection_reason
+    }
+                </pre>
+            </div>
+        </div>
+
+        <!-- Installation Summary -->
+        <div class="section">
+            <h2>⚡ Quick Start Guide</h2>
+            
+            <div class="diagram-container">
+                <pre class="mermaid">
+flowchart LR
+    A[Install Node.js] --> B[Install MySQL]
+    B --> C[Setup Database]
+    C --> D[Install Backend]
+    D --> E[Install Frontend]
+    E --> F[Run System]
+    
+    D --> D1[npm install]
+    D --> D2[copy .env.example .env]
+    D --> D3[edit .env]
+    D --> D4[npm start]
+    
+    E --> E1[npm install]
+    E --> E2[npm start]
+    
+    F --> F1[http://localhost:3000]
+    F --> F2[Login: ADMIN001]
+    F --> F3[Password: admin123]
+                </pre>
+            </div>
+
+            <div style="text-align: center; margin-top: 30px;">
+                <a href="#" class="btn" onclick="window.print()">🖨️ Print This Page</a>
+                <a href="DOCUMENTATION.md" class="btn">📄 Full Documentation</a>
+                <a href="REQUIREMENTS.md" class="btn">📦 Requirements</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="header" style="margin-top: 50px;">
+        <p style="font-size: 0.9em;">© 2026 IPC School System | Dokumentasi Sistem Indeks Prestasi dan Karakter</p>
+    </div>
+
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            securityLevel: 'loose',
+            flowchart: {
+                useMaxWidth: true,
+                htmlLabels: true,
+                curve: 'basis'
+            }
+        });
+    </script>
+</body>
+</html>

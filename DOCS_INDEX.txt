@@ -1,0 +1,302 @@
+================================================================================
+IPC SCHOOL SYSTEM - DOKUMENTASI & FLOWCHART
+================================================================================
+
+Dibuat: 8 Mei 2026
+Sistem: IPC School System v1.0
+Deskripsi: Sistem Indeks Prestasi dan Karakter Sekolah
+
+================================================================================
+DAFTAR FILE DOKUMENTASI
+================================================================================
+
+📄 1. DOCUMENTATION.md
+   - Dokumentasi lengkap sistem
+   - System architecture
+   - Role-based flowcharts (Mermaid)
+   - Database schema
+   - API endpoints
+   - Security features
+   - Deployment guide
+
+📄 2. REQUIREMENTS.md  
+   - System requirements (minimum & recommended)
+   - Software prerequisites (Node.js, MySQL, npm)
+   - Step-by-step installation guide
+   - Dependencies list
+   - Environment configuration
+   - Troubleshooting guide
+
+🌐 3. FLOWCHART.html
+   - VISUAL FLOWCHART INTERAKTIF
+   - Buka di browser untuk melihat diagram lengkap
+   - Flowcharts untuk semua role (Superadmin, Guru, Siswa)
+   - IPC calculation flow
+   - Approval workflow
+   - Database schema diagram
+   - Bisa di-print sebagai PDF
+
+📄 4. QUICK_GUIDE.md
+   - Quick reference guide
+   - Feature matrix per role
+   - ASCII workflow diagrams
+   - Common troubleshooting
+   - Quick commands
+
+📄 5. SECURITY.md (sudah ada)
+   - Security documentation
+   - Implemented security measures
+   - Incident response
+
+📄 6. DOCS_INDEX.txt (file ini)
+   - Index dokumentasi
+
+================================================================================
+CARA MENGGUNAKAN
+================================================================================
+
+1. UNTUK FLOWCHART VISUAL:
+   - Buka file: FLOWCHART.html
+   - Double-click atau buka di browser
+   - Klik tombol "Print This Page" untuk simpan sebagai PDF
+   - Atau: Ctrl+P -> Save as PDF
+
+2. UNTUK DOKUMENTASI TEKS:
+   - Buka file .md dengan text editor atau VS Code
+   - Preview mode: Ctrl+Shift+V (VS Code)
+   - Print ke PDF: Ctrl+P -> Save as PDF
+
+3. UNTUK INSTALLASI:
+   - Baca REQUIREMENTS.md
+   - Ikuti step-by-step guide
+   - Check QUICK_GUIDE.md untuk troubleshooting
+
+================================================================================
+FLOWCHART YANG TERSEDIA
+================================================================================
+
+A. SYSTEM OVERVIEW FLOW
+   - Alur login untuk semua role
+   - Menu access per role
+   - Data flow diagram
+
+B. SUPERADMIN WORKFLOW
+   - User management
+   - Wali kelas management
+   - Approvals V2
+   - Input access control
+   - Reports & logs
+
+C. GURU/PEMBINA WORKFLOW
+   - Kelola siswa
+   - Input data (prestasi, organisasi, event, pelanggaran, perilaku)
+   - Pembina approvals
+   - Wali kelas panel
+
+D. SISWA WORKFLOW
+   - View IPC score
+   - Leaderboard
+   - History tracking
+   - Profile management
+
+E. APPROVAL WORKFLOW
+   - 2-level approval system
+   - Pembina approval
+   - Superadmin approval
+   - Rejection handling
+
+F. IPC CALCULATION FLOW
+   - Base score (80)
+   - Point calculation
+   - Range checking (0-100)
+   - History logging
+
+G. DATABASE SCHEMA
+   - ERD diagram
+   - Table relationships
+   - Key fields
+
+================================================================================
+KEBUTUHAN SISTEM
+================================================================================
+
+Software:
+- Node.js 16.x atau higher
+- MySQL 8.0 atau higher (atau XAMPP)
+- npm 8.x atau higher
+- Browser modern (Chrome/Firefox/Edge)
+
+Hardware Minimum:
+- RAM: 4GB
+- Storage: 10GB
+- CPU: Dual-core
+
+Hardware Recommended:
+- RAM: 8GB+
+- Storage: 50GB SSD
+- CPU: Quad-core
+
+================================================================================
+AKUN DEFAULT
+================================================================================
+
+Role          Username      Password    Akses
+------------- ------------- ----------- ------------------------
+Superadmin    ADMIN001      admin123    Full system access
+Guru          (NIP)         (diatur)    Input data, approvals
+Siswa         (NIS/NISN)    (diatur)    View only
+
+================================================================================
+INSTALLASI CEPAT
+================================================================================
+
+1. Install Node.js dari https://nodejs.org
+2. Install XAMPP dari https://www.apachefriends.org
+3. Jalankan XAMPP, start Apache & MySQL
+4. Buka phpMyAdmin, buat database "ipc_school"
+5. Import file: backend/database/skema.sql
+
+Backend:
+cd backend
+npm install
+copy .env.example .env
+# Edit .env: isi DB_PASSWORD dan JWT_SECRET
+npm start
+
+Frontend:
+cd frontend
+npm install
+npm start
+
+Akses: http://localhost:3000
+Login: ADMIN001 / admin123
+
+================================================================================
+MENU & FITUR PER ROLE
+================================================================================
+
+SUPERADMIN:
+✓ Kelola Akun (Create/Edit/Delete all users)
+✓ Wali Kelas (Assign teachers to classes)
+✓ Approvals V2 (Approve/reject all data)
+✓ Input Access (Control input permissions)
+✓ Laporan Cetak (Export Excel/PDF/Word)
+✓ Logs (View all activities)
+✓ Profile
+
+GURU:
+✓ Kelola Siswa (Manage students in class)
+✓ Input Prestasi (Student achievements)
+✓ Input Organisasi (Organizations)
+✓ Input Event (School events)
+✓ Input Pelanggaran (Violations)
+✓ Input Perilaku (Behavior points)
+✓ Pembina Approvals (Review submissions)
+✓ Wali Kelas Panel (If assigned)
+✓ Laporan Cetak
+✓ Profile
+
+SISWA:
+✓ Dashboard (View IPC score)
+✓ Leaderboard (Academic/Non-academic)
+✓ History (IPC change history)
+✓ Notifications
+✓ Profile (Request updates, pending approval)
+
+================================================================================
+SKEMA DATABASE
+================================================================================
+
+Main Tables:
+- users (All user accounts)
+- prestasi (Achievements)
+- organisasi (Organizations)
+- event (Events)
+- pelanggaran (Violations)
+- perilaku (Behavior)
+- ipc_history (IPC change log)
+- approvals (Approval workflow)
+- permissions (Access control)
+
+Fields utama:
+- users: id, nama, role, kelas, jurusan, ipc_total, ipc_awal
+- prestasi: user_id, jenis, tingkat, peringkat, point, status
+- approvals: user_id, jenis, data, pembina_status, superadmin_status
+
+================================================================================
+ALUR KERJA SISTEM
+================================================================================
+
+1. LOGIN FLOW:
+   User -> Enter credentials -> JWT validation -> Redirect to dashboard
+
+2. DATA INPUT FLOW:
+   Select input type -> Select student -> Fill form -> Upload bukti
+   -> Submit -> Pending -> Approval -> IPC update
+
+3. APPROVAL FLOW:
+   Pending -> Pembina review -> (Approve/Reject/Review)
+   -> If approved -> Superadmin review -> (Final Approve/Reject)
+   -> Apply changes -> Update IPC -> Log history -> Notify user
+
+4. IPC CALCULATION:
+   Base: 80 -> Add/subtract points -> Range check (0-100)
+   -> Save to DB -> Create history -> Update leaderboard
+
+================================================================================
+SECURITY FEATURES
+================================================================================
+
+✓ JWT Authentication
+✓ Role-based Access Control (RBAC)
+✓ SQL Injection Prevention
+✓ XSS Prevention
+✓ Rate Limiting (100 req/min)
+✓ Login Rate Limiting (5 attempts/15min)
+✓ Helmet Security Headers
+✓ CORS Protection
+✓ Input Sanitization
+✓ Password Hashing (bcrypt)
+
+================================================================================
+LINK FILE (UNTUK REFERENSI)
+================================================================================
+
+File Flowchart:
+- FLOWCHART.html -> Buka di browser untuk visual diagrams
+
+File Dokumentasi:
+- DOCUMENTATION.md -> Dokumentasi lengkap
+- REQUIREMENTS.md -> Panduan installasi
+- QUICK_GUIDE.md -> Quick reference
+- SECURITY.md -> Dokumentasi keamanan
+
+================================================================================
+CATATAN
+================================================================================
+
+- Semua file .md bisa dibuka dengan text editor atau VS Code
+- File .html perlu dibuka di browser untuk melihat flowchart
+- Untuk print ke PDF: buka file -> Ctrl+P -> Save as PDF
+- Pastikan sudah install Mermaid extension di VS Code untuk preview diagram
+
+================================================================================
+KONTAK & SUPPORT
+================================================================================
+
+System: IPC School System v1.0
+Created: May 8, 2026
+
+Dokumentasi ini mencakup:
+- System architecture
+- User workflows
+- Database schema
+- Installation guide
+- Troubleshooting
+- Security documentation
+
+Untuk update atau pertanyaan, hubungi administrator sistem.
+
+================================================================================
+END OF DOCUMENTATION INDEX
+================================================================================
