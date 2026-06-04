@@ -1,18 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import * as XLSX from 'xlsx';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+// Import from source to avoid CRA sourcemap warning on dist bundle
+import html2pdf from 'html2pdf.js/src';
+import IpcPrintSheet from './IpcPrintSheet';
+import '../ipcPrint.css';
 
 function LaporanCetak({ user }) {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedClass, setSelectedClass] = useState('');
   const [classes, setClasses] = useState([]);
+  const [selectedStudentId, setSelectedStudentId] = useState('');
+  const [ipcCardData, setIpcCardData] = useState(null);
+  const [ipcLoading, setIpcLoading] = useState(false);
+  const [bulkPrintCards, setBulkPrintCards] = useState([]);
+  const [bulkLoading, setBulkLoading] = useState(false);
 
   useEffect(() => {
     fetchStudents();
   }, []);
+
+  useEffect(() => {
+    setSelectedStudentId('');
+    setIpcCardData(null);
+    setBulkPrintCards([]);
+  }, [selectedClass]);
 
   const fetchStudents = async () => {
     try {
@@ -21,8 +33,7 @@ function LaporanCetak({ user }) {
         headers: { Authorization: `Bearer ${token}` }
       });
       setStudents(response.data);
-      
-      // Extract unique classes
+
       const uniqueClasses = [...new Set(response.data.map(s => s.kelas).filter(Boolean))];
       setClasses(uniqueClasses.sort());
     } catch (error) {
@@ -37,87 +48,111 @@ function LaporanCetak({ user }) {
     return students.filter(s => s.kelas === selectedClass);
   };
 
-  const exportToExcel = () => {
-    const data = getFilteredStudents();
-    const worksheet = XLSX.utils.json_to_sheet(data.map(s => ({
-      Nama: s.nama,
-      NIS: s.nis,
-      Kelas: s.kelas,
-      Jurusan: s.jurusan || '-',
-      'Total IPC': s.ipc_total
-    })));
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Laporan IPC');
-    XLSX.writeFile(workbook, `laporan_ipc_${selectedClass || 'semua'}.xlsx`);
-  };
-
-  const exportToWord = () => {
-    const data = getFilteredStudents();
-    const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word'><head><meta charset='utf-8'><title>Laporan IPC</title></head><body>`;
-    const tableRows = data.map(s => 
-      `<tr><td>${s.nama}</td><td>${s.nis}</td><td>${s.kelas}</td><td>${s.jurusan || '-'}</td><td>${s.ipc_total}</td></tr>`
-    ).join('');
-    const table = `
-      <table border='1' style='border-collapse: collapse; width: 100%;'>
-        <tr style='background-color: #4CAF50; color: white;'>
-          <th style='padding: 10px;'>Nama</th>
-          <th style='padding: 10px;'>NIS</th>
-          <th style='padding: 10px;'>Kelas</th>
-          <th style='padding: 10px;'>Jurusan</th>
-          <th style='padding: 10px;'>Total IPC</th>
-        </tr>
-        ${tableRows}
-      </table>
-    `;
-    const footer = `</body></html>`;
-    const sourceHTML = header + `<h2>Laporan IPC ${selectedClass ? '- Kelas ' + selectedClass : '- Semua Kelas'}</h2>` + table + footer;
-    
-    const source = 'data:application/vnd.ms-word;charset=utf-8,' + encodeURIComponent(sourceHTML);
-    const fileDownload = document.createElement('a');
-    document.body.appendChild(fileDownload);
-    fileDownload.href = source;
-    fileDownload.download = `laporan_ipc_${selectedClass || 'semua'}.doc`;
-    fileDownload.click();
-    document.body.removeChild(fileDownload);
-  };
-
-  const exportToPDF = () => {
-    const data = getFilteredStudents();
-    const doc = new jsPDF();
-    
-    doc.setFontSize(18);
-    doc.text(`Laporan IPC ${selectedClass ? '- Kelas ' + selectedClass : '- Semua Kelas'}`, 14, 22);
-    
-    doc.setFontSize(10);
-    doc.text(`Total Siswa: ${data.length}`, 14, 30);
-    
-    const tableColumn = ['Nama', 'NIS', 'Kelas', 'Jurusan', 'Total IPC'];
-    const tableRows = data.map(s => [s.nama, s.nis, s.kelas, s.jurusan || '-', s.ipc_total.toString()]);
-    
-    doc.autoTable({
-      head: [tableColumn],
-      body: tableRows,
-      startY: 35,
-      theme: 'grid',
-      styles: { fontSize: 8 },
-      headStyles: { fillColor: [76, 175, 80] }
+  const fetchIpcCard = async (userId) => {
+    const token = localStorage.getItem('token');
+    const response = await axios.get(`/reports/ipc-card/${userId}`, {
+      headers: { Authorization: `Bearer ${token}` }
     });
-    
-    doc.save(`laporan_ipc_${selectedClass || 'semua'}.pdf`);
+    return response.data;
+  };
+
+  const handleLoadIpcPreview = async () => {
+    if (!selectedStudentId) {
+      alert('Pilih siswa terlebih dahulu');
+      return;
+    }
+
+    setIpcLoading(true);
+    setBulkPrintCards([]);
+    try {
+      const data = await fetchIpcCard(selectedStudentId);
+      setIpcCardData(data);
+    } catch (error) {
+      console.error('Error fetching IPC card:', error);
+      alert(error.response?.data?.message || 'Gagal memuat data IPC');
+    } finally {
+      setIpcLoading(false);
+    }
+  };
+
+  const handleDownloadPdf = async () => {
+    const el = document.getElementById('ipc-print-area');
+    if (!el) {
+      alert('Area print tidak ditemukan');
+      return;
+    }
+    if (!ipcCardData && bulkPrintCards.length === 0) {
+      alert('Muat preview IPC terlebih dahulu');
+      return;
+    }
+
+    const filename = bulkPrintCards.length > 0
+      ? `IPC_${selectedClass || 'KELAS'}.pdf`
+      : `IPC_${ipcCardData?.student?.nama || 'SISWA'}.pdf`;
+
+    try {
+      setIpcLoading(true);
+      await html2pdf()
+        .set({
+          margin: [10, 10, 10, 10],
+          filename,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+          pagebreak: { mode: ['css', 'legacy'] },
+        })
+        .from(el)
+        .save();
+    } catch (e) {
+      console.error(e);
+      alert('Gagal membuat PDF');
+    } finally {
+      setIpcLoading(false);
+    }
+  };
+
+  const handleBulkPrintClass = async () => {
+    if (!selectedClass) {
+      alert('Pilih kelas terlebih dahulu');
+      return;
+    }
+
+    const classStudents = getFilteredStudents();
+    if (classStudents.length === 0) {
+      alert('Tidak ada siswa di kelas ini');
+      return;
+    }
+
+    setBulkLoading(true);
+    setIpcCardData(null);
+    try {
+      const cards = await Promise.all(
+        classStudents.map(async (student) => fetchIpcCard(student.id))
+      );
+      setBulkPrintCards(cards);
+    } catch (error) {
+      console.error('Error loading bulk IPC cards:', error);
+      alert(error.response?.data?.message || 'Gagal memuat data IPC kelas');
+    } finally {
+      setBulkLoading(false);
+    }
   };
 
   if (loading) {
     return <div className="loading"><div className="spinner"></div></div>;
   }
 
+  const filteredStudents = getFilteredStudents();
+  const hasPrintPreview = ipcCardData || bulkPrintCards.length > 0;
+
   return (
     <div className="container" style={{ padding: '20px' }}>
-      <h2 style={{ marginBottom: '20px' }}>Laporan & Cetak</h2>
-      
-      <div style={{ marginBottom: '20px' }}>
+      <h2 className="ipc-print-no-print laporan-cetak-title" style={{ marginBottom: '20px' }}>Laporan & Cetak</h2>
+
+      <div className="ipc-print-no-print" style={{ marginBottom: '20px' }}>
         <label style={{ marginRight: '10px' }}>Filter Kelas:</label>
-        <select 
-          value={selectedClass} 
+        <select
+          value={selectedClass}
           onChange={(e) => setSelectedClass(e.target.value)}
           style={{ padding: '8px', borderRadius: '5px', border: '1px solid #ddd', minWidth: '200px' }}
         >
@@ -128,56 +163,76 @@ function LaporanCetak({ user }) {
         </select>
       </div>
 
-      <div style={{ marginBottom: '20px', display: 'flex', gap: '10px' }}>
-        <button 
-          onClick={exportToExcel}
-          style={{
-            padding: '10px 20px',
-            backgroundColor: '#217346',
-            color: 'white',
-            border: 'none',
-            borderRadius: '5px',
-            cursor: 'pointer',
-            fontSize: '14px'
-          }}
-        >
-          📊 Export Excel
-        </button>
-        <button 
-          onClick={exportToWord}
-          style={{
-            padding: '10px 20px',
-            backgroundColor: '#2b579a',
-            color: 'white',
-            border: 'none',
-            borderRadius: '5px',
-            cursor: 'pointer',
-            fontSize: '14px'
-          }}
-        >
-          📝 Export Word
-        </button>
-        <button 
-          onClick={exportToPDF}
-          style={{
-            padding: '10px 20px',
-            backgroundColor: '#d32f2f',
-            color: 'white',
-            border: 'none',
-            borderRadius: '5px',
-            cursor: 'pointer',
-            fontSize: '14px'
-          }}
-        >
-          📄 Export PDF
-        </button>
+      <div className="ipc-print-no-print" style={{ marginBottom: '24px', backgroundColor: 'white', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+        <h3 style={{ marginBottom: '12px' }}>Cetak Individual Point Card (IPC)</h3>
+        <p style={{ marginBottom: '14px', color: 'var(--text-secondary)', fontSize: '14px' }}>
+          Format cetak mengikuti lembar IPC resmi sekolah (satu siswa per halaman A4).
+        </p>
+
+        <div className="ipc-print-toolbar">
+          <div>
+            <label htmlFor="ipc-student-select">Siswa:</label>
+            <select
+              id="ipc-student-select"
+              value={selectedStudentId}
+              onChange={(e) => setSelectedStudentId(e.target.value)}
+              disabled={!selectedClass}
+            >
+              <option value="">{selectedClass ? '— Pilih siswa —' : '— Pilih kelas dulu —'}</option>
+              {filteredStudents.map(s => (
+                <option key={s.id} value={s.id}>{s.nama} ({s.nis})</option>
+              ))}
+            </select>
+          </div>
+          <button type="button" onClick={handleLoadIpcPreview} disabled={!selectedStudentId || ipcLoading}>
+            {ipcLoading ? 'Memuat...' : 'Muat Preview'}
+          </button>
+          <button type="button" onClick={handleBulkPrintClass} disabled={!selectedClass || bulkLoading}>
+            {bulkLoading ? 'Memuat kelas...' : 'Muat Semua Siswa Kelas'}
+          </button>
+          <button type="button" onClick={handleDownloadPdf} disabled={!hasPrintPreview || ipcLoading}>
+            {ipcLoading ? 'Membuat PDF...' : 'Download PDF'}
+          </button>
+        </div>
       </div>
 
-      <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+      {hasPrintPreview && (
+        <div className="ipc-print-preview-wrap">
+          <h3 className="ipc-print-no-print" style={{ marginBottom: '16px' }}>
+            Preview IPC
+            {bulkPrintCards.length > 0
+              ? ` — ${bulkPrintCards.length} siswa`
+              : ipcCardData?.student?.nama
+                ? ` — ${ipcCardData.student.nama}`
+                : ''}
+          </h3>
+
+          <div id="ipc-print-area">
+            {bulkPrintCards.length > 0
+              ? bulkPrintCards.map((card) => (
+                <IpcPrintSheet
+                  key={card.student.id}
+                  student={card.student}
+                  wali={card.wali}
+                  history={card.history}
+                />
+              ))
+              : ipcCardData && (
+                <IpcPrintSheet
+                  student={ipcCardData.student}
+                  wali={ipcCardData.wali}
+                  history={ipcCardData.history}
+                />
+              )}
+          </div>
+        </div>
+      )}
+
+      <div className="ipc-print-no-print laporan-cetak-bulk" style={{ marginTop: '24px', backgroundColor: 'white', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
         <h3 style={{ marginBottom: '15px' }}>
-          Preview Data ({selectedClass ? `Kelas ${selectedClass}` : 'Semua Kelas'}) - {getFilteredStudents().length} Siswa
+          Preview Data ({selectedClass ? `Kelas ${selectedClass}` : 'Semua Kelas'}) - {filteredStudents.length} Siswa
         </h3>
-        
+
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ backgroundColor: '#4CAF50', color: 'white' }}>
@@ -189,8 +244,8 @@ function LaporanCetak({ user }) {
             </tr>
           </thead>
           <tbody>
-            {getFilteredStudents().map((student, index) => (
-              <tr key={index} style={{ backgroundColor: index % 2 === 0 ? '#f9f9f9' : 'white' }}>
+            {filteredStudents.map((student, index) => (
+              <tr key={student.id} style={{ backgroundColor: index % 2 === 0 ? '#f9f9f9' : 'white' }}>
                 <td style={{ padding: '10px', border: '1px solid #ddd' }}>{student.nama}</td>
                 <td style={{ padding: '10px', border: '1px solid #ddd' }}>{student.nis}</td>
                 <td style={{ padding: '10px', border: '1px solid #ddd' }}>{student.kelas}</td>

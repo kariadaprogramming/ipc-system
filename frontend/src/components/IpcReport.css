@@ -1,0 +1,293 @@
+.ipc-report-container {
+  padding: 20px;
+  background: #f5f7fa;
+  min-height: 100vh;
+}
+
+.ipc-report {
+  background: white;
+  max-width: 210mm;
+  margin: 0 auto;
+  padding: 20mm;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  font-family: 'Times New Roman', Times, serif;
+}
+
+/* Header */
+.report-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.header-left {
+  flex: 1;
+}
+
+.header-left h1 {
+  font-size: 24px;
+  font-weight: bold;
+  margin: 0 0 8px 0;
+  text-align: center;
+  color: #000;
+}
+
+.header-left p {
+  font-size: 12px;
+  margin: 4px 0;
+  text-align: center;
+  color: #333;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+}
+
+.logo-placeholder {
+  width: 80px;
+  height: 80px;
+  border: 2px solid #333;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: bold;
+  color: #666;
+}
+
+/* Title */
+.report-title {
+  text-align: center;
+  margin: 30px 0;
+}
+
+.report-title h2 {
+  font-size: 20px;
+  font-weight: bold;
+  margin: 0 0 8px 0;
+  color: #000;
+}
+
+.report-title p {
+  font-size: 14px;
+  margin: 0;
+  color: #333;
+}
+
+/* Student Info */
+.student-info {
+  margin: 30px 0;
+  padding: 20px;
+  border: 1px solid #000;
+  background: #f9f9f9;
+}
+
+.info-row {
+  display: flex;
+  margin: 8px 0;
+  font-size: 14px;
+}
+
+.info-label {
+  width: 150px;
+  font-weight: bold;
+  color: #000;
+}
+
+.info-value {
+  flex: 1;
+  color: #333;
+}
+
+/* IPC Table */
+.ipc-table-container {
+  margin: 30px 0;
+}
+
+.ipc-table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 2px solid #000;
+}
+
+.ipc-table thead tr th {
+  background: #000;
+  color: white;
+  padding: 12px;
+  font-size: 14px;
+  font-weight: bold;
+  text-align: center;
+  border: 1px solid #000;
+}
+
+.ipc-table tbody tr td {
+  padding: 10px 12px;
+  border: 1px solid #000;
+  font-size: 13px;
+}
+
+.ipc-table tbody tr td:first-child {
+  width: 70%;
+  padding-left: 20px;
+}
+
+.ipc-table tbody tr td:last-child {
+  width: 30%;
+  text-align: center;
+  font-weight: bold;
+}
+
+.section-header {
+  background: #e0e0e0;
+  font-weight: bold;
+  text-align: center;
+}
+
+.section-header td {
+  font-weight: bold !important;
+  background: #d0d0d0 !important;
+}
+
+.point-value {
+  text-align: center;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.point-value.negative {
+  color: #dc2626;
+}
+
+.total-row {
+  background: #f0f0f0;
+  border-top: 2px solid #000;
+}
+
+.total-row td {
+  font-size: 16px;
+  padding: 15px 12px;
+}
+
+.point-value.total {
+  font-size: 18px;
+  color: #000;
+}
+
+/* Signatures */
+.signatures {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 50px;
+  padding: 0 20px;
+}
+
+.signature-block {
+  text-align: center;
+  width: 45%;
+}
+
+.signature-block p {
+  margin: 8px 0;
+  font-size: 13px;
+  color: #333;
+}
+
+.signature-title {
+  font-weight: bold;
+  margin: 20px 0 8px 0 !important;
+}
+
+.signature-space {
+  height: 80px;
+  margin: 10px 0;
+}
+
+.signature-name {
+  font-weight: bold;
+  font-size: 14px;
+  margin: 10px 0 4px 0 !important;
+  text-decoration: underline;
+}
+
+.signature-nip {
+  font-size: 12px;
+  margin: 0 !important;
+}
+
+/* Report Actions */
+.report-actions {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin-top: 30px;
+  padding: 20px;
+  background: white;
+  max-width: 210mm;
+  margin: 30px auto 0;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Print Styles */
+@media print {
+  .ipc-report-container {
+    background: white;
+    padding: 0;
+  }
+
+  .ipc-report {
+    box-shadow: none;
+    padding: 15mm;
+    margin: 0;
+  }
+
+  .report-actions {
+    display: none;
+  }
+
+  body {
+    background: white;
+  }
+
+  @page {
+    margin: 10mm;
+  }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .ipc-report {
+    padding: 15px;
+  }
+
+  .report-header {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .header-right {
+    margin: 10px auto;
+  }
+
+  .signatures {
+    flex-direction: column;
+    gap: 30px;
+  }
+
+  .signature-block {
+    width: 100%;
+  }
+
+  .info-row {
+    flex-direction: column;
+  }
+
+  .info-label {
+    width: 100%;
+    margin-bottom: 4px;
+  }
+}

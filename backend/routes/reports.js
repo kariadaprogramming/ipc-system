@@ -81,4 +81,58 @@ router.get('/statistics', auth, async (req, res) => {
     }
 });
 
+// Individual Point Card data for print (superadmin / guru)
+router.get('/ipc-card/:userId', auth, async (req, res) => {
+    try {
+        const userId = parseInt(req.params.userId, 10);
+        if (Number.isNaN(userId)) {
+            return res.status(400).json({ message: 'ID siswa tidak valid' });
+        }
+
+        const [students] = await db.query(
+            `SELECT id, nama, nis, nisn, kelas, jurusan, grha, ipc_total, ipc_awal
+             FROM users
+             WHERE id = ? AND role = 'siswa'`,
+            [userId]
+        );
+
+        if (students.length === 0) {
+            return res.status(404).json({ message: 'Siswa tidak ditemukan' });
+        }
+
+        const student = students[0];
+
+        const [waliRows] = await db.query(
+            `SELECT u.nama AS wali_nama, u.nip AS wali_nip, wka.tahun_ajaran
+             FROM wali_kelas_assignment wka
+             JOIN users u ON wka.guru_id = u.id
+             WHERE wka.kelas = ?
+             ORDER BY wka.tahun_ajaran DESC, wka.id DESC
+             LIMIT 1`,
+            [student.kelas]
+        );
+
+        const wali = waliRows.length
+            ? { nama: waliRows[0].wali_nama, nip: waliRows[0].wali_nip, tahun_ajaran: waliRows[0].tahun_ajaran }
+            : null;
+
+        const [history] = await db.query(
+            `SELECT id, jenis_perubahan, point_change, ipc_sebelum, ipc_sesudah, keterangan, created_at
+             FROM ipc_history
+             WHERE user_id = ? AND jenis_perubahan <> 'initial'
+             ORDER BY created_at ASC, id ASC`,
+            [userId]
+        );
+
+        res.json({
+            student,
+            wali,
+            history,
+        });
+    } catch (error) {
+        console.error('Error fetching IPC card data:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
 module.exports = router;

@@ -7,6 +7,7 @@ yarn.lock
 .env
 .env.local
 .env.production
+test.html
 
 # Uploads
 backend/uploads/*
@@ -28,3 +29,6 @@ Thumbs.db
 
 # Build
 frontend/build/
+
+# User
+*.pdf

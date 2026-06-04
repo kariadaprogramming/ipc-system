@@ -21,6 +21,8 @@ function InputOrganisasi() {
   const [hasAccess, setHasAccess] = useState(true);
   const [checkingAccess, setCheckingAccess] = useState(true);
   const [accessMessage, setAccessMessage] = useState('');
+  const [isAutoFilled, setIsAutoFilled] = useState(false);
+  const [nisLoading, setNisLoading] = useState(false);
 
   const kelasOptions = [
     'KELAS 10 TKJ 1', 'KELAS 10 TKJ 2', 'KELAS 10 TO 1', 'KELAS 10 TO 2',
@@ -145,6 +147,7 @@ function InputOrganisasi() {
 
   const fetchStudentData = async (nis) => {
     try {
+      setNisLoading(true);
       const token = localStorage.getItem('token');
       const response = await axios.get(`/users/nis/${nis}`, {
         headers: { Authorization: `Bearer ${token}` }
@@ -158,10 +161,13 @@ function InputOrganisasi() {
           jurusan: response.data.jurusan || '',
           grha: response.data.grha || ''
         }));
+        setIsAutoFilled(true);
       }
     } catch (error) {
       // Student not found or error, don't auto-fill
       console.log('Student not found or error fetching data');
+    } finally {
+      setNisLoading(false);
     }
   };
 
@@ -203,6 +209,7 @@ function InputOrganisasi() {
         kategori_organisasi: ''
       });
       setFoto(null);
+      setIsAutoFilled(false);
       fetchUserSubmissions(); // Refresh submissions list
     } catch (error) {
       setMessage(error.response?.data?.message || 'Gagal mengirim organisasi');
@@ -277,7 +284,7 @@ function InputOrganisasi() {
       <form onSubmit={handleSubmit}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <div className="form-group">
-            <label>Nama</label>
+            <label>Nama <span className="required">*</span></label>
             <input
               type="text"
               name="nama"
@@ -285,25 +292,30 @@ function InputOrganisasi() {
               onChange={handleChange}
               placeholder="Nama siswa"
               required
+              disabled={isAutoFilled}
+              style={{ backgroundColor: isAutoFilled ? '#f0f0f0' : '' }}
             />
+            {isAutoFilled && <p className="form-helper-text">Data diisi otomatis dari NIS</p>}
           </div>
           <div className="form-group">
-            <label>NIS</label>
+            <label>NIS <span className="required">*</span></label>
             <input
               type="text"
               name="nis"
               value={formData.nis}
               onChange={handleChange}
-              placeholder="NIS"
+              placeholder="Masukkan NIS siswa"
               required
+              className={nisLoading ? 'auto-fill-loading' : (isAutoFilled ? 'auto-fill-success' : 'nis-input-highlight')}
             />
+            <p className="form-helper-text">Masukkan NIS untuk mengisi data siswa secara otomatis</p>
           </div>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <div className="form-group">
             <label>Kelas</label>
-            <select name="kelas" value={formData.kelas} onChange={handleChange} required>
+            <select name="kelas" value={formData.kelas} onChange={handleChange} required disabled={isAutoFilled} style={{ backgroundColor: isAutoFilled ? '#f0f0f0' : '' }}>
               <option value="">Pilih Kelas</option>
               {kelasOptions.map(kelas => (
                 <option key={kelas} value={kelas}>{kelas}</option>
@@ -312,7 +324,7 @@ function InputOrganisasi() {
           </div>
           <div className="form-group">
             <label>Grha</label>
-            <select name="grha" value={formData.grha} onChange={handleChange}>
+            <select name="grha" value={formData.grha} onChange={handleChange} disabled={isAutoFilled} style={{ backgroundColor: isAutoFilled ? '#f0f0f0' : '' }}>
               <option value="">Pilih Grha</option>
               {grhaOptions.map(grha => (
                 <option key={grha} value={grha}>{grha}</option>
@@ -323,7 +335,7 @@ function InputOrganisasi() {
 
         <div className="form-group">
           <label>Jurusan</label>
-          <select name="jurusan" value={formData.jurusan} onChange={handleChange}>
+          <select name="jurusan" value={formData.jurusan} onChange={handleChange} disabled={isAutoFilled} style={{ backgroundColor: isAutoFilled ? '#f0f0f0' : '' }}>
             <option value="TKJ">TKJ</option>
             <option value="TO">TO</option>
             <option value="DPIB">DPIB</option>

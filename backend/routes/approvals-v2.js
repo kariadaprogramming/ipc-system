@@ -129,9 +129,9 @@ router.post('/prestasi/submit', auth, checkInputAccess('prestasi'), upload.singl
             
             // Add to IPC History
             await db.query(
-                `INSERT INTO ipc_history (user_id, jenis_perubahan, point_change, keterangan, created_by) 
-                 VALUES (?, 'prestasi', ?, ?, ?)`,
-                [userId, point, `Prestasi: ${nama_lomba} - ${juara} ${kategori}`, userId]
+                `INSERT INTO ipc_history (user_id, jenis_perubahan, point_change, keterangan) 
+                 VALUES (?, 'prestasi', ?, ?)`,
+                [userId, point, `Prestasi: ${nama_lomba} - ${juara} ${kategori}`]
             );
             
             console.log('Prestasi - Directly added by superadmin:', result.insertId);
@@ -267,9 +267,9 @@ router.post('/event/submit', auth, checkInputAccess('event'), upload.single('fot
             
             // Add to IPC History
             await db.query(
-                `INSERT INTO ipc_history (user_id, jenis_perubahan, point_change, keterangan, created_by) 
-                 VALUES (?, 'event', ?, ?, ?)`,
-                [userId, point, `Event: ${nama_event} - ${tingkat}`, userId]
+                `INSERT INTO ipc_history (user_id, jenis_perubahan, point_change, keterangan) 
+                 VALUES (?, 'event', ?, ?)`,
+                [userId, point, `Event: ${nama_event} - ${tingkat}`]
             );
             
             console.log('Event - Directly added by superadmin:', result.insertId);
@@ -402,9 +402,9 @@ router.post('/organisasi/submit', auth, checkInputAccess('organisasi'), upload.s
             
             // Add to IPC History
             await db.query(
-                `INSERT INTO ipc_history (user_id, jenis_perubahan, point_change, keterangan, created_by) 
-                 VALUES (?, 'organisasi', ?, ?, ?)`,
-                [userId, point, `Organisasi: ${kategori_organisasi} - ${jabatan_organisasi}`, userId]
+                `INSERT INTO ipc_history (user_id, jenis_perubahan, point_change, keterangan) 
+                 VALUES (?, 'organisasi', ?, ?)`,
+                [userId, point, `Organisasi: ${kategori_organisasi} - ${jabatan_organisasi}`]
             );
             
             console.log('Organisasi - Directly added by superadmin:', result.insertId);

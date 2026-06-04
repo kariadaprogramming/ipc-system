@@ -1,0 +1,280 @@
+/* Individual Point Card — screen preview & print layout (matches IPC PDF) */
+
+.ipc-print-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.ipc-print-toolbar label {
+  font-weight: 600;
+  margin-right: 4px;
+}
+
+.ipc-print-toolbar select {
+  padding: 8px 12px;
+  border-radius: 5px;
+  border: 1px solid var(--border-color);
+  min-width: 260px;
+}
+
+.ipc-print-toolbar button {
+  padding: 10px 20px;
+  background: var(--secondary-color);
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.ipc-print-toolbar button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.ipc-print-preview-wrap {
+  background: #fff;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: var(--shadow-md);
+  overflow-x: auto;
+}
+
+.ipc-print-sheet {
+  width: 210mm;
+  min-height: 297mm;
+  margin: 0 auto;
+  padding: 15mm 18mm 18mm;
+  background: #fff;
+  color: #000;
+  font-family: 'Times New Roman', Times, serif;
+  font-size: 12pt;
+  line-height: 1.4;
+  box-sizing: border-box;
+}
+
+/* Header */
+.report-header {
+  margin-bottom: 15px;
+  text-align: center;
+}
+
+.header-image {
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+.report-divider {
+  border-top: 3px solid #000;
+  margin: 15px 0;
+}
+
+/* Title */
+.report-title {
+  text-align: center;
+  margin: 25px 0;
+}
+
+.report-title h2 {
+  font-size: 16pt;
+  font-weight: bold;
+  margin: 0 0 6px 0;
+  color: #000;
+}
+
+.report-title p {
+  font-size: 11pt;
+  margin: 0;
+  color: #333;
+}
+
+/* Student Info */
+.student-info {
+  margin: 25px 0;
+  padding: 15px 20px;
+  border: 1px solid #000;
+  background: #f9f9f9;
+}
+
+.info-row {
+  display: flex;
+  margin: 6px 0;
+  font-size: 11pt;
+}
+
+.info-label {
+  width: 120px;
+  font-weight: bold;
+  color: #000;
+}
+
+.info-value {
+  flex: 1;
+  color: #333;
+}
+
+/* IPC Table */
+.ipc-table-container {
+  margin: 25px 0;
+}
+
+.ipc-table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 2px solid #000;
+}
+
+.ipc-table thead tr th {
+  background: #000;
+  color: white;
+  padding: 10px;
+  font-size: 12pt;
+  font-weight: bold;
+  text-align: center;
+  border: 1px solid #000;
+}
+
+.ipc-table tbody tr td {
+  padding: 8px 10px;
+  border: 1px solid #000;
+  font-size: 11pt;
+}
+
+.ipc-table tbody tr td:first-child {
+  width: 70%;
+  padding-left: 15px;
+}
+
+.ipc-table tbody tr td:last-child {
+  width: 30%;
+  text-align: center;
+  font-weight: bold;
+}
+
+.section-header {
+  background: #e0e0e0;
+  font-weight: bold;
+  text-align: center;
+}
+
+.section-header td {
+  font-weight: bold !important;
+  background: #d0d0d0 !important;
+}
+
+.point-value {
+  text-align: center;
+  font-weight: bold;
+  font-size: 12pt;
+}
+
+.point-value.negative {
+  color: #dc2626;
+}
+
+.total-row {
+  background: #f0f0f0;
+  border-top: 2px solid #000;
+}
+
+.total-row td {
+  font-size: 13pt;
+  padding: 12px 10px;
+}
+
+.point-value.total {
+  font-size: 15pt;
+  color: #000;
+}
+
+/* Signatures */
+.signatures {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 45px;
+  padding: 0 15px;
+}
+
+.signature-block {
+  text-align: center;
+  width: 45%;
+}
+
+.signature-block p {
+  margin: 6px 0;
+  font-size: 11pt;
+  color: #333;
+}
+
+.signature-title {
+  font-weight: bold;
+  margin: 18px 0 6px 0 !important;
+}
+
+.signature-space {
+  height: 70px;
+  margin: 8px 0;
+}
+
+.signature-name {
+  font-weight: bold;
+  font-size: 12pt;
+  margin: 8px 0 4px 0 !important;
+  text-decoration: underline;
+}
+
+.signature-nip {
+  font-size: 10pt;
+  margin: 0 !important;
+}
+
+@media print {
+  body.ipc-print-active .mobile-menu-toggle,
+  body.ipc-print-active .sidebar,
+  body.ipc-print-active .ipc-print-no-print,
+  body.ipc-print-active .ipc-print-toolbar,
+  body.ipc-print-active .laporan-cetak-bulk,
+  body.ipc-print-active .laporan-cetak-title {
+    display: none !important;
+  }
+
+  body.ipc-print-active .main-layout,
+  body.ipc-print-active .content,
+  body.ipc-print-active .container {
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  body.ipc-print-active .ipc-print-preview-wrap {
+    box-shadow: none;
+    padding: 0;
+    border-radius: 0;
+    overflow: visible;
+  }
+
+  body.ipc-print-active .ipc-print-sheet {
+    width: 100%;
+    min-height: auto;
+    margin: 0;
+    padding: 10mm 12mm;
+    box-shadow: none;
+    page-break-after: always;
+  }
+
+  body.ipc-print-active .ipc-print-sheet:last-child {
+    page-break-after: auto;
+  }
+
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+}

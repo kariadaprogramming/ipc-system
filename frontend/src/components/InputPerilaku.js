@@ -8,10 +8,18 @@ function InputPerilaku() {
     kelas: '',
     jurusan: 'TKJ',
     grha: '',
-    karakter_siswa: ''
+    tanggung_jawab: '',
+    disiplin: '',
+    kepedulian: '',
+    kemandirian: '',
+    spiritual: '',
+    kejujuran: '',
+    kepercayaan_diri: ''
   });
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isAutoFilled, setIsAutoFilled] = useState(false);
+  const [nisLoading, setNisLoading] = useState(false);
   // const [hasPermission, setHasPermission] = useState(true);
   // const [checkingPermission, setCheckingPermission] = useState(true);
 
@@ -73,6 +81,7 @@ function InputPerilaku() {
 
   const fetchStudentData = async (nis) => {
     try {
+      setNisLoading(true);
       const token = localStorage.getItem('token');
       const response = await axios.get(`/users/nis/${nis}`, {
         headers: { Authorization: `Bearer ${token}` }
@@ -86,10 +95,13 @@ function InputPerilaku() {
           jurusan: response.data.jurusan || '',
           grha: response.data.grha || ''
         }));
+        setIsAutoFilled(true);
       }
     } catch (error) {
       // Student not found or error, don't auto-fill
       console.log('Student not found or error fetching data');
+    } finally {
+      setNisLoading(false);
     }
   };
 
@@ -111,8 +123,15 @@ function InputPerilaku() {
         kelas: '',
         jurusan: 'TKJ',
         grha: '',
-        karakter_siswa: ''
+        tanggung_jawab: '',
+        disiplin: '',
+        kepedulian: '',
+        kemandirian: '',
+        spiritual: '',
+        kejujuran: '',
+        kepercayaan_diri: ''
       });
+      setIsAutoFilled(false);
     } catch (error) {
       setMessage(error.response?.data?.message || 'Gagal mengirim perilaku');
     } finally {
@@ -147,7 +166,7 @@ function InputPerilaku() {
       <form onSubmit={handleSubmit}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <div className="form-group">
-            <label>Nama</label>
+            <label>Nama <span className="required">*</span></label>
             <input
               type="text"
               name="nama"
@@ -155,25 +174,30 @@ function InputPerilaku() {
               onChange={handleChange}
               placeholder="Nama siswa"
               required
+              disabled={isAutoFilled}
+              style={{ backgroundColor: isAutoFilled ? '#f0f0f0' : '' }}
             />
+            {isAutoFilled && <p className="form-helper-text">Data diisi otomatis dari NIS</p>}
           </div>
           <div className="form-group">
-            <label>NIS</label>
+            <label>NIS <span className="required">*</span></label>
             <input
               type="text"
               name="nis"
               value={formData.nis}
               onChange={handleChange}
-              placeholder="NIS"
+              placeholder="Masukkan NIS siswa"
               required
+              className={nisLoading ? 'auto-fill-loading' : (isAutoFilled ? 'auto-fill-success' : 'nis-input-highlight')}
             />
+            <p className="form-helper-text">Masukkan NIS untuk mengisi data siswa secara otomatis</p>
           </div>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <div className="form-group">
             <label>Kelas</label>
-            <select name="kelas" value={formData.kelas} onChange={handleChange} required>
+            <select name="kelas" value={formData.kelas} onChange={handleChange} required disabled={isAutoFilled} style={{ backgroundColor: isAutoFilled ? '#f0f0f0' : '' }}>
               <option value="">Pilih Kelas</option>
               {kelasOptions.map(kelas => (
                 <option key={kelas} value={kelas}>{kelas}</option>
@@ -182,7 +206,7 @@ function InputPerilaku() {
           </div>
           <div className="form-group">
             <label>Grha</label>
-            <select name="grha" value={formData.grha} onChange={handleChange}>
+            <select name="grha" value={formData.grha} onChange={handleChange} disabled={isAutoFilled} style={{ backgroundColor: isAutoFilled ? '#f0f0f0' : '' }}>
               <option value="">Pilih Grha</option>
               {grhaOptions.map(grha => (
                 <option key={grha} value={grha}>{grha}</option>
@@ -193,21 +217,80 @@ function InputPerilaku() {
 
         <div className="form-group">
           <label>Jurusan</label>
-          <select name="jurusan" value={formData.jurusan} onChange={handleChange}>
+          <select name="jurusan" value={formData.jurusan} onChange={handleChange} disabled={isAutoFilled} style={{ backgroundColor: isAutoFilled ? '#f0f0f0' : '' }}>
             <option value="TKJ">TKJ</option>
             <option value="TO">TO</option>
             <option value="DPIB">DPIB</option>
           </select>
         </div>
 
-        <div className="form-group">
-          <label>Karakter Siswa</label>
-          <select name="karakter_siswa" value={formData.karakter_siswa} onChange={handleChange} required>
-            <option value="">Pilih Karakter</option>
-            {karakterOptions.map(karakter => (
-              <option key={karakter.value} value={karakter.value}>{karakter.label}</option>
-            ))}
-          </select>
+        <div style={{ marginBottom: '20px' }}>
+          <h3 style={{ marginBottom: '15px', fontSize: '16px', fontWeight: '600' }}>Perkembangan Karakter</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div className="form-group">
+              <label>Tanggung Jawab <span className="required">*</span></label>
+              <select name="tanggung_jawab" value={formData.tanggung_jawab} onChange={handleChange} required>
+                <option value="">Pilih Nilai</option>
+                {karakterOptions.map(karakter => (
+                  <option key={karakter.value} value={karakter.value}>{karakter.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Disiplin <span className="required">*</span></label>
+              <select name="disiplin" value={formData.disiplin} onChange={handleChange} required>
+                <option value="">Pilih Nilai</option>
+                {karakterOptions.map(karakter => (
+                  <option key={karakter.value} value={karakter.value}>{karakter.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Kepedulian <span className="required">*</span></label>
+              <select name="kepedulian" value={formData.kepedulian} onChange={handleChange} required>
+                <option value="">Pilih Nilai</option>
+                {karakterOptions.map(karakter => (
+                  <option key={karakter.value} value={karakter.value}>{karakter.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Kemandirian <span className="required">*</span></label>
+              <select name="kemandirian" value={formData.kemandirian} onChange={handleChange} required>
+                <option value="">Pilih Nilai</option>
+                {karakterOptions.map(karakter => (
+                  <option key={karakter.value} value={karakter.value}>{karakter.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Spiritual <span className="required">*</span></label>
+              <select name="spiritual" value={formData.spiritual} onChange={handleChange} required>
+                <option value="">Pilih Nilai</option>
+                {karakterOptions.map(karakter => (
+                  <option key={karakter.value} value={karakter.value}>{karakter.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Kejujuran <span className="required">*</span></label>
+              <select name="kejujuran" value={formData.kejujuran} onChange={handleChange} required>
+                <option value="">Pilih Nilai</option>
+                {karakterOptions.map(karakter => (
+                  <option key={karakter.value} value={karakter.value}>{karakter.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+              <label>Kepercayaan Diri <span className="required">*</span></label>
+              <select name="kepercayaan_diri" value={formData.kepercayaan_diri} onChange={handleChange} required>
+                <option value="">Pilih Nilai</option>
+                {karakterOptions.map(karakter => (
+                  <option key={karakter.value} value={karakter.value}>{karakter.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
 
         <button
