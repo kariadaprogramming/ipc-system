@@ -60,15 +60,13 @@ app.use('/uploads', (req, res, next) => {
   next();
 }, express.static(path.join(__dirname, 'uploads')));
 
-// Serve frontend build folder in production
-if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, '../frontend/build')));
+// Serve frontend build folder
+app.use(express.static(path.join(__dirname, '../frontend/build')));
 
-  // Handle client-side routing - return index.html for all routes
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../frontend/build', 'index.html'));
-  });
-}
+// Handle client-side routing - return index.html for all non-API routes
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../frontend/build', 'index.html'));
+});
 
 // Routes - Auth with login rate limiting
 app.use('/api/auth', loginLimiter, require('./routes/auth'));
