@@ -4,12 +4,12 @@ const Service = require('node-windows').Service;
 const svc = new Service({
   name: 'IPC Frontend',
   description: 'IPC System Frontend Server',
-  script: 'C:\\Users\\YourUser\\Documents\\Projects\\ipc-system\\frontend\\node_modules\\react-scripts\\scripts\\start.js',
+  script: 'D:\\ipc-system\\frontend\\node_modules\\react-scripts\\scripts\\start.js',
   scriptOptions: [
     '--',
-    'C:\\Users\\YourUser\\Documents\\Projects\\ipc-system\\frontend'
+    'D:\\ipc-system\\frontend'
   ],
-  workingDirectory: 'C:\\Users\\YourUser\\Documents\\Projects\\ipc-system\\frontend',
+  workingDirectory: 'C:\\ipc-system\\frontend',
   nodeOptions: [
     '--max-old-space-size=4096'
   ],

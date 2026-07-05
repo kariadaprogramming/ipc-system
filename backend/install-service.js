@@ -4,7 +4,7 @@ const Service = require('node-windows').Service;
 const svc = new Service({
   name: 'IPC Backend',
   description: 'IPC System Backend Server',
-  script: 'C:\\Users\\YourUser\\Documents\\Projects\\ipc-system\\backend\\server.js',
+  script: 'D:\\ipc-system\\backend\\server.js',
   nodeOptions: [
     '--max-old-space-size=4096'
   ],
