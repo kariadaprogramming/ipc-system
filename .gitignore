@@ -28,7 +28,7 @@ Thumbs.db
 *.swo
 
 # Build
-frontend/build/
+#frontend/build/
 
 # User
 #*.pdf
