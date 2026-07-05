@@ -36,15 +36,7 @@ jobs:
             cd ../backend
             npm install
 
-            # Restart backend service (adjust based on your setup)
-            # Option 1: If using PM2
-            # pm2 restart ipc-backend
-
-            # Option 2: If using Windows Service
-            # Restart-Service -Name "IPCBackend"
-
-            # Option 3: If running with node directly
-            # taskkill /F /IM node.exe
-            # start /B node server.js
+            # Restart backend service using PM2
+            pm2 restart ipc-backend || pm2 start server.js --name ipc-backend
 
             echo "Deployment completed successfully!"
