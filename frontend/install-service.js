@@ -9,7 +9,7 @@ const svc = new Service({
     '--',
     'D:\\ipc-system\\frontend'
   ],
-  workingDirectory: 'C:\\ipc-system\\frontend',
+  workingDirectory: 'D:\\ipc-system\\frontend',
   nodeOptions: [
     '--max-old-space-size=4096'
   ],
