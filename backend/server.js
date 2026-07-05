@@ -60,11 +60,6 @@ app.use('/uploads', (req, res, next) => {
   next();
 }, express.static(path.join(__dirname, 'uploads')));
 
-// Serve frontend build folder - use absolute path
-const frontendBuildPath = path.join(__dirname, '..', 'frontend', 'build');
-console.log('Serving frontend from:', frontendBuildPath);
-app.use(express.static(frontendBuildPath));
-
 // Routes - Auth with login rate limiting
 app.use('/api/auth', loginLimiter, require('./routes/auth'));
 app.use('/api/users', require('./routes/users'));
@@ -84,11 +79,6 @@ app.use('/api/search', require('./routes/search'));
 app.use('/api/profile', require('./routes/profile'));
 app.use('/api/reports', require('./routes/reports'));
 app.use('/api/file-viewer', require('./routes/file-viewer'));
-
-// Handle client-side routing - return index.html for all non-API routes
-app.get('*', (req, res) => {
-  res.sendFile(path.join(frontendBuildPath, 'index.html'));
-});
 
 // Global error handler - Security: Don't expose internal details
 app.use(errorHandler);
