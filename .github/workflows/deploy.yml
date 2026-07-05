@@ -28,22 +28,19 @@ jobs:
             echo "Installing frontend dependencies..."
             cd frontend
             npm install
+            echo "Building frontend with production environment..."
+            $env:NODE_ENV="production"
+            npm run build
 
             # Deploy Backend
             echo "Installing backend dependencies..."
             cd ../backend
             npm install
 
-            # Install node-windows for Windows Services
-            npm install -g node-windows
+            # Set frontend build path for PM2
+            $env:FRONTEND_BUILD_PATH="${{ secrets.PROJECT_PATH }}/frontend/build"
 
-            # Restart backend Windows Service
-            echo "Restarting backend service..."
-            node install-service.js
-
-            # Restart frontend Windows Service
-            echo "Restarting frontend service..."
-            cd ../frontend
-            node install-service.js
+            # Restart backend service using PM2 with production environment
+            pm2 restart ipc-backend --update-env || pm2 start server.js --name ipc-backend --env production
 
             echo "Deployment completed successfully!"
