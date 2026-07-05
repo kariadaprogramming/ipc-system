@@ -37,9 +37,6 @@ jobs:
             cd ../backend
             npm install
 
-            # Set frontend build path for PM2
-            $env:FRONTEND_BUILD_PATH="${{ secrets.PROJECT_PATH }}/frontend/build"
-
             # Restart backend service using PM2 with production environment
             pm2 restart ipc-backend --update-env || pm2 start server.js --name ipc-backend --env production
 

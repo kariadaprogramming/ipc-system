@@ -60,8 +60,8 @@ app.use('/uploads', (req, res, next) => {
   next();
 }, express.static(path.join(__dirname, 'uploads')));
 
-// Serve frontend build folder - use absolute path or environment variable
-const frontendBuildPath = process.env.FRONTEND_BUILD_PATH || path.join(__dirname, '..', 'frontend', 'build');
+// Serve frontend build folder - use absolute path
+const frontendBuildPath = path.join(__dirname, '..', 'frontend', 'build');
 console.log('Serving frontend from:', frontendBuildPath);
 app.use(express.static(frontendBuildPath));
 
