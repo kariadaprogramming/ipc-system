@@ -32,6 +32,10 @@ jobs:
             $env:NODE_ENV="production"
             npm run build
 
+            # Start frontend with PM2
+            echo "Starting frontend with PM2..."
+            pm2 restart ipc-frontend --update-env || pm2 start npm --name ipc-frontend -- run serve
+
             # Deploy Backend
             echo "Installing backend dependencies..."
             cd ../backend
