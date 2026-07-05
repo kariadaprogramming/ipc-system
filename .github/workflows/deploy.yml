@@ -31,12 +31,18 @@ jobs:
             echo "Building frontend..."
             npm run build
 
+            # Copy frontend build to XAMPP htdocs
+            echo "Copying frontend build to XAMPP..."
+            rm -rf ${{ secrets.XAMPP_PATH }}/ipc-system
+            mkdir -p ${{ secrets.XAMPP_PATH }}/ipc-system
+            cp -r build/* ${{ secrets.XAMPP_PATH }}/ipc-system/
+
             # Deploy Backend
             echo "Installing backend dependencies..."
             cd ../backend
             npm install
 
-            # Restart backend service using PM2 with production environment
-            pm2 restart ipc-backend --update-env || pm2 start server.js --name ipc-backend --env production
+            # Restart backend service using PM2
+            pm2 restart ipc-backend || pm2 start server.js --name ipc-backend
 
             echo "Deployment completed successfully!"
