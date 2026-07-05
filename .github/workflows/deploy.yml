@@ -28,7 +28,8 @@ jobs:
             echo "Installing frontend dependencies..."
             cd frontend
             npm install
-            echo "Building frontend..."
+            echo "Building frontend with production environment..."
+            $env:NODE_ENV="production"
             npm run build
 
             # Copy frontend build to Apache document root

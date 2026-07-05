@@ -89,8 +89,9 @@ function ProtectedRoute({ children, allowedRoles }) {
 }
 
 function App() {
+  const basename = process.env.NODE_ENV === 'production' ? '/ipc-system' : '/';
   return (
-    <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <Router basename={basename} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/" element={
