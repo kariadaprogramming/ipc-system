@@ -8,6 +8,12 @@ function IzinAkun() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [activeTab, setActiveTab] = useState('individual');
+  const [filters, setFilters] = useState({
+    role: '',
+    kelas: '',
+    jurusan: '',
+    grha: ''
+  });
 
   const jenisInputs = [
     { key: 'prestasi', label: 'Prestasi', icon: '🏆' },
@@ -17,22 +23,60 @@ function IzinAkun() {
     { key: 'perilaku', label: 'Perilaku', icon: '✅' }
   ];
 
+  const kelasOptions = [
+    'KELAS 10 TKJ 1', 'KELAS 10 TKJ 2', 'KELAS 10 TO 1', 'KELAS 10 TO 2',
+    'KELAS 10 DPIB 1', 'KELAS 10 DPIB 2',
+    'KELAS 11 TKJ 1', 'KELAS 11 TKJ 2', 'KELAS 11 TO 1', 'KELAS 11 TO 2',
+    'KELAS 11 DPIB 1', 'KELAS 11 DPIB 2',
+    'KELAS 12 TKJ 1', 'KELAS 12 TKJ 2', 'KELAS 12 TO 1', 'KELAS 12 TO 2',
+    'KELAS 12 DPIB 1', 'KELAS 12 DPIB 2'
+  ];
+
+  const grhaOptions = [
+    'Airsanya', 'Daksina', 'Genya', 'Madhya', 'Nairiti', 'Pascima', 'Purwa', 'Uttara', 'Wayabhya'
+  ];
+
+  const handleFilterChange = (key, value) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+  };
+
+  const resetFilters = () => {
+    setFilters({ role: '', kelas: '', jurusan: '', grha: '' });
+    setSearchQuery('');
+  };
+
   useEffect(() => {
     fetchUsers();
   }, []);
 
   useEffect(() => {
+    let filtered = users;
+
+    // Apply search query
     if (searchQuery) {
-      const filtered = users.filter(user =>
+      filtered = filtered.filter(user =>
         user.nama?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         user.nis?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         user.nip?.toLowerCase().includes(searchQuery.toLowerCase())
       );
-      setFilteredUsers(filtered);
-    } else {
-      setFilteredUsers(users);
     }
-  }, [searchQuery, users]);
+
+    // Apply filters
+    if (filters.role) {
+      filtered = filtered.filter(user => user.role === filters.role);
+    }
+    if (filters.kelas) {
+      filtered = filtered.filter(user => user.kelas === filters.kelas);
+    }
+    if (filters.jurusan) {
+      filtered = filtered.filter(user => user.jurusan === filters.jurusan);
+    }
+    if (filters.grha) {
+      filtered = filtered.filter(user => user.grha === filters.grha);
+    }
+
+    setFilteredUsers(filtered);
+  }, [searchQuery, filters, users]);
 
   const fetchUsers = async () => {
     try {
@@ -284,6 +328,62 @@ function IzinAkun() {
                   ❌ Matikan Perilaku
                 </button>
               </div>
+            </div>
+          </div>
+
+          {/* Filters */}
+          <div className="card" style={{ marginBottom: '20px', padding: '15px' }}>
+            <h4>Filter</h4>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+              <div style={{ flex: '1', minWidth: '150px' }}>
+                <label>Role</label>
+                <select
+                  value={filters.role}
+                  onChange={(e) => handleFilterChange('role', e.target.value)}
+                  className="form-control"
+                >
+                  <option value="">Semua Role</option>
+                  <option value="superadmin">Superadmin</option>
+                  <option value="guru">Guru</option>
+                  <option value="siswa">Siswa</option>
+                </select>
+              </div>
+              <div style={{ flex: '1', minWidth: '150px' }}>
+                <label>Kelas</label>
+                <select
+                  value={filters.kelas}
+                  onChange={(e) => handleFilterChange('kelas', e.target.value)}
+                  className="form-control"
+                >
+                  <option value="">Semua Kelas</option>
+                  {kelasOptions.map(k => <option key={k} value={k}>{k}</option>)}
+                </select>
+              </div>
+              <div style={{ flex: '1', minWidth: '150px' }}>
+                <label>Jurusan</label>
+                <select
+                  value={filters.jurusan}
+                  onChange={(e) => handleFilterChange('jurusan', e.target.value)}
+                  className="form-control"
+                >
+                  <option value="">Semua Jurusan</option>
+                  <option value="TKJ">TKJ</option>
+                  <option value="TO">TO</option>
+                  <option value="DPIB">DPIB</option>
+                </select>
+              </div>
+              <div style={{ flex: '1', minWidth: '150px' }}>
+                <label>Grha</label>
+                <select
+                  value={filters.grha}
+                  onChange={(e) => handleFilterChange('grha', e.target.value)}
+                  className="form-control"
+                >
+                  <option value="">Semua Grha</option>
+                  {grhaOptions.map(grha => <option key={grha} value={grha}>{grha}</option>)}
+                </select>
+              </div>
+              <button className="btn btn-secondary" onClick={resetFilters}>Reset</button>
             </div>
           </div>
 

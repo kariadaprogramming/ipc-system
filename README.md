@@ -59,8 +59,11 @@ Sistem Indeks Prestasi dan Karakter untuk sekolah dengan fitur lengkap untuk men
 
 #### 1. Setup Database
 1. Buka phpMyAdmin
-2. Import file `skema.sql` ke database baru bernama `ipc_school`
-3. Pastikan database berhasil dibuat dengan semua tabel
+2. Buat database baru bernama `ipc_school`
+3. Import file `backend/database/skema.sql` ke database `ipc_school`
+4. Pastikan database berhasil dibuat dengan semua tabel
+
+**Catatan**: Gunakan file `skema.sql` untuk instalasi baru. File `ipc_school.sql` berisi data contoh dan `biodata_approval_schema.sql` sudah termasuk dalam skema.sql.
 
 #### 2. Setup Backend
 ```bash
@@ -275,7 +278,8 @@ full project ipcs/
 - Superadmin dapat mengubah IPC siswa kapan saja
 - Data duplikat (NIS/NISN/NIP sama) tidak dapat dibuat
 - Semua input data memerlukan approval kecuali dari superadmin
-- Foto bukti disimpan di folder `uploads` di backend
+- Foto bukti disimpan di folder `backend/uploads/approvals` di server (local storage)
+- Google Drive integration telah dihapus dan diganti dengan penyimpanan lokal server
 
 ## Pengembangan Lanjutan
 

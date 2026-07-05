@@ -74,7 +74,7 @@ function InputPerilaku() {
     setFormData({ ...formData, [name]: value });
 
     // Auto-fill student data when NIS is entered
-    if (name === 'nis' && value.length >= 3) {
+    if (name === 'nis' && value.length >= 1) {
       fetchStudentData(value);
     }
   };

@@ -6,8 +6,7 @@ const path = require('path');
 const fs = require('fs');
 const { auth, superAdminOnly, teacherOrSuperAdmin, checkInputAccess } = require('../middleware/auth');
 const db = require('../config/database');
-const { uploadToDrive, extractFolderId } = require('../config/google-drive');
-const { uploadToPersonalDrive, isAuthenticated } = require('../config/google-drive-oauth');
+// Local file storage only - Google Drive removed
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -26,23 +25,10 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage });
 
-// Helper function to upload to Drive (OAuth first, then Service Account fallback)
-const uploadPhotoToDrive = async (filePath, fileName, folderId, mimeType) => {
-  // Try OAuth first (personal Drive)
-  if (isAuthenticated()) {
-    try {
-      console.log('Using OAuth (Personal Drive) for upload');
-      const result = await uploadToPersonalDrive(filePath, fileName, folderId, mimeType);
-      return { ...result, method: 'oauth' };
-    } catch (oauthError) {
-      console.log('OAuth upload failed, trying Service Account:', oauthError.message);
-    }
-  }
-  
-  // Fallback to Service Account
-  console.log('Using Service Account for upload');
-  const result = await uploadToDrive(filePath, fileName, folderId, mimeType);
-  return { ...result, method: 'service_account' };
+// Helper function to save file locally
+const saveFileLocally = (filePath) => {
+    const relativePath = path.join('/uploads/approvals', path.basename(filePath));
+    return relativePath.replace(/\\/g, '/');
 };
 
 // ==================== SUBMIT FOR APPROVAL ====================
@@ -68,52 +54,8 @@ router.post('/prestasi/submit', auth, checkInputAccess('prestasi'), upload.singl
         const userId = req.user.id;
         const userRole = req.user.role;
         const { nama, nis, jenis, nama_lomba, jurusan, kelas, pembina, grha, juara, kategori } = req.body;
-        let fotoPath = req.file ? req.file.path : null;
-        let driveLink = null;
-        
-        // Upload to Google Drive if file exists (optional - skip if Drive not configured)
-        if (req.file) {
-            try {
-                console.log('Prestasi - Checking Drive configuration...');
-                const [driveConfig] = await db.query('SELECT drive_url FROM drive_links WHERE type = ?', ['prestasi']);
-                console.log('Prestasi - Drive config:', driveConfig);
-                
-                const folderId = driveConfig.length > 0 ? extractFolderId(driveConfig[0].drive_url) : null;
-                console.log('Prestasi - Extracted folder ID:', folderId);
-                
-                if (folderId) {
-                    console.log('Prestasi - Uploading to Drive...');
-                    // Format: Nama_NIS_foto.jpg untuk memudahkan pencarian
-                    const fileExt = req.file.originalname.includes('.') ? req.file.originalname.substring(req.file.originalname.lastIndexOf('.')) : '.jpg';
-                    const descriptiveFileName = `${nama}_${nis}_foto${fileExt}`;
-                    console.log('Prestasi - File will be named:', descriptiveFileName, '(original:', req.file.originalname, ')');
-                    const uploadResult = await uploadPhotoToDrive(
-                        req.file.path,
-                        descriptiveFileName,
-                        folderId,
-                        req.file.mimetype
-                    );
-                    driveLink = uploadResult.webViewLink;
-                    console.log('Prestasi - Uploaded to Drive:', driveLink, 'Method:', uploadResult.method, 'File:', descriptiveFileName);
-                    
-                    // Delete local file after upload
-                    fs.unlinkSync(req.file.path);
-                    fotoPath = driveLink; // Save Drive link instead of local path
-                } else {
-                    console.log('Prestasi - Drive not configured, using local storage');
-                    // Keep local file, but save relative URL path instead of full path
-                    const relativePath = path.join('/uploads/approvals', path.basename(req.file.path));
-                    fotoPath = relativePath.replace(/\\/g, '/'); // Convert backslashes to forward slashes
-                    console.log('Prestasi - Using local path:', fotoPath);
-                }
-            } catch (driveError) {
-                console.error('Prestasi - Drive upload error:', driveError);
-                // Continue with local file if Drive upload fails
-                const relativePath = path.join('/uploads/approvals', path.basename(req.file.path));
-                fotoPath = relativePath.replace(/\\/g, '/');
-                console.log('Prestasi - Using local path (fallback):', fotoPath);
-            }
-        }
+        let fotoPath = req.file ? saveFileLocally(req.file.path) : null;
+        console.log('Prestasi - Using local path:', fotoPath);
         
         // SUPERADMIN: Direct submit to main table
         if (userRole === 'superadmin') {
@@ -141,47 +83,30 @@ router.post('/prestasi/submit', auth, checkInputAccess('prestasi'), upload.singl
                 id: result.insertId 
             });
         }
-        
-        // SISWA/GURU: Submit for approval
-        // Find pembina user ID
-        const [pembinaUser] = await db.query('SELECT id FROM users WHERE nama = ? AND role = "guru" LIMIT 1', [pembina]);
-        const pembinaId = pembinaUser.length > 0 ? pembinaUser[0].id : null;
-        console.log('Prestasi - Pembina found:', pembinaId, 'for pembina name:', pembina);
-        
+
+        // SISWA/GURU: Submit for approval (superadmin only)
         const [result] = await db.query(
-            `INSERT INTO prestasi_approvals 
-            (user_id, nama, nis, jenis, nama_lomba, jurusan, kelas, pembina, grha, juara, kategori, foto_path, pembina_id) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [userId, nama, nis, jenis, nama_lomba, jurusan, kelas, pembina, grha, juara, kategori, fotoPath, pembinaId]
+            `INSERT INTO prestasi_approvals
+            (user_id, nama, nis, jenis, nama_lomba, jurusan, kelas, pembina, grha, juara, kategori, foto_path)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [userId, nama, nis, jenis, nama_lomba, jurusan, kelas, pembina, grha, juara, kategori, fotoPath]
         );
-        
-        // Create notification for pembina
-        if (pembinaId) {
-            await db.query(
-                `INSERT INTO notifications (user_id, type, title, message, related_id, related_type) 
-                 VALUES (?, 'approval_needed', 'Persetujuan Prestasi', ?, ?, 'prestasi')`,
-                [pembinaId, `${nama} (${nis}) mengajukan prestasi: ${nama_lomba}`, result.insertId]
-            );
-            console.log('Prestasi - Notification sent to pembina:', pembinaId);
-        } else {
-            console.log('Prestasi - No pembina found, notification not sent to pembina');
-        }
-        
-        // Create notification for superadmin
+
+        // Create notification for superadmin only
         const [superadmins] = await db.query('SELECT id FROM users WHERE role = "superadmin"');
         console.log('Prestasi - Superadmins found:', superadmins.length);
         for (const admin of superadmins) {
             await db.query(
-                `INSERT INTO notifications (user_id, type, title, message, related_id, related_type) 
-                 VALUES (?, 'new_submission', 'Pengajuan Prestasi Baru', ?, ?, 'prestasi')`,
+                `INSERT INTO notifications (user_id, type, title, message, related_id, related_type)
+                 VALUES (?, 'approval_needed', 'Persetujuan Prestasi', ?, ?, 'prestasi')`,
                 [admin.id, `${nama} (${nis}) mengajukan prestasi: ${nama_lomba}`, result.insertId]
             );
             console.log('Prestasi - Notification sent to superadmin:', admin.id);
         }
-        
-        res.status(201).json({ 
-            message: 'Prestasi berhasil diajukan untuk persetujuan', 
-            id: result.insertId 
+
+        res.status(201).json({
+            message: 'Prestasi berhasil diajukan untuk persetujuan',
+            id: result.insertId
         });
     } catch (error) {
         console.error(error);
@@ -208,50 +133,8 @@ router.post('/event/submit', auth, checkInputAccess('event'), upload.single('fot
         const userId = req.user.id;
         const userRole = req.user.role;
         const { nama, nis, kelas, grha, jurusan, pembina, nama_event, tingkat } = req.body;
-        let foto_path = req.file ? req.file.filename : null;
-        
-        // Upload to Google Drive if file exists
-        if (req.file) {
-            try {
-                console.log('Event - Checking Drive configuration...');
-                const [driveConfig] = await db.query('SELECT drive_url FROM drive_links WHERE type = ?', ['event']);
-                console.log('Event - Drive config:', driveConfig);
-                
-                const folderId = driveConfig.length > 0 ? extractFolderId(driveConfig[0].drive_url) : null;
-                console.log('Event - Extracted folder ID:', folderId);
-                
-                if (folderId) {
-                    console.log('Event - Uploading to Drive...');
-                    // Format: Nama_NIS_foto.jpg untuk memudahkan pencarian
-                    const fileExt = req.file.originalname.includes('.') ? req.file.originalname.substring(req.file.originalname.lastIndexOf('.')) : '.jpg';
-                    const descriptiveFileName = `${nama}_${nis}_foto${fileExt}`;
-                    console.log('Event - File will be named:', descriptiveFileName, '(original:', req.file.originalname, ')');
-                    const uploadResult = await uploadPhotoToDrive(
-                        req.file.path,
-                        descriptiveFileName,
-                        folderId,
-                        req.file.mimetype
-                    );
-                    console.log('Event - Uploaded to Drive:', uploadResult.webViewLink, 'Method:', uploadResult.method, 'File:', descriptiveFileName);
-                    
-                    // Delete local file after upload
-                    fs.unlinkSync(req.file.path);
-                    foto_path = uploadResult.webViewLink; // Save Drive link instead of local path
-                } else {
-                    console.log('Event - Drive not configured, using local storage');
-                    // Keep local file, but save relative URL path instead of full path
-                    const relativePath = path.join('/uploads/approvals', path.basename(req.file.path));
-                    foto_path = relativePath.replace(/\\/g, '/');
-                    console.log('Event - Using local path:', foto_path);
-                }
-            } catch (driveError) {
-                console.error('Event - Drive upload error:', driveError);
-                // Continue with local file if Drive upload fails
-                const relativePath = path.join('/uploads/approvals', path.basename(req.file.path));
-                foto_path = relativePath.replace(/\\/g, '/');
-                console.log('Event - Using local path (fallback):', foto_path);
-            }
-        }
+        let foto_path = req.file ? saveFileLocally(req.file.path) : null;
+        console.log('Event - Using local path:', foto_path);
         
         // SUPERADMIN: Direct submit to main table
         if (userRole === 'superadmin') {
@@ -279,44 +162,30 @@ router.post('/event/submit', auth, checkInputAccess('event'), upload.single('fot
                 id: result.insertId 
             });
         }
-        
-        // SISWA/GURU: Submit for approval
-        const [pembinaUser] = await db.query('SELECT id FROM users WHERE nama = ? AND role = "guru" LIMIT 1', [pembina]);
-        const pembinaId = pembinaUser.length > 0 ? pembinaUser[0].id : null;
-        console.log('Event - Pembina found:', pembinaId, 'for pembina name:', pembina);
-        
+
+        // SISWA/GURU: Submit for approval (superadmin only)
         const [result] = await db.query(
-            `INSERT INTO event_approvals 
-            (user_id, nama, nis, kelas, grha, jurusan, pembina, nama_event, tingkat, foto_path, pembina_id) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [userId, nama, nis, kelas, grha, jurusan, pembina, nama_event, tingkat, foto_path, pembinaId]
+            `INSERT INTO event_approvals
+            (user_id, nama, nis, kelas, grha, jurusan, pembina, nama_event, tingkat, foto_path)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [userId, nama, nis, kelas, grha, jurusan, pembina, nama_event, tingkat, foto_path]
         );
-        
-        if (pembinaId) {
-            await db.query(
-                `INSERT INTO notifications (user_id, type, title, message, related_id, related_type) 
-                 VALUES (?, 'approval_needed', 'Persetujuan Event', ?, ?, 'event')`,
-                [pembinaId, `${nama} (${nis}) mengajukan event: ${nama_event}`, result.insertId]
-            );
-            console.log('Event - Notification sent to pembina:', pembinaId);
-        } else {
-            console.log('Event - No pembina found, notification not sent to pembina');
-        }
-        
+
+        // Create notification for superadmin only
         const [superadmins] = await db.query('SELECT id FROM users WHERE role = "superadmin"');
         console.log('Event - Superadmins found:', superadmins.length);
         for (const admin of superadmins) {
             await db.query(
-                `INSERT INTO notifications (user_id, type, title, message, related_id, related_type) 
-                 VALUES (?, 'new_submission', 'Pengajuan Event Baru', ?, ?, 'event')`,
+                `INSERT INTO notifications (user_id, type, title, message, related_id, related_type)
+                 VALUES (?, 'approval_needed', 'Persetujuan Event', ?, ?, 'event')`,
                 [admin.id, `${nama} (${nis}) mengajukan event: ${nama_event}`, result.insertId]
             );
             console.log('Event - Notification sent to superadmin:', admin.id);
         }
-        
-        res.status(201).json({ 
-            message: 'Event berhasil diajukan untuk persetujuan', 
-            id: result.insertId 
+
+        res.status(201).json({
+            message: 'Event berhasil diajukan untuk persetujuan',
+            id: result.insertId
         });
     } catch (error) {
         console.error(error);
@@ -343,50 +212,8 @@ router.post('/organisasi/submit', auth, checkInputAccess('organisasi'), upload.s
         const userId = req.user.id;
         const userRole = req.user.role;
         const { nama, nis, kelas, grha, jurusan, pembina, jabatan_organisasi, kategori_organisasi } = req.body;
-        let foto_path = req.file ? req.file.filename : null;
-        
-        // Upload to Google Drive if file exists
-        if (req.file) {
-            try {
-                console.log('Organisasi - Checking Drive configuration...');
-                const [driveConfig] = await db.query('SELECT drive_url FROM drive_links WHERE type = ?', ['organisasi']);
-                console.log('Organisasi - Drive config:', driveConfig);
-                
-                const folderId = driveConfig.length > 0 ? extractFolderId(driveConfig[0].drive_url) : null;
-                console.log('Organisasi - Extracted folder ID:', folderId);
-                
-                if (folderId) {
-                    console.log('Organisasi - Uploading to Drive...');
-                    // Format: Nama_NIS_foto.jpg untuk memudahkan pencarian
-                    const fileExt = req.file.originalname.includes('.') ? req.file.originalname.substring(req.file.originalname.lastIndexOf('.')) : '.jpg';
-                    const descriptiveFileName = `${nama}_${nis}_foto${fileExt}`;
-                    console.log('Organisasi - File will be named:', descriptiveFileName, '(original:', req.file.originalname, ')');
-                    const uploadResult = await uploadPhotoToDrive(
-                        req.file.path,
-                        descriptiveFileName,
-                        folderId,
-                        req.file.mimetype
-                    );
-                    console.log('Organisasi - Uploaded to Drive:', uploadResult.webViewLink, 'Method:', uploadResult.method, 'File:', descriptiveFileName);
-                    
-                    // Delete local file after upload
-                    fs.unlinkSync(req.file.path);
-                    foto_path = uploadResult.webViewLink; // Save Drive link instead of local path
-                } else {
-                    console.log('Organisasi - Drive not configured, using local storage');
-                    // Keep local file, but save relative URL path instead of full path
-                    const relativePath = path.join('/uploads/approvals', path.basename(req.file.path));
-                    foto_path = relativePath.replace(/\\/g, '/');
-                    console.log('Organisasi - Using local path:', foto_path);
-                }
-            } catch (driveError) {
-                console.error('Organisasi - Drive upload error:', driveError);
-                // Continue with local file if Drive upload fails
-                const relativePath = path.join('/uploads/approvals', path.basename(req.file.path));
-                foto_path = relativePath.replace(/\\/g, '/');
-                console.log('Organisasi - Using local path (fallback):', foto_path);
-            }
-        }
+        let foto_path = req.file ? saveFileLocally(req.file.path) : null;
+        console.log('Organisasi - Using local path:', foto_path);
         
         // SUPERADMIN: Direct submit to main table
         if (userRole === 'superadmin') {
@@ -415,43 +242,29 @@ router.post('/organisasi/submit', auth, checkInputAccess('organisasi'), upload.s
             });
         }
         
-        // SISWA/GURU: Submit for approval
-        const [pembinaUser] = await db.query('SELECT id FROM users WHERE nama = ? AND role = "guru" LIMIT 1', [pembina]);
-        const pembinaId = pembinaUser.length > 0 ? pembinaUser[0].id : null;
-        console.log('Pembina found:', pembinaId, 'for pembina name:', pembina);
-        
+        // SISWA/GURU: Submit for approval (superadmin only)
         const [result] = await db.query(
-            `INSERT INTO organisasi_approvals 
-            (user_id, nama, nis, kelas, grha, jurusan, pembina, jabatan_organisasi, kategori_organisasi, foto_path, pembina_id) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [userId, nama, nis, kelas, grha, jurusan, pembina, jabatan_organisasi, kategori_organisasi, foto_path, pembinaId]
+            `INSERT INTO organisasi_approvals
+            (user_id, nama, nis, kelas, grha, jurusan, pembina, jabatan_organisasi, kategori_organisasi, foto_path)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [userId, nama, nis, kelas, grha, jurusan, pembina, jabatan_organisasi, kategori_organisasi, foto_path]
         );
-        
-        if (pembinaId) {
-            await db.query(
-                `INSERT INTO notifications (user_id, type, title, message, related_id, related_type) 
-                 VALUES (?, 'approval_needed', 'Persetujuan Organisasi', ?, ?, 'organisasi')`,
-                [pembinaId, `${nama} (${nis}) mengajukan organisasi: ${kategori_organisasi}`, result.insertId]
-            );
-            console.log('Notification sent to pembina:', pembinaId);
-        } else {
-            console.log('No pembina found, notification not sent to pembina');
-        }
-        
+
+        // Create notification for superadmin only
         const [superadmins] = await db.query('SELECT id FROM users WHERE role = "superadmin"');
-        console.log('Superadmins found:', superadmins.length);
+        console.log('Organisasi - Superadmins found:', superadmins.length);
         for (const admin of superadmins) {
             await db.query(
-                `INSERT INTO notifications (user_id, type, title, message, related_id, related_type) 
-                 VALUES (?, 'new_submission', 'Pengajuan Organisasi Baru', ?, ?, 'organisasi')`,
+                `INSERT INTO notifications (user_id, type, title, message, related_id, related_type)
+                 VALUES (?, 'approval_needed', 'Persetujuan Organisasi', ?, ?, 'organisasi')`,
                 [admin.id, `${nama} (${nis}) mengajukan organisasi: ${kategori_organisasi}`, result.insertId]
             );
-            console.log('Notification sent to superadmin:', admin.id);
+            console.log('Organisasi - Notification sent to superadmin:', admin.id);
         }
-        
-        res.status(201).json({ 
-            message: 'Organisasi berhasil diajukan untuk persetujuan', 
-            id: result.insertId 
+
+        res.status(201).json({
+            message: 'Organisasi berhasil diajukan untuk persetujuan',
+            id: result.insertId
         });
     } catch (error) {
         console.error(error);
@@ -497,99 +310,26 @@ router.post('/siswa/submit', auth, teacherOrSuperAdmin, async (req, res) => {
 
 // ==================== APPROVAL ACTIONS ====================
 
-// Pembina Approve/Reject
-router.put('/pembina/:type/:id', auth, teacherOrSuperAdmin, async (req, res) => {
-    try {
-        const { type, id } = req.params;
-        const { status, notes } = req.body;
-        const pembinaId = req.user.id;
-        
-        let table, points, pointType;
-        switch(type) {
-            case 'prestasi':
-                table = 'prestasi_approvals';
-                points = { 'juara 1': 20, 'juara 2': 15, 'juara 3': 10 };
-                break;
-            case 'event':
-                table = 'event_approvals';
-                points = { 'sekolah': 2, 'kecamatan': 4, 'kabupaten': 6, 'provinsi': 8, 'nasional': 10, 'internasional': 12 };
-                break;
-            case 'organisasi':
-                table = 'organisasi_approvals';
-                points = { 'ketua': 6, 'wakil ketua': 5, 'sekretaris': 4, 'bendahara': 3, 'koordinator': 2, 'anggota': 1 };
-                break;
-            default:
-                return res.status(400).json({ message: 'Invalid type' });
-        }
-        
-        if (status === 'approved') {
-            await db.query(
-                `UPDATE ${table} SET pembina_status = 'approved', pembina_approved_at = NOW(), pembina_notes = ?, pembina_id = ? WHERE id = ?`,
-                [notes || 'Disetujui oleh pembina', pembinaId, id]
-            );
-            
-            // Notify student
-            const [submission] = await db.query(`SELECT user_id, nama, ${type === 'organisasi' ? 'kategori_organisasi, jabatan_organisasi' : type === 'prestasi' ? 'nama_lomba, juara' : 'nama_event, tingkat'} FROM ${table} WHERE id = ?`, [id]);
-            if (submission.length > 0) {
-                await db.query(
-                    `INSERT INTO notifications (user_id, type, title, message, related_id, related_type) 
-                     VALUES (?, 'pembina_approved', 'Persetujuan Pembina', ?, ?, ?)`,
-                    [submission[0].user_id, `Pengajuan Anda telah disetujui oleh Pembina dan menunggu persetujuan SuperAdmin`, id, type]
-                );
-                
-                // Notify all SuperAdmins
-                const detailField = type === 'organisasi' ? submission[0].kategori_organisasi : type === 'prestasi' ? submission[0].nama_lomba : submission[0].nama_event;
-                const [superadmins] = await db.query('SELECT id FROM users WHERE role = "superadmin"');
-                for (const admin of superadmins) {
-                    await db.query(
-                        `INSERT INTO notifications (user_id, type, title, message, related_id, related_type) 
-                         VALUES (?, 'approval_needed', 'Persetujuan SuperAdmin Diperlukan', ?, ?, ?)`,
-                        [admin.id, `Pengajuan ${type} dari ${submission[0].nama} telah disetujui oleh Pembina dan menunggu persetujuan Anda: ${detailField}`, id, type]
-                    );
-                }
-            }
-        } else {
-            await db.query(
-                `UPDATE ${table} SET pembina_status = 'rejected', pembina_notes = ?, pembina_id = ? WHERE id = ?`,
-                [notes || 'Ditolak oleh pembina', pembinaId, id]
-            );
-            
-            // Notify student of rejection
-            const [submission] = await db.query(`SELECT user_id, nama FROM ${table} WHERE id = ?`, [id]);
-            if (submission.length > 0) {
-                await db.query(
-                    `INSERT INTO notifications (user_id, type, title, message, related_id, related_type) 
-                     VALUES (?, 'rejected', 'Pengajuan Ditolak', ?, ?, ?)`,
-                    [submission[0].user_id, `Pengajuan Anda ditolak oleh Pembina: ${notes || 'Tidak ada alasan'}`, id, type]
-                );
-            }
-        }
-        
-        res.json({ message: `Pengajuan ${type} ${status === 'approved' ? 'disetujui' : 'ditolak'} oleh Pembina` });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server error' });
-    }
-});
+// REMOVED: Pembina approval route - now only superadmin approval
 
-// SuperAdmin Final Approve/Reject
+// SuperAdmin Approve/Reject (single-step approval)
 router.put('/superadmin/:type/:id', auth, superAdminOnly, async (req, res) => {
     try {
         const { type, id } = req.params;
         const { status, notes } = req.body;
-        
+
         console.log(`SuperAdmin ${status} request: type=${type}, id=${id}`);
-        
+
         if (type === 'siswa') {
             return handleSiswaApproval(id, status, notes, res);
         }
-        
+
         let table, targetTable, points, pointField, pointType;
         switch(type) {
             case 'prestasi':
                 table = 'prestasi_approvals';
                 targetTable = 'prestasi';
-                points = { 'juara 1': 20, 'juara 2': 15, 'juara 3': 10 };
+                points = { 'juara 1': { 'kecamatan': 15, 'kabupaten': 20, 'provinsi': 30, 'nasional': 50, 'internasional': 100 }, 'juara 2': { 'kecamatan': 12, 'kabupaten': 17, 'provinsi': 27, 'nasional': 45, 'internasional': 90 }, 'juara 3': { 'kecamatan': 10, 'kabupaten': 15, 'provinsi': 25, 'nasional': 40, 'internasional': 80 } };
                 pointField = 'juara';
                 pointType = 'Prestasi';
                 break;
@@ -610,33 +350,27 @@ router.put('/superadmin/:type/:id', auth, superAdminOnly, async (req, res) => {
             default:
                 return res.status(400).json({ message: 'Invalid type' });
         }
-        
+
         // Get submission data
-        const [data] = await db.query(`SELECT * FROM ${table} WHERE id = ?`, [id]);
-        if (data.length === 0) {
+        const [submission] = await db.query(`SELECT * FROM ${table} WHERE id = ?`, [id]);
+        if (submission.length === 0) {
             return res.status(404).json({ message: 'Submission not found' });
         }
-        
-        console.log('Submission data:', data[0]);
-        
+
+        const data = submission[0];
+        console.log('Submission data:', data);
+
         if (status === 'approved') {
-            // Get submission data
-            const [submission] = await db.query(`SELECT * FROM ${table} WHERE id = ?`, [id]);
-            if (submission.length === 0) {
-                return res.status(404).json({ message: 'Submission not found' });
-            }
-            
-            const data = submission[0];
-            console.log('Approving data:', data);
-            
-            // Check if pembina already approved
-            if (data.pembina_status !== 'approved') {
-                return res.status(400).json({ message: 'Belum disetujui oleh Pembina' });
-            }
-            
             // Calculate points
-            const pointChange = points[data[pointField]] || 0;
-            
+            let pointChange = 0;
+            if (type === 'prestasi') {
+                const juara = data.juara;
+                const kategori = data.kategori;
+                pointChange = points[juara]?.[kategori] || 0;
+            } else {
+                pointChange = points[data[pointField]] || 0;
+            }
+
             // Insert to actual table
             let insertQuery, insertParams;
             if (type === 'prestasi') {
@@ -649,60 +383,59 @@ router.put('/superadmin/:type/:id', auth, superAdminOnly, async (req, res) => {
                 insertQuery = `INSERT INTO organisasi (user_id, nama, nis, kelas, grha, jurusan, jabatan_organisasi, kategori_organisasi, foto, point, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'approved')`;
                 insertParams = [data.user_id, data.nama || 'Unknown', data.nis || '', data.kelas || '', data.grha || '', data.jurusan || '', data.jabatan_organisasi || '', data.kategori_organisasi || '', data.foto_path || null, pointChange];
             }
-            
+
             await db.query(insertQuery, insertParams);
-            
+
             // Update IPC
             const [user] = await db.query('SELECT ipc_total FROM users WHERE id = ?', [data.user_id]);
             if (user.length > 0) {
                 const ipcSebelum = user[0].ipc_total;
                 const ipcBaru = ipcSebelum + pointChange;
                 await db.query('UPDATE users SET ipc_total = ? WHERE id = ?', [ipcBaru, data.user_id]);
-                
+
                 // Log IPC history
                 await db.query(
-                    `INSERT INTO ipc_history (user_id, jenis_perubahan, point_change, ipc_sebelum, ipc_sesudah, keterangan) 
+                    `INSERT INTO ipc_history (user_id, jenis_perubahan, point_change, ipc_sebelum, ipc_sesudah, keterangan)
                      VALUES (?, ?, ?, ?, ?, ?)`,
                     [data.user_id, type, pointChange, ipcSebelum, ipcBaru, `Poin dari ${pointType}: ${data[pointField]}`]
                 );
             }
-            
+
             // Update approval status
             await db.query(
-                `UPDATE ${table} SET superadmin_status = 'approved', superadmin_approved_at = NOW(), superadmin_notes = ? WHERE id = ?`,
+                `UPDATE ${table} SET status = 'approved', approved_at = NOW(), notes = ? WHERE id = ?`,
                 [notes || 'Disetujui oleh SuperAdmin', id]
             );
-            
+
             // Notify student
             await db.query(
-                `INSERT INTO notifications (user_id, type, title, message, related_id, related_type) 
-                 VALUES (?, 'approved', 'Pengajuan Disetujui', ?, ?, ?)`,
-                [data.user_id, `Selamat! Pengajuan ${pointType} Anda telah disetujui dan poin telah ditambahkan.`, id, type]
+                `INSERT INTO notifications (user_id, type, title, message, related_id, related_type) VALUES (?, 'approved', 'Pengajuan Disetujui', ?, ?, ?)`,
+                [data.user_id, `Pengajuan ${type} Anda telah disetujui`, id, type]
             );
-            
+
+            res.json({ message: `${type} berhasil disetujui` });
         } else {
-            // Reject
+            // Update approval status to rejected
             await db.query(
-                `UPDATE ${table} SET superadmin_status = 'rejected', superadmin_notes = ? WHERE id = ?`,
+                `UPDATE ${table} SET status = 'rejected', notes = ? WHERE id = ?`,
                 [notes || 'Ditolak oleh SuperAdmin', id]
             );
-            
-            const [submission] = await db.query(`SELECT user_id FROM ${table} WHERE id = ?`, [id]);
-            if (submission.length > 0) {
-                await db.query(
-                    `INSERT INTO notifications (user_id, type, title, message, related_id, related_type) 
-                     VALUES (?, 'rejected', 'Pengajuan Ditolak', ?, ?, ?)`,
-                    [submission[0].user_id, `Pengajuan Anda ditolak oleh SuperAdmin: ${notes || 'Tidak ada alasan'}`, id, type]
-                );
-            }
+
+            // Notify student of rejection
+            await db.query(
+                `INSERT INTO notifications (user_id, type, title, message, related_id, related_type) VALUES (?, 'rejected', 'Pengajuan Ditolak', ?, ?, ?)`,
+                [data.user_id, `Pengajuan ${type} Anda ditolak: ${notes || 'Tanpa alasan'}`, id, type]
+            );
+
+            res.json({ message: `${type} berhasil ditolak` });
         }
-        
-        res.json({ message: `Pengajuan ${type} ${status === 'approved' ? 'disetujui' : 'ditolak'} oleh SuperAdmin` });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error' });
     }
 });
+
+// Get approvals for Pembina (Guru) - REMOVED: No longer needed
 
 // Handle Siswa Approval
 async function handleSiswaApproval(id, status, notes, res) {
@@ -778,36 +511,33 @@ async function handleSiswaApproval(id, status, notes, res) {
 router.get('/all', auth, superAdminOnly, async (req, res) => {
     try {
         const [prestasi] = await db.query(`
-            SELECT p.*, u.nama as user_name, pembina.nama as pembina_name, pembina.foto as pembina_foto
+            SELECT p.*, u.nama as user_name
             FROM prestasi_approvals p
             JOIN users u ON p.user_id = u.id
-            LEFT JOIN users pembina ON p.pembina_id = pembina.id
-            WHERE p.superadmin_status = 'pending'
+            WHERE p.status = 'pending'
         `);
-        
+
         const [event] = await db.query(`
-            SELECT e.*, u.nama as user_name, pembina.nama as pembina_name, pembina.foto as pembina_foto
+            SELECT e.*, u.nama as user_name
             FROM event_approvals e
             JOIN users u ON e.user_id = u.id
-            LEFT JOIN users pembina ON e.pembina_id = pembina.id
-            WHERE e.superadmin_status = 'pending'
+            WHERE e.status = 'pending'
         `);
-        
+
         const [organisasi] = await db.query(`
-            SELECT o.*, u.nama as user_name, pembina.nama as pembina_name, pembina.foto as pembina_foto
+            SELECT o.*, u.nama as user_name
             FROM organisasi_approvals o
             JOIN users u ON o.user_id = u.id
-            LEFT JOIN users pembina ON o.pembina_id = pembina.id
-            WHERE o.superadmin_status = 'pending'
+            WHERE o.status = 'pending'
         `);
-        
+
         const [siswa] = await db.query(`
             SELECT s.*, creator.nama as created_by_name
             FROM siswa_approvals s
             JOIN users creator ON s.created_by = creator.id
             WHERE s.superadmin_status = 'pending'
         `);
-        
+
         res.json({
             prestasi: prestasi.map(p => ({ ...p, type: 'prestasi' })),
             event: event.map(e => ({ ...e, type: 'event' })),
@@ -820,42 +550,7 @@ router.get('/all', auth, superAdminOnly, async (req, res) => {
     }
 });
 
-// Get approvals for Pembina (Guru)
-router.get('/pembina', auth, teacherOrSuperAdmin, async (req, res) => {
-    try {
-        const pembinaId = req.user.id;
-        
-        const [prestasi] = await db.query(`
-            SELECT p.*, u.nama as user_name, u.foto as user_foto
-            FROM prestasi_approvals p
-            JOIN users u ON p.user_id = u.id
-            WHERE p.pembina_id = ? AND p.pembina_status = 'pending'
-        `, [pembinaId]);
-        
-        const [event] = await db.query(`
-            SELECT e.*, u.nama as user_name, u.foto as user_foto
-            FROM event_approvals e
-            JOIN users u ON e.user_id = u.id
-            WHERE e.pembina_id = ? AND e.pembina_status = 'pending'
-        `, [pembinaId]);
-        
-        const [organisasi] = await db.query(`
-            SELECT o.*, u.nama as user_name, u.foto as user_foto
-            FROM organisasi_approvals o
-            JOIN users u ON o.user_id = u.id
-            WHERE o.pembina_id = ? AND o.pembina_status = 'pending'
-        `, [pembinaId]);
-        
-        res.json({
-            prestasi: prestasi.map(p => ({ ...p, type: 'prestasi' })),
-            event: event.map(e => ({ ...e, type: 'event' })),
-            organisasi: organisasi.map(o => ({ ...o, type: 'organisasi' }))
-        });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server error' });
-    }
-});
+// Get approvals for Pembina (Guru) - REMOVED: No longer needed
 
 // Get user's submissions
 router.get('/user-submissions', auth, async (req, res) => {

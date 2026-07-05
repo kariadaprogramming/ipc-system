@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import * as XLSX from 'xlsx';
 
 function KelolaAkun() {
   const [users, setUsers] = useState([]);
@@ -11,6 +12,15 @@ function KelolaAkun() {
   const [showEditForm, setShowEditForm] = useState(false);
   const [editStudent, setEditStudent] = useState(null);
   const [userRole, setUserRole] = useState(null);
+  const [filters, setFilters] = useState({
+    role: '',
+    kelas: '',
+    jurusan: '',
+    grha: ''
+  });
+  const [excelFile, setExcelFile] = useState(null);
+  const [importing, setImporting] = useState(false);
+  const [importResults, setImportResults] = useState([]);
 
   const kelasOptions = [
     'KELAS 10 TKJ 1', 'KELAS 10 TKJ 2', 'KELAS 10 TO 1', 'KELAS 10 TO 2',
@@ -24,6 +34,22 @@ function KelolaAkun() {
   const grhaOptions = [
     'Airsanya', 'Daksina', 'Genya', 'Madhya', 'Nairiti', 'Pascima', 'Purwa', 'Uttara', 'Wayabhya'
   ];
+
+  const filteredUsers = users.filter(user => {
+    if (filters.role && user.role !== filters.role) return false;
+    if (filters.kelas && user.kelas !== filters.kelas) return false;
+    if (filters.jurusan && user.jurusan !== filters.jurusan) return false;
+    if (filters.grha && user.grha !== filters.grha) return false;
+    return true;
+  });
+
+  const handleFilterChange = (key, value) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+  };
+
+  const resetFilters = () => {
+    setFilters({ role: '', kelas: '', jurusan: '', grha: '' });
+  };
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('user'));
@@ -131,7 +157,6 @@ function KelolaAkun() {
         nama: user.nama,
         nip: user.nip,
         jabatan: user.jabatan,
-        alamat: user.alamat,
         no_hp: user.no_hp
       });
     }
@@ -163,6 +188,85 @@ function KelolaAkun() {
       fetchUsers();
     } catch (error) {
       setMessage(error.response?.data?.message || 'Gagal update data');
+    }
+  };
+
+  const handleExcelFileChange = (e) => {
+    setExcelFile(e.target.files[0]);
+  };
+
+  const handleExcelImport = async () => {
+    if (!excelFile) {
+      setMessage('Please select an Excel file');
+      return;
+    }
+
+    setImporting(true);
+    setImportResults([]);
+    const results = [];
+
+    try {
+      const data = await excelFile.arrayBuffer();
+      const workbook = XLSX.read(data, { type: 'array' });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+      const token = localStorage.getItem('token');
+
+      for (const row of jsonData) {
+        try {
+          // Determine if this is a student or teacher based on fields
+          const isStudent = row.nis && !row.nip;
+
+          if (isStudent) {
+            // Import student
+            const studentData = {
+              nama: row.nama || row.Nama || '',
+              nis: row.nis || row.NIS || '',
+              nisn: row.nisn || row.NISN || '',
+              kelas: row.kelas || row.Kelas || '',
+              jurusan: row.jurusan || row.Jurusan || 'TKJ',
+              grha: row.grha || row.Gra || '',
+              password: row.password || row.Password || '123456'
+            };
+
+            await axios.post('/users/create-student', studentData, {
+              headers: { Authorization: `Bearer ${token}` }
+            });
+            results.push({ status: 'success', name: studentData.nama, type: 'siswa' });
+          } else {
+            // Import teacher
+            const teacherData = {
+              nama: row.nama || row.Nama || '',
+              nip: row.nip || row.NIP || '',
+              jabatan: row.jabatan || row.Jabatan || '',
+              no_hp: row.no_hp || row.NoHP || row['No HP'] || '',
+              password: row.password || row.Password || '123456'
+            };
+
+            await axios.post('/users/create-teacher', teacherData, {
+              headers: { Authorization: `Bearer ${token}` }
+            });
+            results.push({ status: 'success', name: teacherData.nama, type: 'guru' });
+          }
+        } catch (error) {
+          results.push({
+            status: 'error',
+            name: row.nama || row.Nama || 'Unknown',
+            error: error.response?.data?.message || error.message
+          });
+        }
+      }
+
+      setImportResults(results);
+      setMessage(`Import completed: ${results.filter(r => r.status === 'success').length} successful, ${results.filter(r => r.status === 'error').length} failed`);
+      fetchUsers();
+    } catch (error) {
+      setMessage('Error reading Excel file: ' + error.message);
+    } finally {
+      setImporting(false);
+      setExcelFile(null);
     }
   };
 
@@ -200,10 +304,125 @@ function KelolaAkun() {
         
         {/* Buat Akun Guru - only for superadmin */}
         {userRole === 'superadmin' && (
-          <button className="btn btn-success" onClick={() => { setShowForm(true); setFormType('teacher'); setFormData({}); }}>
+          <button className="btn btn-success" onClick={() => { setShowForm(true); setFormType('teacher'); setFormData({}); }} style={{ marginRight: '10px' }}>
             + Buat Akun Guru
           </button>
         )}
+
+        {/* Import from Excel - only for superadmin */}
+        {userRole === 'superadmin' && (
+          <button className="btn btn-info" onClick={() => setExcelFile({})} style={{ marginRight: '10px' }}>
+            📥 Import Excel
+          </button>
+        )}
+      </div>
+
+      {/* Excel Import Section */}
+      {userRole === 'superadmin' && excelFile && (
+        <div className="card" style={{ marginBottom: '20px', padding: '15px' }}>
+          <h4>Import dari Excel</h4>
+          <div style={{ marginBottom: '15px' }}>
+            <input
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={handleExcelFileChange}
+              style={{ marginBottom: '10px' }}
+            />
+            <div style={{ fontSize: '12px', color: '#666', marginBottom: '10px' }}>
+              <strong>Format untuk Siswa:</strong> nama, nis, nisn, kelas, jurusan, grha, password<br/>
+              <strong>Format untuk Guru:</strong> nama, nip, jabatan, no_hp, password
+            </div>
+            <button
+              className="btn btn-primary"
+              onClick={handleExcelImport}
+              disabled={importing || !excelFile}
+            >
+              {importing ? 'Importing...' : 'Import'}
+            </button>
+            <button
+              className="btn btn-danger"
+              onClick={() => { setExcelFile(null); setImportResults([]); }}
+              style={{ marginLeft: '10px' }}
+            >
+              Cancel
+            </button>
+          </div>
+
+          {importResults.length > 0 && (
+            <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid #ddd', padding: '10px', borderRadius: '4px' }}>
+              <h5>Import Results:</h5>
+              {importResults.map((result, index) => (
+                <div key={index} style={{ 
+                  padding: '5px', 
+                  marginBottom: '5px', 
+                  backgroundColor: result.status === 'success' ? '#d4edda' : '#f8d7da',
+                  borderRadius: '4px',
+                  fontSize: '12px'
+                }}>
+                  {result.status === 'success' ? '✅' : '❌'} {result.name} ({result.type}) - {result.status === 'error' ? result.error : 'Success'}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Filters */}
+      <div className="card" style={{ marginBottom: '20px', padding: '15px' }}>
+        <h4>Filter</h4>
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          {userRole === 'superadmin' && (
+            <div style={{ flex: '1', minWidth: '150px' }}>
+              <label>Role</label>
+              <select
+                value={filters.role}
+                onChange={(e) => handleFilterChange('role', e.target.value)}
+                className="form-control"
+              >
+                <option value="">Semua Role</option>
+                <option value="superadmin">Superadmin</option>
+                <option value="guru">Guru</option>
+                <option value="siswa">Siswa</option>
+              </select>
+            </div>
+          )}
+          <div style={{ flex: '1', minWidth: '150px' }}>
+            <label>Kelas</label>
+            <select
+              value={filters.kelas}
+              onChange={(e) => handleFilterChange('kelas', e.target.value)}
+              className="form-control"
+            >
+              <option value="">Semua Kelas</option>
+              {kelasOptions.map(k => <option key={k} value={k}>{k}</option>)}
+            </select>
+          </div>
+          <div style={{ flex: '1', minWidth: '150px' }}>
+            <label>Jurusan</label>
+            <select
+              value={filters.jurusan}
+              onChange={(e) => handleFilterChange('jurusan', e.target.value)}
+              className="form-control"
+            >
+              <option value="">Semua Jurusan</option>
+              <option value="TKJ">TKJ</option>
+              <option value="TO">TO</option>
+              <option value="DPIB">DPIB</option>
+            </select>
+          </div>
+          <div style={{ flex: '1', minWidth: '150px' }}>
+            <label>Grha</label>
+            <select
+              value={filters.grha}
+              onChange={(e) => handleFilterChange('grha', e.target.value)}
+              className="form-control"
+            >
+              <option value="">Semua Grha</option>
+              {grhaOptions.map(grha => <option key={grha} value={grha}>{grha}</option>)}
+            </select>
+          </div>
+          <button className="btn btn-secondary" onClick={resetFilters}>Reset</button>
+        </div>
       </div>
 
       {showForm && (
@@ -268,10 +487,6 @@ function KelolaAkun() {
               <div className="form-group">
                 <label>Jabatan</label>
                 <input type="text" value={formData.jabatan || ''} onChange={(e) => setFormData({...formData, jabatan: e.target.value})} />
-              </div>
-              <div className="form-group">
-                <label>Alamat</label>
-                <input type="text" value={formData.alamat || ''} onChange={(e) => setFormData({...formData, alamat: e.target.value})} />
               </div>
               <div className="form-group">
                 <label>No HP</label>
@@ -344,10 +559,6 @@ function KelolaAkun() {
                   <input type="text" value={formData.jabatan || ''} onChange={(e) => setFormData({...formData, jabatan: e.target.value})} />
                 </div>
                 <div className="form-group">
-                  <label>Alamat</label>
-                  <input type="text" value={formData.alamat || ''} onChange={(e) => setFormData({...formData, alamat: e.target.value})} />
-                </div>
-                <div className="form-group">
                   <label>No HP</label>
                   <input type="text" value={formData.no_hp || ''} onChange={(e) => setFormData({...formData, no_hp: e.target.value})} />
                 </div>
@@ -374,7 +585,7 @@ function KelolaAkun() {
             </tr>
           </thead>
           <tbody>
-            {users.map(user => (
+            {filteredUsers.map(user => (
               <tr key={user.id}>
                 <td>{user.nama}</td>
                 <td>{user.nis || user.nip || '-'}</td>

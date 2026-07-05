@@ -70,9 +70,6 @@ app.use('/api/pelanggaran', require('./routes/pelanggaran'));
 app.use('/api/perilaku', require('./routes/perilaku'));
 app.use('/api/approvals', require('./routes/approvals'));
 app.use('/api/approvals-v2', require('./routes/approvals-v2'));
-app.use('/api/drive-links', require('./routes/drive-links'));
-app.use('/api/drive-status', require('./routes/drive-status'));
-app.use('/api/drive-auth', require('./routes/drive-auth'));
 app.use('/api/permissions', require('./routes/permissions'));
 app.use('/api/input-access', require('./routes/input-access'));
 app.use('/api/logs', require('./routes/logs'));
@@ -81,6 +78,7 @@ app.use('/api/wali-kelas', require('./routes/waliKelas'));
 app.use('/api/search', require('./routes/search'));
 app.use('/api/profile', require('./routes/profile'));
 app.use('/api/reports', require('./routes/reports'));
+app.use('/api/file-viewer', require('./routes/file-viewer'));
 
 // Global error handler - Security: Don't expose internal details
 app.use(errorHandler);

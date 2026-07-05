@@ -18,7 +18,6 @@ import WaliKelas from './components/WaliKelas';
 import TeacherWaliKelas from './components/TeacherWaliKelas';
 // import Approvals from './components/Approvals'; // Old approvals component
 import ApprovalsV2 from './components/ApprovalsV2';
-import PembinaApprovals from './components/PembinaApprovals';
 import DriveViewer from './components/DriveViewer';
 import Notifications from './components/Notifications';
 import LaporanCetak from './components/LaporanCetak';
@@ -172,11 +171,6 @@ function App() {
         <Route path="/approvals" element={
           <ProtectedRoute allowedRoles={['superadmin']}>
             {(user) => <MainLayout user={user}><ApprovalsV2 /></MainLayout>}
-          </ProtectedRoute>
-        } />
-        <Route path="/pembina-approvals" element={
-          <ProtectedRoute allowedRoles={['guru']}>
-            {(user) => <MainLayout user={user}><PembinaApprovals /></MainLayout>}
           </ProtectedRoute>
         } />
         <Route path="/drive-viewer" element={

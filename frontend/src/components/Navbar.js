@@ -1,6 +1,5 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { PWA_CONFIG } from '../config';
 
 function Navbar({ user, onLogout, isMobileMenuOpen, toggleMobileMenu }) {
   // const [permissions, setPermissions] = useState(null);
@@ -42,10 +41,9 @@ function Navbar({ user, onLogout, isMobileMenuOpen, toggleMobileMenu }) {
     { path: '/kelola-akun', label: 'Kelola Akun', show: user?.role === 'superadmin' },
     { path: '/kelola-siswa', label: 'Kelola Siswa', show: user?.role === 'guru' },
     { path: '/izin-akun', label: 'Izin Akun', show: user?.role === 'superadmin' },
-    // Approvals for superadmin, Pembina Approvals for guru
+    // Approvals for superadmin only
     { path: '/approvals', label: 'Approvals', show: user?.role === 'superadmin' },
-    { path: '/pembina-approvals', label: 'Persetujuan', show: user?.role === 'guru' },
-    { path: '/drive-viewer', label: 'Drive Viewer', show: user?.role === 'superadmin' },
+    { path: '/drive-viewer', label: 'File Manager', show: user?.role === 'superadmin' },
     { path: '/notifications', label: 'Notifikasi', show: user?.role === 'siswa' || user?.role === 'guru' },
     { path: '/logs', label: 'Logs', show: user?.role === 'superadmin' },
     { path: '/wali-kelas', label: 'Manajemen Wali Kelas', show: user?.role === 'superadmin' },
@@ -65,12 +63,9 @@ function Navbar({ user, onLogout, isMobileMenuOpen, toggleMobileMenu }) {
     <>
       <div className={`sidebar ${isMobileMenuOpen ? 'open' : ''}`}>
         <div className="sidebar-header">
-          <div className="sidebar-logo">
-            <img src={PWA_CONFIG.logoUrl} alt={PWA_CONFIG.shortName} style={{width: '100%', height: '100%', objectFit: 'cover'}} />
-          </div>
           <div className="sidebar-header-content">
-            <h2>{PWA_CONFIG.shortName}</h2>
-            <p>{PWA_CONFIG.description}</p>
+            <h2>IPC School</h2>
+            <p>Sistem Informasi Sekolah IPC</p>
           </div>
         </div>
         <ul className="sidebar-nav">

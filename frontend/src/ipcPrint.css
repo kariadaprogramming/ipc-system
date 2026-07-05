@@ -45,20 +45,20 @@
 
 .ipc-print-sheet {
   width: 210mm;
-  min-height: 297mm;
+  min-height: auto;
   margin: 0 auto;
-  padding: 15mm 18mm 18mm;
+  padding: 5mm 8mm 5mm;
   background: #fff;
   color: #000;
   font-family: 'Times New Roman', Times, serif;
-  font-size: 12pt;
-  line-height: 1.4;
+  font-size: 10pt;
+  line-height: 1.2;
   box-sizing: border-box;
 }
 
 /* Header */
 .report-header {
-  margin-bottom: 15px;
+  margin-bottom: 5px;
   text-align: center;
 }
 
@@ -70,45 +70,52 @@
 }
 
 .report-divider {
-  border-top: 3px solid #000;
-  margin: 15px 0;
+  border-top: 2px solid #000;
+  margin: 8px 0;
 }
 
 /* Title */
 .report-title {
   text-align: center;
-  margin: 25px 0;
+  margin: 10px 0;
 }
 
 .report-title h2 {
-  font-size: 16pt;
+  font-size: 12pt;
   font-weight: bold;
-  margin: 0 0 6px 0;
+  margin: 0 0 3px 0;
   color: #000;
 }
 
 .report-title p {
-  font-size: 11pt;
+  font-size: 9pt;
   margin: 0;
   color: #333;
 }
 
 /* Student Info */
 .student-info {
-  margin: 25px 0;
-  padding: 15px 20px;
+  margin: 10px 0;
+  padding: 8px 12px;
   border: 1px solid #000;
   background: #f9f9f9;
+  display: flex;
+  gap: 12px;
+}
+
+.info-column-left,
+.info-column-right {
+  flex: 1;
 }
 
 .info-row {
   display: flex;
-  margin: 6px 0;
-  font-size: 11pt;
+  margin: 3px 0;
+  font-size: 9pt;
 }
 
 .info-label {
-  width: 120px;
+  width: 100px;
   font-weight: bold;
   color: #000;
 }
@@ -120,7 +127,7 @@
 
 /* IPC Table */
 .ipc-table-container {
-  margin: 25px 0;
+  margin: 10px 0;
 }
 
 .ipc-table {
@@ -132,17 +139,17 @@
 .ipc-table thead tr th {
   background: #000;
   color: white;
-  padding: 10px;
-  font-size: 12pt;
+  padding: 4px 6px;
+  font-size: 9pt;
   font-weight: bold;
   text-align: center;
   border: 1px solid #000;
 }
 
 .ipc-table tbody tr td {
-  padding: 8px 10px;
+  padding: 3px 6px;
   border: 1px solid #000;
-  font-size: 11pt;
+  font-size: 9pt;
 }
 
 .ipc-table tbody tr td:first-child {
@@ -196,8 +203,8 @@
 .signatures {
   display: flex;
   justify-content: space-between;
-  margin-top: 45px;
-  padding: 0 15px;
+  margin-top: 15px;
+  padding: 0 8px;
 }
 
 .signature-block {
@@ -206,30 +213,30 @@
 }
 
 .signature-block p {
-  margin: 6px 0;
-  font-size: 11pt;
+  margin: 2px 0;
+  font-size: 9pt;
   color: #333;
 }
 
 .signature-title {
   font-weight: bold;
-  margin: 18px 0 6px 0 !important;
+  margin: 8px 0 2px 0 !important;
 }
 
 .signature-space {
-  height: 70px;
-  margin: 8px 0;
+  height: 35px;
+  margin: 3px 0;
 }
 
 .signature-name {
   font-weight: bold;
-  font-size: 12pt;
-  margin: 8px 0 4px 0 !important;
+  font-size: 10pt;
+  margin: 3px 0 1px 0 !important;
   text-decoration: underline;
 }
 
 .signature-nip {
-  font-size: 10pt;
+  font-size: 8pt;
   margin: 0 !important;
 }
 
@@ -264,17 +271,14 @@
     width: 100%;
     min-height: auto;
     margin: 0;
-    padding: 10mm 12mm;
+    padding: 8mm 10mm;
     box-shadow: none;
-    page-break-after: always;
-  }
-
-  body.ipc-print-active .ipc-print-sheet:last-child {
-    page-break-after: auto;
+    page-break-inside: avoid;
+    page-break-before: auto;
   }
 
   @page {
     size: A4 portrait;
-    margin: 10mm;
+    margin: 5mm;
   }
 }

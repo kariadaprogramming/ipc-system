@@ -128,7 +128,7 @@ function InputPrestasi() {
     setFormData({ ...formData, [name]: value });
 
     // Auto-fill student data when NIS is entered
-    if (name === 'nis' && value.length >= 3) {
+    if (name === 'nis' && value.length >= 1) {
       fetchStudentData(value);
     }
   };
@@ -180,7 +180,11 @@ function InputPrestasi() {
         data.append(key, formData[key]);
       });
       if (foto) {
-        data.append('foto', foto);
+        // Prepend NIS to filename if NIS exists
+        const fileToUpload = formData.nis
+          ? new File([foto], `${formData.nis}_${foto.name}`, { type: foto.type })
+          : foto;
+        data.append('foto', fileToUpload);
       }
 
       const response = await axios.post('/approvals-v2/prestasi/submit', data, {

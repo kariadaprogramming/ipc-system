@@ -6,6 +6,7 @@
 -- ==================== CORE TABLES ====================
 
 -- Users Table
+DROP TABLE IF EXISTS users;
 CREATE TABLE users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nama VARCHAR(100) NOT NULL,
@@ -29,6 +30,7 @@ CREATE TABLE users (
 );
 
 -- Permissions Table
+DROP TABLE IF EXISTS permissions;
 CREATE TABLE permissions (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
@@ -44,6 +46,7 @@ CREATE TABLE permissions (
 -- ==================== DATA TABLES ====================
 
 -- Prestasi Table
+DROP TABLE IF EXISTS prestasi;
 CREATE TABLE prestasi (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
@@ -65,6 +68,7 @@ CREATE TABLE prestasi (
 );
 
 -- Organisasi Table
+DROP TABLE IF EXISTS organisasi;
 CREATE TABLE organisasi (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
@@ -84,6 +88,7 @@ CREATE TABLE organisasi (
 );
 
 -- Event Table
+DROP TABLE IF EXISTS event;
 CREATE TABLE event (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
@@ -103,6 +108,7 @@ CREATE TABLE event (
 );
 
 -- Pelanggaran Table
+DROP TABLE IF EXISTS pelanggaran;
 CREATE TABLE pelanggaran (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
@@ -122,6 +128,7 @@ CREATE TABLE pelanggaran (
 );
 
 -- Perilaku Table
+DROP TABLE IF EXISTS perilaku;
 CREATE TABLE perilaku (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
@@ -141,6 +148,7 @@ CREATE TABLE perilaku (
 -- ==================== LOGGING & HISTORY TABLES ====================
 
 -- Activity Logs Table
+DROP TABLE IF EXISTS activity_logs;
 CREATE TABLE activity_logs (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
@@ -152,6 +160,7 @@ CREATE TABLE activity_logs (
 );
 
 -- IPC History Table
+DROP TABLE IF EXISTS ipc_history;
 CREATE TABLE ipc_history (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
@@ -167,6 +176,7 @@ CREATE TABLE ipc_history (
 -- ==================== WALI KELAS TABLES ====================
 
 -- Wali Kelas Assignment Table
+DROP TABLE IF EXISTS wali_kelas_assignment;
 CREATE TABLE wali_kelas_assignment (
     id INT AUTO_INCREMENT PRIMARY KEY,
     guru_id INT NOT NULL,
@@ -180,7 +190,8 @@ CREATE TABLE wali_kelas_assignment (
 -- ==================== APPROVAL TABLES ====================
 
 -- Prestasi Approvals Table
-CREATE TABLE IF NOT EXISTS prestasi_approvals (
+DROP TABLE IF EXISTS prestasi_approvals;
+CREATE TABLE prestasi_approvals (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
     nama VARCHAR(255) NOT NULL,
@@ -194,21 +205,17 @@ CREATE TABLE IF NOT EXISTS prestasi_approvals (
     juara VARCHAR(50),
     kategori VARCHAR(50),
     foto_path VARCHAR(255),
-    pembina_status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
-    superadmin_status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
-    pembina_id INT,
-    pembina_approved_at TIMESTAMP NULL,
-    superadmin_approved_at TIMESTAMP NULL,
-    pembina_notes TEXT,
-    superadmin_notes TEXT,
+    status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
+    approved_at TIMESTAMP NULL,
+    notes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id),
-    FOREIGN KEY (pembina_id) REFERENCES users(id)
+    FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
 -- Event Approvals Table
-CREATE TABLE IF NOT EXISTS event_approvals (
+DROP TABLE IF EXISTS event_approvals;
+CREATE TABLE event_approvals (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
     nama VARCHAR(255) NOT NULL,
@@ -220,21 +227,17 @@ CREATE TABLE IF NOT EXISTS event_approvals (
     nama_event VARCHAR(255) NOT NULL,
     tingkat VARCHAR(50),
     foto_path VARCHAR(255),
-    pembina_status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
-    superadmin_status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
-    pembina_id INT,
-    pembina_approved_at TIMESTAMP NULL,
-    superadmin_approved_at TIMESTAMP NULL,
-    pembina_notes TEXT,
-    superadmin_notes TEXT,
+    status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
+    approved_at TIMESTAMP NULL,
+    notes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id),
-    FOREIGN KEY (pembina_id) REFERENCES users(id)
+    FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
 -- Organisasi Approvals Table
-CREATE TABLE IF NOT EXISTS organisasi_approvals (
+DROP TABLE IF EXISTS organisasi_approvals;
+CREATE TABLE organisasi_approvals (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
     nama VARCHAR(255) NOT NULL,
@@ -246,21 +249,17 @@ CREATE TABLE IF NOT EXISTS organisasi_approvals (
     jabatan_organisasi VARCHAR(100),
     kategori_organisasi VARCHAR(255),
     foto_path VARCHAR(255),
-    pembina_status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
-    superadmin_status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
-    pembina_id INT,
-    pembina_approved_at TIMESTAMP NULL,
-    superadmin_approved_at TIMESTAMP NULL,
-    pembina_notes TEXT,
-    superadmin_notes TEXT,
+    status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
+    approved_at TIMESTAMP NULL,
+    notes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id),
-    FOREIGN KEY (pembina_id) REFERENCES users(id)
+    FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
 -- Siswa Approvals Table (for new student accounts created by guru)
-CREATE TABLE IF NOT EXISTS siswa_approvals (
+DROP TABLE IF EXISTS siswa_approvals;
+CREATE TABLE siswa_approvals (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
     nama VARCHAR(255) NOT NULL,
@@ -282,6 +281,7 @@ CREATE TABLE IF NOT EXISTS siswa_approvals (
 );
 
 -- Biodata Update Approvals Table
+DROP TABLE IF EXISTS biodata_update_approvals;
 CREATE TABLE biodata_update_approvals (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
@@ -310,6 +310,7 @@ CREATE TABLE biodata_update_approvals (
 );
 
 -- Student Creation Approvals Table
+DROP TABLE IF EXISTS student_creation_approvals;
 CREATE TABLE student_creation_approvals (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nama VARCHAR(100) NOT NULL,
@@ -330,7 +331,8 @@ CREATE TABLE student_creation_approvals (
 -- ==================== NOTIFICATIONS TABLE ====================
 
 -- Notifications Table
-CREATE TABLE IF NOT EXISTS notifications (
+DROP TABLE IF EXISTS notifications;
+CREATE TABLE notifications (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
     type VARCHAR(50) NOT NULL,
@@ -344,19 +346,12 @@ CREATE TABLE IF NOT EXISTS notifications (
 );
 
 -- ==================== DRIVE LINKS TABLE ====================
-
--- Drive Links Table
-CREATE TABLE IF NOT EXISTS drive_links (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    type ENUM('prestasi', 'event', 'organisasi', 'pelanggaran', 'perilaku') NOT NULL UNIQUE,
-    drive_url VARCHAR(500) NOT NULL,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+-- REMOVED: Google Drive integration replaced with local server storage
 
 -- ==================== INPUT ACCESS CONTROL TABLES ====================
 
 -- Input Access Control Table
+DROP TABLE IF EXISTS input_access_control;
 CREATE TABLE input_access_control (
     id INT AUTO_INCREMENT PRIMARY KEY,
     control_type ENUM('global', 'role') NOT NULL,
@@ -369,6 +364,7 @@ CREATE TABLE input_access_control (
 );
 
 -- Input Access Logs Table
+DROP TABLE IF EXISTS input_access_logs;
 CREATE TABLE input_access_logs (
     id INT AUTO_INCREMENT PRIMARY KEY,
     control_type ENUM('global', 'role', 'individual') NOT NULL,
@@ -386,18 +382,15 @@ CREATE TABLE input_access_logs (
 
 -- Indexes for Prestasi Approvals
 CREATE INDEX idx_prestasi_user ON prestasi_approvals(user_id);
-CREATE INDEX idx_prestasi_pembina ON prestasi_approvals(pembina_id);
-CREATE INDEX idx_prestasi_status ON prestasi_approvals(pembina_status, superadmin_status);
+CREATE INDEX idx_prestasi_status ON prestasi_approvals(status);
 
 -- Indexes for Event Approvals
 CREATE INDEX idx_event_user ON event_approvals(user_id);
-CREATE INDEX idx_event_pembina ON event_approvals(pembina_id);
-CREATE INDEX idx_event_status ON event_approvals(pembina_status, superadmin_status);
+CREATE INDEX idx_event_status ON event_approvals(status);
 
 -- Indexes for Organisasi Approvals
 CREATE INDEX idx_organisasi_user ON organisasi_approvals(user_id);
-CREATE INDEX idx_organisasi_pembina ON organisasi_approvals(pembina_id);
-CREATE INDEX idx_organisasi_status ON organisasi_approvals(pembina_status, superadmin_status);
+CREATE INDEX idx_organisasi_status ON organisasi_approvals(status);
 
 -- Indexes for Notifications
 CREATE INDEX idx_notifications_user ON notifications(user_id);
@@ -413,15 +406,6 @@ INSERT INTO users (nama, nis, password, role, ipc_total, ipc_awal) VALUES
 -- const bcrypt = require('bcryptjs');
 -- const hash = bcrypt.hashSync('admin123', 10);
 -- console.log(hash);
-
--- Insert default drive links
-INSERT INTO drive_links (type, drive_url) VALUES
-('prestasi', 'https://drive.google.com/drive/folders/'),
-('event', 'https://drive.google.com/drive/folders/'),
-('organisasi', 'https://drive.google.com/drive/folders/'),
-('pelanggaran', 'https://drive.google.com/drive/folders/'),
-('perilaku', 'https://drive.google.com/drive/folders/')
-ON DUPLICATE KEY UPDATE drive_url = VALUES(drive_url);
 
 -- Insert default values for input access control (semua input diaktifkan secara default)
 INSERT INTO input_access_control (control_type, role_target, jenis_input, is_enabled, updated_by) VALUES

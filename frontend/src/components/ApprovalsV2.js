@@ -157,9 +157,9 @@ function ApprovalsV2() {
     }
 
     const columns = {
-      prestasi: ['Nama', 'NIS', 'Lomba', 'Juara', 'Pembina', 'Foto', 'Status', 'Aksi'],
-      event: ['Nama', 'NIS', 'Event', 'Tingkat', 'Pembina', 'Foto', 'Status', 'Aksi'],
-      organisasi: ['Nama', 'NIS', 'Organisasi', 'Jabatan', 'Pembina', 'Foto', 'Status', 'Aksi'],
+      prestasi: ['Nama', 'NIS', 'Lomba', 'Juara', 'Kategori', 'Foto', 'Status', 'Aksi'],
+      event: ['Nama', 'NIS', 'Event', 'Tingkat', 'Foto', 'Status', 'Aksi'],
+      organisasi: ['Nama', 'NIS', 'Organisasi', 'Jabatan', 'Foto', 'Status', 'Aksi'],
       siswa: ['Nama', 'NIS', 'NISN', 'Kelas', 'Dibuat Oleh', 'Status', 'Aksi'],
       biodata: ['Siswa', 'NIS Lama', 'NIS Baru', 'Perubahan', 'Diajukan Oleh', 'Status', 'Aksi'],
       student_creation: ['Nama', 'NIS', 'NISN', 'Kelas', 'Diajukan Oleh', 'Status', 'Aksi']
@@ -200,6 +200,7 @@ function ApprovalsV2() {
                 <>
                   <td>{item.nama_lomba}</td>
                   <td>{item.juara}</td>
+                  <td>{item.kategori}</td>
                 </>
               )}
               {type === 'event' && (
@@ -263,32 +264,36 @@ function ApprovalsV2() {
                   </td>
                 </>
               )}
+              {type === 'siswa' && <td>{item.created_by_name || '-'}</td>}
               {type !== 'siswa' && type !== 'biodata' && type !== 'student_creation' && (
                 <td>
-                  <div>
-                    <strong>{item.pembina_name || item.pembina || '-'}</strong>
-                    {item.pembina_foto && (
-                      <div style={{ marginTop: '5px' }}>
-                        <img 
-                          src={getPhotoUrl(item.pembina_foto)} 
-                          alt="Foto Pembina" 
-                          style={{ width: '50px', height: '50px', objectFit: 'cover', borderRadius: '5px', cursor: 'pointer' }}
-                          onClick={() => window.open(getPhotoUrl(item.pembina_foto), '_blank')}
-                          title="Klik untuk memperbesar"
-                        />
-                      </div>
-                    )}
-                  </div>
+                  {item.status === 'pending' ? (
+                    <span className="badge badge-warning">⏳ Menunggu</span>
+                  ) : item.status === 'approved' ? (
+                    <span className="badge badge-success">✅ Disetujui</span>
+                  ) : (
+                    <span className="badge badge-danger">❌ Ditolak</span>
+                  )}
                 </td>
               )}
-              {type === 'siswa' && <td>{item.created_by_name || '-'}</td>}
+              {type === 'siswa' && (
+                <td>
+                  {item.superadmin_status === 'pending' ? (
+                    <span className="badge badge-warning">⏳ Menunggu</span>
+                  ) : item.superadmin_status === 'approved' ? (
+                    <span className="badge badge-success">✅ Disetujui</span>
+                  ) : (
+                    <span className="badge badge-danger">❌ Ditolak</span>
+                  )}
+                </td>
+              )}
               {type !== 'siswa' && type !== 'biodata' && type !== 'student_creation' && (
                 <td>
                   {item.foto_path ? (
                     <div>
-                      <img 
-                        src={getPhotoUrl(item.foto_path)} 
-                        alt="Foto Bukti" 
+                      <img
+                        src={getPhotoUrl(item.foto_path)}
+                        alt="Foto Bukti"
                         style={{ width: '60px', height: '60px', objectFit: 'cover', borderRadius: '5px', cursor: 'pointer' }}
                         onClick={() => window.open(getPhotoUrl(item.foto_path), '_blank')}
                         title="Klik untuk memperbesar"

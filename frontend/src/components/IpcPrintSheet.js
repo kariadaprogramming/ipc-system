@@ -123,29 +123,33 @@ function IpcPrintSheet({ student, wali, history, printDate = new Date() }) {
 
       {/* Student Information */}
       <section className="student-info">
-        <div className="info-row">
-          <span className="info-label">Nama:</span>
-          <span className="info-value">{student?.nama || '-'}</span>
+        <div className="info-column-left">
+          <div className="info-row">
+            <span className="info-label">Nama:</span>
+            <span className="info-value">{student?.nama || '-'}</span>
+          </div>
+          <div className="info-row">
+            <span className="info-label">NIS/NISN:</span>
+            <span className="info-value">{formatNisNisn(student?.nis, student?.nisn)}</span>
+          </div>
+          <div className="info-row">
+            <span className="info-label">Wali Kelas:</span>
+            <span className="info-value">{wali?.nama || 'Putu Andika Wirasatriya, S.Pd.'}</span>
+          </div>
         </div>
-        <div className="info-row">
-          <span className="info-label">NIS/NISN:</span>
-          <span className="info-value">{formatNisNisn(student?.nis, student?.nisn)}</span>
-        </div>
-        <div className="info-row">
-          <span className="info-label">Kelas:</span>
-          <span className="info-value">{student?.kelas || '-'}</span>
-        </div>
-        <div className="info-row">
-          <span className="info-label">Grha:</span>
-          <span className="info-value">{student?.grha || '-'}</span>
-        </div>
-        <div className="info-row">
-          <span className="info-label">Wali Kelas:</span>
-          <span className="info-value">{wali?.nama || 'Putu Andika Wirasatriya, S.Pd.'}</span>
-        </div>
-        <div className="info-row">
-          <span className="info-label">Semester:</span>
-          <span className="info-value">{formatTahunPelajaran(printDate)}</span>
+        <div className="info-column-right">
+          <div className="info-row">
+            <span className="info-label">Kelas:</span>
+            <span className="info-value">{student?.kelas || '-'}</span>
+          </div>
+          <div className="info-row">
+            <span className="info-label">Grha:</span>
+            <span className="info-value">{student?.grha || '-'}</span>
+          </div>
+          <div className="info-row">
+            <span className="info-label">Semester:</span>
+            <span className="info-value">{formatTahunPelajaran(printDate)}</span>
+          </div>
         </div>
       </section>
 

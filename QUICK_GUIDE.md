@@ -363,7 +363,7 @@ Error: ERR_BLOCKED_BY_RESPONSE
 ### Documentation Files
 - **DOCUMENTATION.md** - Full system documentation
 - **REQUIREMENTS.md** - Installation requirements
-- **FLOWCHART.html** - Visual diagrams (open in browser)
+- **FLOWCHART.html** - Visual diagrams (open in browser, print to PDF)
 - **SECURITY.md** - Security features & best practices
 
 ### Default Credentials
