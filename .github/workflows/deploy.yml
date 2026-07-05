@@ -31,18 +31,24 @@ jobs:
             echo "Building frontend..."
             npm run build
 
-            # Copy frontend build to XAMPP htdocs
-            echo "Copying frontend build to XAMPP..."
-            rm -rf ${{ secrets.XAMPP_PATH }}/ipc-system
-            mkdir -p ${{ secrets.XAMPP_PATH }}/ipc-system
-            cp -r build/* ${{ secrets.XAMPP_PATH }}/ipc-system/
+            # Copy frontend build to Apache document root
+            echo "Copying frontend build to Apache..."
+            Copy-Item -Path build -Destination "${{ secrets.APACHE_DOCUMENT_ROOT }}/ipc-system" -Recurse -Force
 
             # Deploy Backend
             echo "Installing backend dependencies..."
             cd ../backend
             npm install
 
-            # Restart backend service using PM2
-            pm2 restart ipc-backend || pm2 start server.js --name ipc-backend
+            # Restart backend service using PM2 with production environment
+            pm2 restart ipc-backend --update-env || pm2 start server.js --name ipc-backend --env production
+
+            # Restart Apache to apply configuration changes
+            echo "Restarting Apache..."
+            # For XAMPP on Windows
+            # C:\xampp\apache\bin\httpd.exe -k restart
+            # Or use Apache Monitor
+            # Or restart Apache service
+            echo "Please restart Apache manually if needed"
 
             echo "Deployment completed successfully!"
