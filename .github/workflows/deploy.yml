@@ -22,7 +22,7 @@ jobs:
             cd ${{ secrets.PROJECT_PATH }}
 
             # Pull latest changes
-            git pull origin main
+            git pull
 
             # Deploy Frontend
             echo "Installing frontend dependencies..."
