@@ -9,17 +9,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Deploy to Server
-        uses: appleboy/ssh-action@master
+        uses: webfactory/ssh-action@master
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
           port: ${{ secrets.SERVER_PORT || 22 }}
-          script_stop: true
           script: |
-            echo "Shell test"
-            echo $0
-            pwd
             echo "Starting deployment..."
             cd ${{ secrets.PROJECT_PATH }}
             echo "Pulling latest changes..."
@@ -28,7 +24,7 @@ jobs:
             cd frontend
             npm install
             echo "Building frontend with production environment..."
-            export NODE_ENV=production
+            set NODE_ENV=production
             npm run build
             echo "Installing backend dependencies..."
             cd ../backend
