@@ -1,22 +1,18 @@
-const { spawn } = require('child_process');
+const express = require('express');
 const path = require('path');
 
-// Serve the build folder using the serve package
-const servePath = path.join(__dirname, 'node_modules', '.bin', 'serve');
-const buildPath = path.join(__dirname, 'build');
+const app = express();
+const PORT = 3000;
 
-const serve = spawn(servePath, ['-s', buildPath, '-l', '3000'], {
-  cwd: __dirname,
-  stdio: 'inherit',
-  shell: true
+// Serve static files from the build directory
+app.use(express.static(path.join(__dirname, 'build')));
+
+// Handle client-side routing - serve index.html for all routes
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'build', 'index.html'));
 });
 
-serve.on('error', (err) => {
-  console.error('Failed to start serve:', err);
-  process.exit(1);
-});
-
-serve.on('exit', (code) => {
-  console.log(`Serve exited with code ${code}`);
-  process.exit(code);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Frontend server running on http://0.0.0.0:${PORT}`);
+  console.log(`Serving build directory: ${path.join(__dirname, 'build')}`);
 });
