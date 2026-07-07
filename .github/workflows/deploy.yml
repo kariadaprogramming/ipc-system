@@ -17,22 +17,21 @@ jobs:
           port: ${{ secrets.SERVER_PORT || 22 }}
           script_stop: true
           script: |
-            echo Starting deployment...
-            D:
+            echo "Shell test"
+            echo $0
+            pwd
+            echo "Starting deployment..."
             cd ${{ secrets.PROJECT_PATH }}
-            echo Stopping running processes...
-            taskkill /F /IM node.exe >nul 2>&1
-            echo Done
-            echo Pulling latest changes...
+            echo "Pulling latest changes..."
             git pull
-            echo Installing frontend dependencies...
+            echo "Installing frontend dependencies..."
             cd frontend
             npm install
-            echo Building frontend with production environment...
-            set NODE_ENV=production
+            echo "Building frontend with production environment..."
+            export NODE_ENV=production
             npm run build
-            echo Installing backend dependencies...
+            echo "Installing backend dependencies..."
             cd ../backend
             npm install
-            echo Deployment completed successfully!
-            echo Please start the application manually
+            echo "Deployment completed successfully!"
+            echo "Please start the application manually"
