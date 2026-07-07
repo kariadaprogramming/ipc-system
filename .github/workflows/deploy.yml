@@ -16,7 +16,7 @@ jobs:
           password: ${{ secrets.SERVER_PASSWORD }}
           port: ${{ secrets.SERVER_PORT || 22 }}
           script: |
-            echo "Starting deployment..."
+            echo "Starting installation..."
 
             # Navigate to project directory
             D:
@@ -33,12 +33,9 @@ jobs:
             $env:NODE_ENV="production"
             npm run build
 
-            # Start frontend with PM2
-            echo "Starting frontend with PM2..."
-
-            # Deploy Backend
+            # Install Backend
             echo "Installing backend dependencies..."
             cd ../backend
             npm install
 
-            echo "Deployment completed successfully!"
+            echo "Installation completed successfully!"
