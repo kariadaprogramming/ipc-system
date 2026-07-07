@@ -21,6 +21,7 @@ function KelolaAkun() {
   const [excelFile, setExcelFile] = useState(null);
   const [importing, setImporting] = useState(false);
   const [importResults, setImportResults] = useState([]);
+  const [importType, setImportType] = useState('siswa');
 
   const kelasOptions = [
     'KELAS 10 TKJ 1', 'KELAS 10 TKJ 2', 'KELAS 10 TO 1', 'KELAS 10 TO 2',
@@ -216,10 +217,7 @@ function KelolaAkun() {
 
       for (const row of jsonData) {
         try {
-          // Determine if this is a student or teacher based on fields
-          const isStudent = row.nis && !row.nip;
-
-          if (isStudent) {
+          if (importType === 'siswa') {
             // Import student
             const studentData = {
               nama: row.nama || row.Nama || '',
@@ -270,6 +268,21 @@ function KelolaAkun() {
     }
   };
 
+  const downloadTemplate = (type) => {
+    const templateData = type === 'siswa'
+      ? [
+          { Nama: '', NIS: '', NISN: '', Kelas: '', Jurusan: 'TKJ', Gra: '', Password: '123456' }
+        ]
+      : [
+          { Nama: '', NIP: '', Jabatan: '', NoHP: '', Password: '123456' }
+        ];
+
+    const ws = XLSX.utils.json_to_sheet(templateData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Template');
+    XLSX.writeFile(wb, `template_${type}.xlsx`);
+  };
+
   if (loading) {
     return <div className="loading"><div className="spinner"></div></div>;
   }
@@ -311,17 +324,29 @@ function KelolaAkun() {
 
         {/* Import from Excel - only for superadmin */}
         {userRole === 'superadmin' && (
-          <button className="btn btn-info" onClick={() => setExcelFile({})} style={{ marginRight: '10px' }}>
-            📥 Import Excel
-          </button>
+          <>
+            <button className="btn btn-info" onClick={() => { setImportType('siswa'); setExcelFile({}); }} style={{ marginRight: '10px' }}>
+              📥 Import Siswa
+            </button>
+            <button className="btn btn-info" onClick={() => { setImportType('guru'); setExcelFile({}); }} style={{ marginRight: '10px' }}>
+              📥 Import Guru
+            </button>
+          </>
         )}
       </div>
 
       {/* Excel Import Section */}
       {userRole === 'superadmin' && excelFile && (
         <div className="card" style={{ marginBottom: '20px', padding: '15px' }}>
-          <h4>Import dari Excel</h4>
+          <h4>Import {importType === 'siswa' ? 'Siswa' : 'Guru'} dari Excel</h4>
           <div style={{ marginBottom: '15px' }}>
+            <button
+              className="btn btn-secondary"
+              onClick={() => downloadTemplate(importType)}
+              style={{ marginBottom: '10px' }}
+            >
+              📥 Download Template {importType === 'siswa' ? 'Siswa' : 'Guru'}
+            </button>
             <input
               type="file"
               accept=".xlsx,.xls"
@@ -329,8 +354,11 @@ function KelolaAkun() {
               style={{ marginBottom: '10px' }}
             />
             <div style={{ fontSize: '12px', color: '#666', marginBottom: '10px' }}>
-              <strong>Format untuk Siswa:</strong> nama, nis, nisn, kelas, jurusan, grha, password<br/>
-              <strong>Format untuk Guru:</strong> nama, nip, jabatan, no_hp, password
+              {importType === 'siswa' ? (
+                <strong>Format Siswa:</strong>
+              ) : (
+                <strong>Format Guru:</strong>
+              )} {importType === 'siswa' ? 'nama, nis, nisn, kelas, jurusan, grha, password' : 'nama, nip, jabatan, no_hp, password'}
             </div>
             <button
               className="btn btn-primary"
@@ -340,7 +368,7 @@ function KelolaAkun() {
               {importing ? 'Importing...' : 'Import'}
             </button>
             <button
-              className="btn btn-danger"
+              className="btn btn-secondary"
               onClick={() => { setExcelFile(null); setImportResults([]); }}
               style={{ marginLeft: '10px' }}
             >
