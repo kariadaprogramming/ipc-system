@@ -39,11 +39,40 @@ app.use(xssPrevention);
 // Security Middleware - Input sanitization
 app.use(sanitizeInput);
 
-// CORS - Restricted for production
+// CORS - Allow requests from same origin or configured origins
 const corsOptions = {
-  origin: process.env.NODE_ENV === 'production' 
-    ? process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000']
-    : '*',
+  origin: function(origin, callback) {
+    // Allow requests with no origin (like mobile apps, curl, etc.)
+    if (!origin) return callback(null, true);
+
+    // In development, allow all
+    if (process.env.NODE_ENV !== 'production') {
+      return callback(null, true);
+    }
+
+    // In production, check allowed origins
+    const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [
+      'http://localhost:3000',
+      'http://202.162.215.133:3000',
+      'http://202.162.215.133'
+    ];
+
+    // Allow if origin is in allowed list or same IP different port
+    const isAllowed = allowedOrigins.some(allowed => {
+      // Exact match
+      if (allowed === origin) return true;
+      // Same IP, different port
+      const allowedUrl = new URL(allowed);
+      const originUrl = new URL(origin);
+      return allowedUrl.hostname === originUrl.hostname;
+    });
+
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
