@@ -17,4 +17,22 @@ jobs:
           port: ${{ secrets.SERVER_PORT || 22 }}
           script_stop: true
           script: |
-            powershell -Command "Write-Host 'Starting deployment...'; D:; cd '${{ secrets.PROJECT_PATH }}'; Write-Host 'Stopping running processes...'; taskkill /F /IM node.exe 2`$null; Write-Host 'Done'; Write-Host 'Pulling latest changes...'; git pull; Write-Host 'Installing frontend dependencies...'; cd frontend; npm install; Write-Host 'Building frontend with production environment...'; `$env:NODE_ENV='production'; npm run build; Write-Host 'Installing backend dependencies...'; cd ../backend; npm install; Write-Host 'Deployment completed successfully!'; Write-Host 'Please start the application manually'"
+            echo Starting deployment...
+            D:
+            cd ${{ secrets.PROJECT_PATH }}
+            echo Stopping running processes...
+            taskkill /F /IM node.exe >nul 2>&1
+            echo Done
+            echo Pulling latest changes...
+            git pull
+            echo Installing frontend dependencies...
+            cd frontend
+            npm install
+            echo Building frontend with production environment...
+            set NODE_ENV=production
+            npm run build
+            echo Installing backend dependencies...
+            cd ../backend
+            npm install
+            echo Deployment completed successfully!
+            echo Please start the application manually
