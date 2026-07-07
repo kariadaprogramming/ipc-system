@@ -2,12 +2,13 @@ const { spawn } = require('child_process');
 const path = require('path');
 
 // Serve the build folder using the serve package
-const servePath = path.join(__dirname, 'node_modules', 'serve', 'bin', 'serve.js');
+const servePath = path.join(__dirname, 'node_modules', '.bin', 'serve');
 const buildPath = path.join(__dirname, 'build');
 
-const serve = spawn('node', [servePath, '-s', buildPath, '-l', '3000'], {
+const serve = spawn(servePath, ['-s', buildPath, '-l', '3000'], {
   cwd: __dirname,
-  stdio: 'inherit'
+  stdio: 'inherit',
+  shell: true
 });
 
 serve.on('error', (err) => {
