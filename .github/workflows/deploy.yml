@@ -16,26 +16,48 @@ jobs:
           password: ${{ secrets.SERVER_PASSWORD }}
           port: ${{ secrets.SERVER_PORT || 22 }}
           script: |
-            echo "Starting installation..."
+            echo "Starting deployment..."
 
             # Navigate to project directory
             D:
             cd ${{ secrets.PROJECT_PATH }}
 
+            # Stop running Node.js processes
+            echo "Stopping running processes..."
+            taskkill /F /IM node.exe 2>$null || echo "No node processes running"
+
             # Pull latest changes
+            echo "Pulling latest changes..."
             git pull
+            if ($LASTEXITCODE -ne 0) {
+              Write-Error "Git pull failed"
+              exit 1
+            }
 
             # Deploy Frontend
             echo "Installing frontend dependencies..."
             cd frontend
             npm install
+            if ($LASTEXITCODE -ne 0) {
+              Write-Error "Frontend npm install failed"
+              exit 1
+            }
             echo "Building frontend with production environment..."
             $env:NODE_ENV="production"
             npm run build
+            if ($LASTEXITCODE -ne 0) {
+              Write-Error "Frontend build failed"
+              exit 1
+            }
 
             # Install Backend
             echo "Installing backend dependencies..."
             cd ../backend
             npm install
+            if ($LASTEXITCODE -ne 0) {
+              Write-Error "Backend npm install failed"
+              exit 1
+            }
 
-            echo "Installation completed successfully!"
+            echo "Deployment completed successfully!"
+            echo "Please start the application manually"
