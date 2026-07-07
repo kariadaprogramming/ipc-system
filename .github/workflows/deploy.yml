@@ -16,20 +16,4 @@ jobs:
           password: ${{ secrets.SERVER_PASSWORD }}
           port: ${{ secrets.SERVER_PORT || 22 }}
           script_stop: true
-          shell: powershell
-          script: |
-            Write-Host "Starting deployment..."
-            cd ${{ secrets.PROJECT_PATH }}
-            Write-Host "Pulling latest changes..."
-            git pull
-            Write-Host "Installing frontend dependencies..."
-            cd frontend
-            npm install
-            Write-Host "Building frontend with production environment..."
-            $env:NODE_ENV="production"
-            npm run build
-            Write-Host "Installing backend dependencies..."
-            cd ../backend
-            npm install
-            Write-Host "Deployment completed successfully!"
-            Write-Host "Please start the application manually"
+          script: "D: && cd ${{ secrets.PROJECT_PATH }} && taskkill /F /IM node.exe && git pull && cd frontend && npm install && set NODE_ENV=production && npm run build && cd ../backend && npm install && echo Deployment completed successfully"
