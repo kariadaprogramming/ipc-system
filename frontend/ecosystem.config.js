@@ -1,8 +1,8 @@
 module.exports = {
   apps: [{
     name: 'ipc-frontend',
-    script: 'npx',
-    args: 'serve -s build -l 3000',
+    script: 'node',
+    args: 'serve.js',
     instances: 1,
     autorestart: true,
     watch: false,
