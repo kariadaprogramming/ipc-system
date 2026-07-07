@@ -3,7 +3,7 @@ const Service = require('node-windows').Service;
 // Create a new service object (must match the installed service)
 const svc = new Service({
   name: 'IPC Frontend',
-  script: require('path').join(__dirname, 'node_modules', 'serve', 'bin', 'serve.js')
+  script: require('path').join(__dirname, 'serve.js')
 });
 
 // Listen for the "uninstall" event

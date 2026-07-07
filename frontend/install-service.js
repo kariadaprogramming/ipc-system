@@ -8,13 +8,7 @@ const currentDir = __dirname;
 const svc = new Service({
   name: 'IPC Frontend',
   description: 'IPC System Frontend Server (Production)',
-  script: path.join(currentDir, 'node_modules', 'serve', 'bin', 'serve.js'),
-  scriptOptions: [
-    '-s',
-    'build',
-    '-l',
-    '3000'
-  ],
+  script: path.join(currentDir, 'serve.js'),
   workingDirectory: currentDir,
   nodeOptions: [
     '--max-old-space-size=4096'
