@@ -16,4 +16,4 @@ jobs:
           password: ${{ secrets.SERVER_PASSWORD }}
           port: ${{ secrets.SERVER_PORT || 22 }}
           script_stop: true
-          script: "D: && cd ${{ secrets.PROJECT_PATH }} && git pull && cd frontend && npm install && npm run build && cd ../backend && npm install && echo Deployment completed successfully"
+          script: "D: && cd ${{ secrets.PROJECT_PATH }} && git pull && cd frontend && npm install && npm run build && cd ../backend && npm install && node install-service.js && echo Deployment completed successfully"
