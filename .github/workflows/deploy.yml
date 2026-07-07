@@ -19,6 +19,7 @@ jobs:
             echo "Starting deployment..."
 
             # Navigate to project directory
+            D:
             cd ${{ secrets.PROJECT_PATH }}
 
             # Pull latest changes
@@ -34,14 +35,10 @@ jobs:
 
             # Start frontend with PM2
             echo "Starting frontend with PM2..."
-            pm2 restart ipc-frontend --update-env || pm2 start npm --name ipc-frontend -- run serve
 
             # Deploy Backend
             echo "Installing backend dependencies..."
             cd ../backend
             npm install
-
-            # Restart backend service using PM2 with production environment
-            pm2 restart ipc-backend --update-env || pm2 start server.js --name ipc-backend --env production
 
             echo "Deployment completed successfully!"
