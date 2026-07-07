@@ -15,49 +15,6 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
           port: ${{ secrets.SERVER_PORT || 22 }}
+          script_stop: true
           script: |
-            echo "Starting deployment..."
-
-            # Navigate to project directory
-            D:
-            cd ${{ secrets.PROJECT_PATH }}
-
-            # Stop running Node.js processes
-            echo "Stopping running processes..."
-            taskkill /F /IM node.exe 2>$null || echo "No node processes running"
-
-            # Pull latest changes
-            echo "Pulling latest changes..."
-            git pull
-            if ($LASTEXITCODE -ne 0) {
-              Write-Error "Git pull failed"
-              exit 1
-            }
-
-            # Deploy Frontend
-            echo "Installing frontend dependencies..."
-            cd frontend
-            npm install
-            if ($LASTEXITCODE -ne 0) {
-              Write-Error "Frontend npm install failed"
-              exit 1
-            }
-            echo "Building frontend with production environment..."
-            $env:NODE_ENV="production"
-            npm run build
-            if ($LASTEXITCODE -ne 0) {
-              Write-Error "Frontend build failed"
-              exit 1
-            }
-
-            # Install Backend
-            echo "Installing backend dependencies..."
-            cd ../backend
-            npm install
-            if ($LASTEXITCODE -ne 0) {
-              Write-Error "Backend npm install failed"
-              exit 1
-            }
-
-            echo "Deployment completed successfully!"
-            echo "Please start the application manually"
+            powershell -Command "Write-Host 'Starting deployment...'; D:; cd '${{ secrets.PROJECT_PATH }}'; Write-Host 'Stopping running processes...'; taskkill /F /IM node.exe 2`$null; Write-Host 'Done'; Write-Host 'Pulling latest changes...'; git pull; Write-Host 'Installing frontend dependencies...'; cd frontend; npm install; Write-Host 'Building frontend with production environment...'; `$env:NODE_ENV='production'; npm run build; Write-Host 'Installing backend dependencies...'; cd ../backend; npm install; Write-Host 'Deployment completed successfully!'; Write-Host 'Please start the application manually'"
