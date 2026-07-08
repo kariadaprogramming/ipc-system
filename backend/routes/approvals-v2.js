@@ -12,6 +12,12 @@ const {
     normalizePrestasiJenis
 } = require('../constants/points');
 const { resolveStudentIdByNis, applyIpcChange } = require('../utils/ipc');
+const {
+    getRowApprovalStatus,
+    fetchPendingApprovals,
+    approveSubmission,
+    rejectSubmission
+} = require('../utils/approvalSchema');
 // Local file storage only - Google Drive removed
 
 // Configure multer for file uploads
@@ -273,7 +279,7 @@ router.put('/superadmin/:type/:id', auth, superAdminOnly, async (req, res) => {
         const data = submission[0];
         console.log('Submission data:', data);
 
-        const approvalStatus = data.superadmin_status || data.status;
+        const approvalStatus = getRowApprovalStatus(data);
         if (approvalStatus !== 'pending') {
             return res.status(400).json({ message: 'Pengajuan ini sudah diproses' });
         }
@@ -311,15 +317,7 @@ router.put('/superadmin/:type/:id', auth, superAdminOnly, async (req, res) => {
                 `Poin dari ${pointType}: ${data[pointField]}`
             );
 
-            // Update approval status
-            await db.query(
-                `UPDATE ${table}
-                 SET superadmin_status = 'approved',
-                     superadmin_approved_at = NOW(),
-                     superadmin_notes = ?
-                 WHERE id = ?`,
-                [notes || 'Disetujui oleh SuperAdmin', id]
-            );
+            await approveSubmission(table, id, notes || 'Disetujui oleh SuperAdmin');
 
             // Notify student
             await db.query(
@@ -329,14 +327,7 @@ router.put('/superadmin/:type/:id', auth, superAdminOnly, async (req, res) => {
 
             res.json({ message: `${type} berhasil disetujui` });
         } else {
-            // Update approval status to rejected
-            await db.query(
-                `UPDATE ${table}
-                 SET superadmin_status = 'rejected',
-                     superadmin_notes = ?
-                 WHERE id = ?`,
-                [notes || 'Ditolak oleh SuperAdmin', id]
-            );
+            await rejectSubmission(table, id, notes || 'Ditolak oleh SuperAdmin');
 
             // Notify student of rejection
             await db.query(
@@ -425,26 +416,11 @@ async function handleLegacyApproval(type, id, status, notes, approverId, res) {
 // Get all approvals for SuperAdmin
 router.get('/all', auth, superAdminOnly, async (req, res) => {
     try {
-        const [prestasi] = await db.query(`
-            SELECT p.*, u.nama as user_name
-            FROM prestasi_approvals p
-            JOIN users u ON p.user_id = u.id
-            WHERE p.superadmin_status = 'pending'
-        `);
-
-        const [event] = await db.query(`
-            SELECT e.*, u.nama as user_name
-            FROM event_approvals e
-            JOIN users u ON e.user_id = u.id
-            WHERE e.superadmin_status = 'pending'
-        `);
-
-        const [organisasi] = await db.query(`
-            SELECT o.*, u.nama as user_name
-            FROM organisasi_approvals o
-            JOIN users u ON o.user_id = u.id
-            WHERE o.superadmin_status = 'pending'
-        `);
+        const [prestasi, event, organisasi] = await Promise.all([
+            fetchPendingApprovals('prestasi_approvals', 'p'),
+            fetchPendingApprovals('event_approvals', 'e'),
+            fetchPendingApprovals('organisasi_approvals', 'o')
+        ]);
 
         const [pelanggaran] = await db.query(`
             SELECT p.*, u.nama as user_name
@@ -461,9 +437,9 @@ router.get('/all', auth, superAdminOnly, async (req, res) => {
         `);
 
         res.json({
-            prestasi: prestasi.map(p => ({ ...p, type: 'prestasi', status: p.superadmin_status || p.status })),
-            event: event.map(e => ({ ...e, type: 'event', status: e.superadmin_status || e.status })),
-            organisasi: organisasi.map(o => ({ ...o, type: 'organisasi', status: o.superadmin_status || o.status })),
+            prestasi: prestasi.map(p => ({ ...p, type: 'prestasi', status: getRowApprovalStatus(p) })),
+            event: event.map(e => ({ ...e, type: 'event', status: getRowApprovalStatus(e) })),
+            organisasi: organisasi.map(o => ({ ...o, type: 'organisasi', status: getRowApprovalStatus(o) })),
             pelanggaran: pelanggaran.map(p => ({ ...p, type: 'pelanggaran' })),
             perilaku: perilaku.map(p => ({ ...p, type: 'perilaku' }))
         });
