@@ -141,6 +141,31 @@ function KelolaAkun() {
     setShowIpcModal(true);
   };
 
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) {
+      setMessage('Pilih minimal satu pengguna');
+      return;
+    }
+
+    const label = selectionRole === 'guru' ? 'guru' : 'siswa';
+    if (!window.confirm(`Apakah Anda yakin ingin menghapus ${selectedIds.length} akun ${label}?\n\nData terkait (pengajuan/notifications) juga akan ikut terhapus.`)) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post('/users/bulk-delete', { user_ids: selectedIds }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setMessage(`Berhasil menghapus ${selectedIds.length} akun`);
+      setSelectedIds([]);
+      setSelectionRole(null);
+      fetchUsers();
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Gagal menghapus akun (bulk)');
+    }
+  };
+
   const handleSaveIpcAwal = async (e) => {
     e.preventDefault();
     const parsed = parseInt(ipcAwalValue, 10);
@@ -695,6 +720,9 @@ function KelolaAkun() {
                 <>
                   <button type="button" className="btn btn-warning" onClick={openBulkIpcModal} style={{ fontSize: 13 }}>
                     Edit IPC Awal ({selectedIds.length} {selectionRole === 'guru' ? 'guru' : 'siswa'})
+                  </button>
+                  <button type="button" className="btn btn-danger" onClick={handleBulkDelete} style={{ fontSize: 13 }}>
+                    Hapus ({selectedIds.length})
                   </button>
                   <button type="button" className="btn btn-secondary" onClick={clearSelection} style={{ fontSize: 13 }}>
                     Batal Pilih

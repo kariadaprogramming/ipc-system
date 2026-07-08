@@ -383,6 +383,69 @@ router.put('/:id', auth, async (req, res) => {
     }
 });
 
+async function deleteUserAndDependencies(conn, userId) {
+    // Tables with FK references to users.id but without ON DELETE CASCADE in skema.sql
+    // (these can block deleting a student/teacher who has pending approvals/notifications)
+    await conn.query('DELETE FROM notifications WHERE user_id = ?', [userId]);
+
+    await conn.query('DELETE FROM prestasi_approvals WHERE user_id = ? OR pembina_id = ?', [userId, userId]);
+    await conn.query('DELETE FROM event_approvals WHERE user_id = ? OR pembina_id = ?', [userId, userId]);
+    await conn.query('DELETE FROM organisasi_approvals WHERE user_id = ? OR pembina_id = ?', [userId, userId]);
+    await conn.query('DELETE FROM siswa_approvals WHERE user_id = ? OR created_by = ?', [userId, userId]);
+
+    // These *do* have cascades in most schemas, but delete defensively anyway.
+    await conn.query('DELETE FROM student_creation_approvals WHERE requested_by = ?', [userId]);
+    await conn.query('DELETE FROM biodata_update_approvals WHERE user_id = ? OR requested_by = ?', [userId, userId]);
+
+    await conn.query('DELETE FROM users WHERE id = ?', [userId]);
+}
+
+// Bulk delete users (Superadmin only) - must be BEFORE /:id
+router.post('/bulk-delete', auth, superAdminOnly, async (req, res) => {
+    let conn;
+    try {
+        const userIds = Array.isArray(req.body?.user_ids) ? req.body.user_ids : [];
+        const parsed = [...new Set(userIds.map((id) => parseInt(id, 10)).filter((n) => Number.isInteger(n) && n > 0))];
+
+        if (parsed.length === 0) {
+            return res.status(400).json({ message: 'user_ids harus berisi minimal 1 id' });
+        }
+
+        conn = await db.getConnection();
+        await conn.beginTransaction();
+
+        // Prevent deleting any superadmin
+        const [superadmins] = await conn.query(
+            `SELECT id FROM users WHERE id IN (${parsed.map(() => '?').join(',')}) AND role = 'superadmin'`,
+            parsed
+        );
+        if (superadmins.length > 0) {
+            await conn.rollback();
+            return res.status(403).json({ message: 'Tidak bisa menghapus akun SuperAdmin' });
+        }
+
+        for (const id of parsed) {
+            await deleteUserAndDependencies(conn, id);
+        }
+
+        await conn.query(
+            'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
+            [req.user.id, 'Bulk Delete User', `Deleted ${parsed.length} users: ${parsed.join(',')}`]
+        );
+
+        await conn.commit();
+        res.json({ message: `Berhasil menghapus ${parsed.length} akun` });
+    } catch (error) {
+        if (conn) {
+            try { await conn.rollback(); } catch (_) {}
+        }
+        console.error(error);
+        res.status(500).json({ message: error.message || 'Server error' });
+    } finally {
+        if (conn) conn.release();
+    }
+});
+
 // Delete user
 router.delete('/:id', auth, superAdminOnly, async (req, res) => {
     try {
@@ -394,18 +457,27 @@ router.delete('/:id', auth, superAdminOnly, async (req, res) => {
             return res.status(403).json({ message: 'Cannot delete superadmin account' });
         }
 
-        await db.query('DELETE FROM users WHERE id = ?', [userId]);
+        const conn = await db.getConnection();
+        try {
+            await conn.beginTransaction();
+            await deleteUserAndDependencies(conn, userId);
+            await conn.query(
+                'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
+                [req.user.id, 'Delete User', `Deleted user ID ${userId}`]
+            );
+            await conn.commit();
+        } catch (e) {
+            try { await conn.rollback(); } catch (_) {}
+            throw e;
+        } finally {
+            conn.release();
+        }
 
         // Log activity
-        await db.query(
-            'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Delete User', `Deleted user ID ${userId}`]
-        );
-
         res.json({ message: 'User deleted successfully' });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Server error' });
+        res.status(500).json({ message: error.message || 'Server error' });
     }
 });
 
