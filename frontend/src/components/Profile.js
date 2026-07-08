@@ -11,6 +11,12 @@ function Profile() {
   const [editData, setEditData] = useState({});
   const [avatarFile, setAvatarFile] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [passwordMode, setPasswordMode] = useState(false);
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
 
   useEffect(() => {
     fetchProfile();
@@ -117,6 +123,30 @@ function Profile() {
     }
   };
 
+  const handlePasswordChange = async (e) => {
+    e.preventDefault();
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      alert('Password baru tidak cocok');
+      return;
+    }
+    if (passwordData.newPassword.length < 6) {
+      alert('Password minimal 6 karakter');
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post('/profile/change-password', passwordData, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      alert('Password berhasil diubah');
+      setPasswordMode(false);
+      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    } catch (error) {
+      alert(error.response?.data?.message || 'Gagal mengubah password');
+    }
+  };
+
   if (loading) {
     return <div className="loading"><div className="spinner"></div></div>;
   }
@@ -129,6 +159,90 @@ function Profile() {
   }
   
   const avatarUrl = profile?.foto ? `${API_BASE_URL.replace('/api', '')}${profile.foto}` : null;
+
+  const renderBiodata = () => {
+    if (editMode) {
+      return (
+        <form onSubmit={handleUpdateProfile}>
+          {user.role === 'siswa' && (
+            <>
+              <div className="form-group">
+                <label>Alamat</label>
+                <input type="text" value={editData.alamat || ''} onChange={(e) => setEditData({...editData, alamat: e.target.value})} />
+              </div>
+              <div className="form-group">
+                <label>No HP</label>
+                <input type="text" value={editData.no_hp || ''} onChange={(e) => setEditData({...editData, no_hp: e.target.value})} />
+              </div>
+            </>
+          )}
+          {user.role === 'guru' && (
+            <>
+              <div className="form-group">
+                <label>Alamat</label>
+                <input type="text" value={editData.alamat || ''} onChange={(e) => setEditData({...editData, alamat: e.target.value})} />
+              </div>
+              <div className="form-group">
+                <label>No HP</label>
+                <input type="text" value={editData.no_hp || ''} onChange={(e) => setEditData({...editData, no_hp: e.target.value})} />
+              </div>
+              <div className="form-group">
+                <label>Jabatan</label>
+                <input type="text" value={editData.jabatan || ''} onChange={(e) => setEditData({...editData, jabatan: e.target.value})} />
+              </div>
+            </>
+          )}
+          {user.role === 'superadmin' && (
+            <>
+              <div className="form-group">
+                <label>Nama</label>
+                <input type="text" value={editData.nama || ''} onChange={(e) => setEditData({...editData, nama: e.target.value})} />
+              </div>
+              <div className="form-group">
+                <label>Alamat</label>
+                <input type="text" value={editData.alamat || ''} onChange={(e) => setEditData({...editData, alamat: e.target.value})} />
+              </div>
+              <div className="form-group">
+                <label>No HP</label>
+                <input type="text" value={editData.no_hp || ''} onChange={(e) => setEditData({...editData, no_hp: e.target.value})} />
+              </div>
+            </>
+          )}
+          <button type="submit" className="btn btn-primary">Simpan</button>
+          <button type="button" className="btn btn-danger" onClick={() => setEditMode(false)}>Batal</button>
+        </form>
+      );
+    }
+
+    return (
+      <>
+        <p><strong>Nama:</strong> {profile?.nama}</p>
+        {user.role === 'siswa' && (
+          <>
+            <p><strong>NIS:</strong> {profile?.nis || '-'}</p>
+            <p><strong>NISN:</strong> {profile?.nisn || '-'}</p>
+            <p><strong>Kelas:</strong> {profile?.kelas || '-'}</p>
+            <p><strong>Jurusan:</strong> {profile?.jurusan || '-'}</p>
+            <p><strong>Grha:</strong> {profile?.grha || '-'}</p>
+            <p><strong>Wali Kelas:</strong> {profile?.wali_kelas || '-'}</p>
+          </>
+        )}
+        {user.role === 'guru' && (
+          <>
+            <p><strong>NIP:</strong> {profile?.nip || '-'}</p>
+            <p><strong>Jabatan:</strong> {profile?.jabatan || '-'}</p>
+          </>
+        )}
+        {user.role === 'superadmin' && (
+          <p><strong>NIS:</strong> {profile?.nis || '-'}</p>
+        )}
+        <p><strong>Role:</strong> {profile?.role}</p>
+        <p><strong>Alamat:</strong> {profile?.alamat || '-'}</p>
+        <p><strong>No HP:</strong> {profile?.no_hp || '-'}</p>
+        <button className="btn btn-primary" onClick={() => setEditMode(true)} style={{ marginTop: '10px' }}>Edit Biodata</button>
+      </>
+    );
+  };
 
   return (
     <div>
@@ -197,99 +311,105 @@ function Profile() {
         </div>
       </div>
 
-      <div className="card">
+      <div className="card" style={{ marginBottom: '24px' }}>
         <h3>Biodata</h3>
-        {editMode && user.role === 'guru' ? (
-          <form onSubmit={handleUpdateProfile}>
+        {renderBiodata()}
+      </div>
+
+      <div className="card" style={{ marginBottom: '24px' }}>
+        <h3>Ubah Password</h3>
+        {passwordMode ? (
+          <form onSubmit={handlePasswordChange}>
             <div className="form-group">
-              <label>Alamat</label>
-              <input type="text" value={editData.alamat || ''} onChange={(e) => setEditData({...editData, alamat: e.target.value})} />
+              <label>Password Saat Ini</label>
+              <input 
+                type="password" 
+                value={passwordData.currentPassword} 
+                onChange={(e) => setPasswordData({...passwordData, currentPassword: e.target.value})}
+                required
+              />
             </div>
             <div className="form-group">
-              <label>No HP</label>
-              <input type="text" value={editData.no_hp || ''} onChange={(e) => setEditData({...editData, no_hp: e.target.value})} />
+              <label>Password Baru</label>
+              <input 
+                type="password" 
+                value={passwordData.newPassword} 
+                onChange={(e) => setPasswordData({...passwordData, newPassword: e.target.value})}
+                required
+              />
             </div>
             <div className="form-group">
-              <label>Jabatan</label>
-              <input type="text" value={editData.jabatan || ''} onChange={(e) => setEditData({...editData, jabatan: e.target.value})} />
+              <label>Konfirmasi Password Baru</label>
+              <input 
+                type="password" 
+                value={passwordData.confirmPassword} 
+                onChange={(e) => setPasswordData({...passwordData, confirmPassword: e.target.value})}
+                required
+              />
             </div>
-            <button type="submit" className="btn btn-primary">Simpan</button>
-            <button type="button" className="btn btn-danger" onClick={() => setEditMode(false)}>Batal</button>
+            <button type="submit" className="btn btn-primary">Ubah Password</button>
+            <button type="button" className="btn btn-danger" onClick={() => setPasswordMode(false)}>Batal</button>
           </form>
         ) : (
-          <>
-            <p><strong>Nama:</strong> {profile?.nama}</p>
-            <p><strong>NIS:</strong> {profile?.nis || '-'}</p>
-            <p><strong>NISN:</strong> {profile?.nisn || '-'}</p>
-            <p><strong>NIP:</strong> {profile?.nip || '-'}</p>
-            <p><strong>Role:</strong> {profile?.role}</p>
-            <p><strong>Kelas:</strong> {profile?.kelas || '-'}</p>
-            <p><strong>Jurusan:</strong> {profile?.jurusan || '-'}</p>
-            <p><strong>Grha:</strong> {profile?.grha || '-'}</p>
-            <p><strong>Wali Kelas:</strong> {profile?.wali_kelas || '-'}</p>
-            <p><strong>Alamat:</strong> {profile?.alamat || '-'}</p>
-            <p><strong>No HP:</strong> {profile?.no_hp || '-'}</p>
-            <p><strong>Jabatan:</strong> {profile?.jabatan || '-'}</p>
-            {user.role === 'guru' && (
-              <button className="btn btn-primary" onClick={() => setEditMode(true)} style={{ marginTop: '10px' }}>Edit Biodata</button>
-            )}
-          </>
+          <button className="btn btn-primary" onClick={() => setPasswordMode(true)}>Ubah Password</button>
         )}
       </div>
 
       {user.role === 'siswa' && (
-        <div className="card">
-          <h3>IPC Anda</h3>
-          <p style={{ fontSize: '48px', fontWeight: 'bold', color: '#3498db' }}>{profile?.ipc_total || 0}</p>
-          <p>IPC Awal: {profile?.ipc_awal || 0}</p>
-        </div>
-      )}
+        <>
+          <div className="card" style={{ marginBottom: '24px' }}>
+            <h3>IPC Anda</h3>
+            <p style={{ fontSize: '48px', fontWeight: 'bold', color: '#3498db' }}>{profile?.ipc_total || 0}</p>
+            <p>IPC Awal: {profile?.ipc_awal || 0}</p>
+          </div>
 
-      {summary && user.role === 'siswa' && (
-        <div className="card">
-          <h3>Ringkasan Prestasi</h3>
-          <p><strong>Total Prestasi Akademik:</strong> {summary.total_prestasi_akademik}</p>
-          <p><strong>Total Prestasi Non-Akademik:</strong> {summary.total_prestasi_nonakademik}</p>
-          <p><strong>Total Organisasi:</strong> {summary.total_organisasi}</p>
-          <p><strong>Total Event:</strong> {summary.total_event}</p>
-          <p><strong>Total Pelanggaran:</strong> {summary.total_pelanggaran}</p>
-          <p><strong>Total Perilaku:</strong> {summary.total_perilaku}</p>
-        </div>
-      )}
+          {summary && (
+            <div className="card" style={{ marginBottom: '24px' }}>
+              <h3>Ringkasan Prestasi</h3>
+              <p><strong>Total Prestasi Akademik:</strong> {summary.total_prestasi_akademik}</p>
+              <p><strong>Total Prestasi Non-Akademik:</strong> {summary.total_prestasi_nonakademik}</p>
+              <p><strong>Total Organisasi:</strong> {summary.total_organisasi}</p>
+              <p><strong>Total Event:</strong> {summary.total_event}</p>
+              <p><strong>Total Pelanggaran:</strong> {summary.total_pelanggaran}</p>
+              <p><strong>Total Perilaku:</strong> {summary.total_perilaku}</p>
+            </div>
+          )}
 
-      <div className="card">
-        <h3>Riwayat IPC</h3>
-        {ipcHistory.length > 0 ? (
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Jenis Perubahan</th>
-                <th>Point Change</th>
-                <th>IPC Sebelum</th>
-                <th>IPC Sesudah</th>
-                <th>Keterangan</th>
-                <th>Tanggal</th>
-              </tr>
-            </thead>
-            <tbody>
-              {ipcHistory.map(history => (
-                <tr key={history.id}>
-                  <td>{history.jenis_perubahan}</td>
-                  <td style={{ color: history.point_change >= 0 ? 'green' : 'red' }}>
-                    {history.point_change >= 0 ? '+' : ''}{history.point_change}
-                  </td>
-                  <td>{history.ipc_sebelum}</td>
-                  <td>{history.ipc_sesudah}</td>
-                  <td>{history.keterangan}</td>
-                  <td>{new Date(history.created_at).toLocaleDateString('id-ID')}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <p>Belum ada riwayat IPC</p>
-        )}
-      </div>
+          <div className="card">
+            <h3>Riwayat IPC</h3>
+            {ipcHistory.length > 0 ? (
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Jenis Perubahan</th>
+                    <th>Point Change</th>
+                    <th>IPC Sebelum</th>
+                    <th>IPC Sesudah</th>
+                    <th>Keterangan</th>
+                    <th>Tanggal</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ipcHistory.map(history => (
+                    <tr key={history.id}>
+                      <td>{history.jenis_perubahan}</td>
+                      <td style={{ color: history.point_change >= 0 ? 'green' : 'red' }}>
+                        {history.point_change >= 0 ? '+' : ''}{history.point_change}
+                      </td>
+                      <td>{history.ipc_sebelum}</td>
+                      <td>{history.ipc_sesudah}</td>
+                      <td>{history.keterangan}</td>
+                      <td>{new Date(history.created_at).toLocaleDateString('id-ID')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <p>Belum ada riwayat IPC</p>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

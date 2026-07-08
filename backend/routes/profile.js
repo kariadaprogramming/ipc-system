@@ -5,6 +5,7 @@ const db = require('../config/database');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const bcrypt = require('bcryptjs');
 
 // Configure multer for avatar uploads
 const storage = multer.diskStorage({
@@ -173,6 +174,46 @@ router.get('/summary', auth, async (req, res) => {
             pelanggaran,
             perilaku
         });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Change password
+router.post('/change-password', auth, async (req, res) => {
+    try {
+        const { currentPassword, newPassword } = req.body;
+
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({ message: 'Current password and new password are required' });
+        }
+
+        if (newPassword.length < 6) {
+            return res.status(400).json({ message: 'New password must be at least 6 characters' });
+        }
+
+        // Get user with current password
+        const [user] = await db.query('SELECT password FROM users WHERE id = ?', [req.user.id]);
+
+        if (user.length === 0) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        // Verify current password
+        const isMatch = await bcrypt.compare(currentPassword, user[0].password);
+
+        if (!isMatch) {
+            return res.status(400).json({ message: 'Current password is incorrect' });
+        }
+
+        // Hash new password
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+        // Update password
+        await db.query('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, req.user.id]);
+
+        res.json({ message: 'Password changed successfully' });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error' });
