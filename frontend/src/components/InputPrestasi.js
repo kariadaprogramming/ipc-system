@@ -105,10 +105,9 @@ function InputPrestasi() {
       const response = await axios.get('/approvals-v2/user-submissions', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setSubmissions(response.data?.prestasi || []);
+      setSubmissions(response.data.prestasi || []);
     } catch (error) {
       console.error('Error fetching submissions:', error);
-      setSubmissions([]);
     }
   };
 
@@ -421,28 +420,14 @@ function InputPrestasi() {
   );
 }
 
-const getStatusBadge = (status) => {
-  const styles = {
-    pending: { background: '#ffc107', color: '#333' },
-    approved: { background: '#28a745', color: 'white' },
-    rejected: { background: '#dc3545', color: 'white' }
-  };
-  const labels = {
-    pending: '⏳ Menunggu',
-    approved: '✅ Disetujui',
-    rejected: '❌ Ditolak'
-  };
-  return (
-    <span style={{
-      padding: '4px 12px',
-      borderRadius: '12px',
-      fontSize: '12px',
-      fontWeight: '500',
-      ...styles[status]
-    }}>
-      {labels[status] || status}
-    </span>
-  );
-};
+function getStatusBadge(item) {
+  if (item.status === 'rejected') {
+    return <span className="badge badge-danger">Ditolak</span>;
+  }
+  if (item.status === 'approved') {
+    return <span className="badge badge-success">Disetujui</span>;
+  }
+  return <span className="badge badge-warning">Menunggu</span>;
+}
 
 export default InputPrestasi;
