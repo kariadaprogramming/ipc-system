@@ -369,7 +369,7 @@ function KelolaAkun() {
   const downloadTemplate = (type) => {
     const templateData = type === 'siswa'
       ? [
-          { Nama: '', NIS: '', NISN: '', Kelas: 'X TKJ 1', Jurusan: 'TKJ', Gra: '', Password: '123456' }
+          { Nama: '', NIS: '', NISN: '', Kelas: 'X TKJ 1', Jurusan: 'TKJ', Grha: '', Password: '123456' }
         ]
       : [
           { Nama: '', NIP: '', Jabatan: '', NoHP: '', Password: '123456' }
