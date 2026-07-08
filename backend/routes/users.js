@@ -384,14 +384,39 @@ router.put('/:id', auth, async (req, res) => {
 });
 
 async function deleteUserAndDependencies(conn, userId) {
+    const tryQuery = async (sql, params) => {
+        try {
+            await conn.query(sql, params);
+            return true;
+        } catch (e) {
+            // Some installations/older schemas may not have certain columns (e.g. pembina_id).
+            // In that case we retry with a simpler query instead of failing deletion.
+            if (e && e.code === 'ER_BAD_FIELD_ERROR') {
+                return false;
+            }
+            throw e;
+        }
+    };
+
     // Tables with FK references to users.id but without ON DELETE CASCADE in skema.sql
     // (these can block deleting a student/teacher who has pending approvals/notifications)
     await conn.query('DELETE FROM notifications WHERE user_id = ?', [userId]);
 
-    await conn.query('DELETE FROM prestasi_approvals WHERE user_id = ? OR pembina_id = ?', [userId, userId]);
-    await conn.query('DELETE FROM event_approvals WHERE user_id = ? OR pembina_id = ?', [userId, userId]);
-    await conn.query('DELETE FROM organisasi_approvals WHERE user_id = ? OR pembina_id = ?', [userId, userId]);
-    await conn.query('DELETE FROM siswa_approvals WHERE user_id = ? OR created_by = ?', [userId, userId]);
+    // Approval tables: some schemas use pembina_id, some don't.
+    if (!(await tryQuery('DELETE FROM prestasi_approvals WHERE user_id = ? OR pembina_id = ?', [userId, userId]))) {
+        await conn.query('DELETE FROM prestasi_approvals WHERE user_id = ?', [userId]);
+    }
+    if (!(await tryQuery('DELETE FROM event_approvals WHERE user_id = ? OR pembina_id = ?', [userId, userId]))) {
+        await conn.query('DELETE FROM event_approvals WHERE user_id = ?', [userId]);
+    }
+    if (!(await tryQuery('DELETE FROM organisasi_approvals WHERE user_id = ? OR pembina_id = ?', [userId, userId]))) {
+        await conn.query('DELETE FROM organisasi_approvals WHERE user_id = ?', [userId]);
+    }
+
+    // Siswa approvals: schema should have created_by, but keep it simple if not.
+    if (!(await tryQuery('DELETE FROM siswa_approvals WHERE user_id = ? OR created_by = ?', [userId, userId]))) {
+        await conn.query('DELETE FROM siswa_approvals WHERE user_id = ?', [userId]);
+    }
 
     // These *do* have cascades in most schemas, but delete defensively anyway.
     await conn.query('DELETE FROM student_creation_approvals WHERE requested_by = ?', [userId]);
