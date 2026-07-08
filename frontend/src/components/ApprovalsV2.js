@@ -8,7 +8,8 @@ function ApprovalsV2() {
     prestasi: [],
     event: [],
     organisasi: [],
-    siswa: [],
+    pelanggaran: [],
+    perilaku: [],
     biodata: [],
     student_creation: []
   });
@@ -81,7 +82,8 @@ function ApprovalsV2() {
         prestasi: 'Prestasi',
         event: 'Event',
         organisasi: 'Organisasi',
-        siswa: 'Data siswa'
+        pelanggaran: 'Pelanggaran',
+        perilaku: 'Perilaku'
       };
       setMessage(`${typeLabels[type] || type} berhasil disetujui!`);
       setSelectedItem(null);
@@ -125,7 +127,8 @@ function ApprovalsV2() {
         prestasi: 'Prestasi',
         event: 'Event',
         organisasi: 'Organisasi',
-        siswa: 'Data siswa'
+        pelanggaran: 'Pelanggaran',
+        perilaku: 'Perilaku'
       };
       setMessage(`${typeLabels[type] || type} ditolak`);
       setSelectedItem(null);
@@ -161,29 +164,35 @@ function ApprovalsV2() {
       prestasi: ['Nama', 'NIS', 'Lomba', 'Juara', 'Kategori', 'Foto', 'Status', 'Aksi'],
       event: ['Nama', 'NIS', 'Event', 'Tingkat', 'Foto', 'Status', 'Aksi'],
       organisasi: ['Nama', 'NIS', 'Organisasi', 'Jabatan', 'Foto', 'Status', 'Aksi'],
-      siswa: ['Nama', 'NIS', 'NISN', 'Kelas', 'Dibuat Oleh', 'Status', 'Aksi'],
+      pelanggaran: ['Nama', 'NIS', 'Keterangan', 'Jenis', 'Foto', 'Status', 'Aksi'],
+      perilaku: ['Nama', 'NIS', 'Karakter', 'Status', 'Aksi'],
       biodata: ['Siswa', 'NIS Lama', 'NIS Baru', 'Perubahan', 'Diajukan Oleh', 'Status', 'Aksi'],
       student_creation: ['Nama', 'NIS', 'NISN', 'Kelas', 'Diajukan Oleh', 'Status', 'Aksi']
     };
 
-    const getPhotoUrl = (path) => {
+    const getPhotoUrl = (path, uploadFolder = 'approvals') => {
       if (!path) return null;
-      // If it's already a full URL (http/https or Google Drive), use as-is
       if (path.startsWith('http://') || path.startsWith('https://')) {
         return path;
       }
-      // If it's a full local Windows path, extract just the filename
       let cleanPath = path;
       if (path.includes('\\') || path.includes(':')) {
-        // Extract filename from full path
         cleanPath = path.split('\\').pop();
-        cleanPath = `/uploads/approvals/${cleanPath}`;
+        cleanPath = `/uploads/${uploadFolder}/${cleanPath}`;
       } else if (!path.startsWith('/')) {
-        // If it's a relative path without leading slash, add it
-        cleanPath = `/${path}`;
+        cleanPath = `/uploads/${uploadFolder}/${path}`;
       }
       return `${API_BASE_URL.replace('/api', '')}${cleanPath}`;
     };
+
+    const getItemPhoto = (item, itemType) => {
+      if (itemType === 'pelanggaran') {
+        return item.foto ? getPhotoUrl(item.foto, 'pelanggaran') : null;
+      }
+      return item.foto_path ? getPhotoUrl(item.foto_path) : null;
+    };
+
+    const usesApprovalStatus = !['biodata', 'student_creation'].includes(type);
 
     return (
       <table className="table">
@@ -216,11 +225,14 @@ function ApprovalsV2() {
                   <td>{item.jabatan_organisasi}</td>
                 </>
               )}
-              {type === 'siswa' && (
+              {type === 'pelanggaran' && (
                 <>
-                  <td>{item.nisn}</td>
-                  <td>{item.kelas}</td>
+                  <td>{item.keterangan}</td>
+                  <td>{item.jenis_pelanggaran}</td>
                 </>
+              )}
+              {type === 'perilaku' && (
+                <td>{item.karakter_siswa}</td>
               )}
               {type === 'biodata' && (
                 <>
@@ -265,8 +277,7 @@ function ApprovalsV2() {
                   </td>
                 </>
               )}
-              {type === 'siswa' && <td>{item.created_by_name || '-'}</td>}
-              {type !== 'siswa' && type !== 'biodata' && type !== 'student_creation' && (
+              {usesApprovalStatus && (
                 <td>
                   {item.status === 'pending' ? (
                     <span className="badge badge-warning">⏳ Menunggu</span>
@@ -277,42 +288,23 @@ function ApprovalsV2() {
                   )}
                 </td>
               )}
-              {type === 'siswa' && (
+              {usesApprovalStatus && type !== 'perilaku' && (
                 <td>
-                  {item.superadmin_status === 'pending' ? (
-                    <span className="badge badge-warning">⏳ Menunggu</span>
-                  ) : item.superadmin_status === 'approved' ? (
-                    <span className="badge badge-success">✅ Disetujui</span>
-                  ) : (
-                    <span className="badge badge-danger">❌ Ditolak</span>
-                  )}
-                </td>
-              )}
-              {type !== 'siswa' && type !== 'biodata' && type !== 'student_creation' && (
-                <td>
-                  {item.foto_path ? (
+                  {getItemPhoto(item, type) ? (
                     <div>
                       <img
-                        src={getPhotoUrl(item.foto_path)}
+                        src={getItemPhoto(item, type)}
                         alt="Foto Bukti"
                         style={{ width: '60px', height: '60px', objectFit: 'cover', borderRadius: '5px', cursor: 'pointer' }}
-                        onClick={() => window.open(getPhotoUrl(item.foto_path), '_blank')}
+                        onClick={() => window.open(getItemPhoto(item, type), '_blank')}
                         title="Klik untuk memperbesar"
                       />
-                      <div style={{ marginTop: '5px' }}>
-                        <a href={getPhotoUrl(item.foto_path)} download target="_blank" rel="noopener noreferrer">
-                          <button className="btn btn-sm btn-primary" style={{ padding: '2px 6px', fontSize: '10px' }}>
-                            ⬇️ Download
-                          </button>
-                        </a>
-                      </div>
                     </div>
                   ) : (
                     <span className="text-muted">-</span>
                   )}
                 </td>
               )}
-              {type !== 'biodata' && type !== 'student_creation' && <td>{getStatusBadge(item.pembina_status, item.superadmin_status)}</td>}
               <td>
                 {type === 'biodata' || type === 'student_creation' ? (
                   item.superadmin_status === 'approved' ? (
@@ -344,9 +336,7 @@ function ApprovalsV2() {
                     <span className="badge badge-danger">❌ Ditolak</span>
                   ) : (
                     <>
-                      {type !== 'siswa' && item.pembina_status === 'pending' ? (
-                        <span className="text-muted" style={{ fontSize: '12px' }}>⏳ Menunggu Pembina</span>
-                      ) : (
+                      {usesApprovalStatus && item.status === 'pending' ? (
                         <>
                           <button 
                             className="btn btn-success" 
@@ -362,6 +352,31 @@ function ApprovalsV2() {
                           >
                             ❌ Tolak
                           </button>
+                        </>
+                      ) : usesApprovalStatus ? (
+                        <span className="badge badge-secondary">Selesai</span>
+                      ) : (
+                        <>
+                          {item.pembina_status === 'pending' ? (
+                            <span className="text-muted" style={{ fontSize: '12px' }}>⏳ Menunggu Pembina</span>
+                          ) : (
+                            <>
+                              <button 
+                                className="btn btn-success" 
+                                onClick={() => setSelectedItem({ ...item, type })} 
+                                style={{ marginRight: '5px', padding: '6px 12px', fontSize: '13px' }}
+                              >
+                                ✅ Setuju
+                              </button>
+                              <button 
+                                className="btn btn-danger" 
+                                onClick={() => setSelectedItem({ ...item, type, action: 'reject' })} 
+                                style={{ padding: '6px 12px', fontSize: '13px' }}
+                              >
+                                ❌ Tolak
+                              </button>
+                            </>
+                          )}
                         </>
                       )}
                     </>
@@ -383,7 +398,8 @@ function ApprovalsV2() {
     { key: 'prestasi', label: 'Prestasi', count: approvals.prestasi.length },
     { key: 'event', label: 'Event', count: approvals.event.length },
     { key: 'organisasi', label: 'Organisasi', count: approvals.organisasi.length },
-    { key: 'siswa', label: 'Data Siswa', count: approvals.siswa.length },
+    { key: 'pelanggaran', label: 'Pelanggaran', count: approvals.pelanggaran?.length || 0 },
+    { key: 'perilaku', label: 'Perilaku', count: approvals.perilaku?.length || 0 },
     { key: 'biodata', label: 'Update Biodata', count: approvals.biodata?.length || 0 },
     { key: 'student_creation', label: 'Buat Akun Siswa', count: approvals.student_creation?.length || 0 }
   ];

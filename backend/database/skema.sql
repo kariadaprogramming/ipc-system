@@ -196,7 +196,7 @@ CREATE TABLE prestasi_approvals (
     user_id INT NOT NULL,
     nama VARCHAR(255) NOT NULL,
     nis VARCHAR(50) NOT NULL,
-    jenis ENUM('akademik', 'non_akademik') DEFAULT 'akademik',
+    jenis ENUM('akademik', 'nonakademik') DEFAULT 'akademik',
     nama_lomba VARCHAR(255) NOT NULL,
     jurusan VARCHAR(50),
     kelas VARCHAR(50),
@@ -339,7 +339,7 @@ CREATE TABLE notifications (
     title VARCHAR(255) NOT NULL,
     message TEXT NOT NULL,
     related_id INT,
-    related_type ENUM('prestasi', 'event', 'organisasi', 'siswa') NOT NULL,
+    related_type ENUM('prestasi', 'event', 'organisasi', 'siswa', 'student_creation', 'biodata', 'input_access', 'wali_kelas', 'pelanggaran', 'perilaku') NOT NULL,
     is_read BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id)

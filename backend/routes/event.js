@@ -17,20 +17,7 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage: storage });
-
-// Calculate points for event
-const calculateEventPoints = (tingkat) => {
-    const points = {
-        'sekolah': 2,
-        'kecamatan': 4,
-        'kabupaten': 6,
-        'provinsi': 8,
-        'nasional': 10,
-        'internasional': 12
-    };
-    
-    return points[tingkat.toLowerCase()] || 0;
-};
+const { calculateEventPoints } = require('../constants/points');
 
 // Get all event (for approvals)
 router.get('/all', auth, async (req, res) => {

@@ -43,26 +43,7 @@ router.get('/', auth, teacherOrSuperAdmin, async (req, res) => {
     }
 });
 
-// Get student data by NIS (for auto-fill in input forms)
-router.get('/nis/:nis', auth, async (req, res) => {
-    try {
-        const [users] = await db.query(
-            'SELECT id, nama, nis, nisn, kelas, jurusan, grha FROM users WHERE nis = ? AND role = ?',
-            [req.params.nis, 'siswa']
-        );
-        
-        if (users.length === 0) {
-            return res.status(404).json({ message: 'Siswa tidak ditemukan' });
-        }
-        
-        res.json(users[0]);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server error' });
-    }
-});
-
-// Get biodata update approvals for SuperAdmin - MUST BE BEFORE /:id
+// Get all users (Superadmin and Teacher)
 router.get('/biodata-approvals', auth, superAdminOnly, async (req, res) => {
     try {
         const [approvals] = await db.query(
@@ -231,25 +212,6 @@ router.post('/create-teacher', auth, superAdminOnly, async (req, res) => {
         );
 
         res.status(201).json({ message: 'Teacher account created successfully' });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server error' });
-    }
-});
-
-// Get biodata update approvals for SuperAdmin - MUST BE BEFORE /:id routes
-router.get('/biodata-approvals', auth, superAdminOnly, async (req, res) => {
-    try {
-        const [approvals] = await db.query(
-            `SELECT b.*, u.nama as student_name, u.nis as student_nis, 
-                    requester.nama as requested_by_name
-             FROM biodata_update_approvals b
-             JOIN users u ON b.user_id = u.id
-             JOIN users requester ON b.requested_by = requester.id
-             WHERE b.superadmin_status = 'pending'
-             ORDER BY b.created_at DESC`
-        );
-        res.json(approvals);
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error' });

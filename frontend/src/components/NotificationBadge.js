@@ -39,7 +39,10 @@ function NotificationBadge() {
         headers: { Authorization: `Bearer ${token}` }
       });
       setNotifications(response.data);
-      setCount(0); // Reset count when viewing
+      await axios.put('/approvals-v2/notifications/read-all', {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setCount(0);
     } catch (error) {
       console.error('Error fetching notifications:', error);
     }

@@ -17,20 +17,7 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage: storage });
-
-// Calculate points for organisasi
-const calculateOrganisasiPoints = (jabatan) => {
-    const points = {
-        'ketua': 6,
-        'wakil ketua': 5,
-        'sekretaris': 4,
-        'bendahara': 3,
-        'koordinator': 2,
-        'anggota': 1
-    };
-    
-    return points[jabatan.toLowerCase()] || 0;
-};
+const { calculateOrganisasiPoints } = require('../constants/points');
 
 // Get all organisasi (for approvals)
 router.get('/all', auth, async (req, res) => {

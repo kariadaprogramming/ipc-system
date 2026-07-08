@@ -2,18 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { auth, checkInputAccess } = require('../middleware/auth');
 const db = require('../config/database');
-
-// Calculate points for perilaku
-const calculatePerilakuPoints = (karakter) => {
-    const points = {
-        'kurang baik': 1,
-        'cukup baik': 2,
-        'baik': 3,
-        'sangat baik': 4
-    };
-    
-    return points[karakter.toLowerCase()] || 0;
-};
+const { calculatePerilakuPoints } = require('../constants/points');
 
 // Get all perilaku (for approvals)
 router.get('/all', auth, async (req, res) => {

@@ -1,11 +1,16 @@
 const express = require('express');
 const router = express.Router();
-const bcrypt = require('bcryptjs');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const { auth, superAdminOnly, teacherOrSuperAdmin, checkInputAccess } = require('../middleware/auth');
+const { auth, superAdminOnly, checkInputAccess } = require('../middleware/auth');
 const db = require('../config/database');
+const {
+    calculatePrestasiPoints,
+    calculateEventPoints,
+    calculateOrganisasiPoints,
+    normalizePrestasiJenis
+} = require('../constants/points');
 // Local file storage only - Google Drive removed
 
 // Configure multer for file uploads
@@ -32,21 +37,6 @@ const saveFileLocally = (filePath) => {
 };
 
 // ==================== SUBMIT FOR APPROVAL ====================
-
-// Helper function to calculate prestasi points
-const calculatePrestasiPoints = (juara, kategori) => {
-    const points = {
-        'juara 1': { 'kecamatan': 15, 'kabupaten': 20, 'provinsi': 30, 'nasional': 50, 'internasional': 100 },
-        'juara 2': { 'kecamatan': 12, 'kabupaten': 17, 'provinsi': 27, 'nasional': 45, 'internasional': 90 },
-        'juara 3': { 'kecamatan': 10, 'kabupaten': 15, 'provinsi': 25, 'nasional': 40, 'internasional': 80 },
-        'juara harapan 1': { 'kecamatan': 8, 'kabupaten': 12, 'provinsi': 20, 'nasional': 35, 'internasional': 70 },
-        'juara harapan 2': { 'kecamatan': 6, 'kabupaten': 10, 'provinsi': 18, 'nasional': 30, 'internasional': 60 },
-        'juara harapan 3': { 'kecamatan': 5, 'kabupaten': 8, 'provinsi': 15, 'nasional': 25, 'internasional': 50 },
-        'finalis': { 'kecamatan': 4, 'kabupaten': 6, 'provinsi': 12, 'nasional': 20, 'internasional': 40 },
-        'peserta': { 'kecamatan': 3, 'kabupaten': 5, 'provinsi': 10, 'nasional': 15, 'internasional': 30 }
-    };
-    return points[juara]?.[kategori] || 0;
-};
 
 // Submit Prestasi for Approval (or Direct Submit for Superadmin)
 router.post('/prestasi/submit', auth, checkInputAccess('prestasi'), upload.single('foto'), async (req, res) => {
@@ -114,19 +104,6 @@ router.post('/prestasi/submit', auth, checkInputAccess('prestasi'), upload.singl
     }
 });
 
-// Helper function to calculate event points
-const calculateEventPoints = (tingkat) => {
-    const points = {
-        'sekolah': 2,
-        'kecamatan': 4,
-        'kabupaten': 6,
-        'provinsi': 8,
-        'nasional': 10,
-        'internasional': 12
-    };
-    return points[tingkat] || 0;
-};
-
 // Submit Event for Approval (or Direct Submit for Superadmin)
 router.post('/event/submit', auth, checkInputAccess('event'), upload.single('foto'), async (req, res) => {
     try {
@@ -192,19 +169,6 @@ router.post('/event/submit', auth, checkInputAccess('event'), upload.single('fot
         res.status(500).json({ message: 'Server error' });
     }
 });
-
-// Helper function to calculate organisasi points
-const calculateOrganisasiPoints = (jabatan) => {
-    const points = {
-        'ketua': 6,
-        'wakil ketua': 5,
-        'sekretaris': 4,
-        'bendahara': 3,
-        'koordinator': 2,
-        'anggota': 1
-    };
-    return points[jabatan] || 0;
-};
 
 // Submit Organisasi for Approval (or Direct Submit for Superadmin)
 router.post('/organisasi/submit', auth, checkInputAccess('organisasi'), upload.single('foto'), async (req, res) => {
@@ -272,42 +236,6 @@ router.post('/organisasi/submit', auth, checkInputAccess('organisasi'), upload.s
     }
 });
 
-// Submit Siswa for Approval (by Guru)
-router.post('/siswa/submit', auth, teacherOrSuperAdmin, async (req, res) => {
-    try {
-        const createdBy = req.user.id;
-        const { nama, nis, nisn, kelas, jurusan, grha, password } = req.body;
-        
-        const hashedPassword = bcrypt.hashSync(password, 10);
-        const ipcAwal = 80;
-        
-        const [result] = await db.query(
-            `INSERT INTO siswa_approvals 
-            (user_id, nama, nis, nisn, kelas, jurusan, grha, password_hash, ipc_awal, created_by) 
-            VALUES (0, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [nama, nis, nisn, kelas, jurusan, grha, hashedPassword, ipcAwal, createdBy]
-        );
-        
-        // Notify superadmin
-        const [superadmins] = await db.query('SELECT id FROM users WHERE role = "superadmin"');
-        for (const admin of superadmins) {
-            await db.query(
-                `INSERT INTO notifications (user_id, type, title, message, related_id, related_type) 
-                 VALUES (?, 'approval_needed', 'Persetujuan Akun Siswa Baru', ?, ?, 'siswa')`,
-                [admin.id, `Guru mengajukan pembuatan akun siswa: ${nama} (${nis})`, result.insertId]
-            );
-        }
-        
-        res.status(201).json({ 
-            message: 'Akun siswa berhasil diajukan untuk persetujuan SuperAdmin', 
-            id: result.insertId 
-        });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server error' });
-    }
-});
-
 // ==================== APPROVAL ACTIONS ====================
 
 // REMOVED: Pembina approval route - now only superadmin approval
@@ -320,30 +248,24 @@ router.put('/superadmin/:type/:id', auth, superAdminOnly, async (req, res) => {
 
         console.log(`SuperAdmin ${status} request: type=${type}, id=${id}`);
 
-        if (type === 'siswa') {
-            return handleSiswaApproval(id, status, notes, res);
+        if (type === 'pelanggaran' || type === 'perilaku') {
+            return handleLegacyApproval(type, id, status, notes, req.user.id, res);
         }
 
-        let table, targetTable, points, pointField, pointType;
+        let table, pointField, pointType;
         switch(type) {
             case 'prestasi':
                 table = 'prestasi_approvals';
-                targetTable = 'prestasi';
-                points = { 'juara 1': { 'kecamatan': 15, 'kabupaten': 20, 'provinsi': 30, 'nasional': 50, 'internasional': 100 }, 'juara 2': { 'kecamatan': 12, 'kabupaten': 17, 'provinsi': 27, 'nasional': 45, 'internasional': 90 }, 'juara 3': { 'kecamatan': 10, 'kabupaten': 15, 'provinsi': 25, 'nasional': 40, 'internasional': 80 } };
                 pointField = 'juara';
                 pointType = 'Prestasi';
                 break;
             case 'event':
                 table = 'event_approvals';
-                targetTable = 'event';
-                points = { 'sekolah': 2, 'kecamatan': 4, 'kabupaten': 6, 'provinsi': 8, 'nasional': 10, 'internasional': 12 };
                 pointField = 'tingkat';
                 pointType = 'Event';
                 break;
             case 'organisasi':
                 table = 'organisasi_approvals';
-                targetTable = 'organisasi';
-                points = { 'ketua': 6, 'wakil ketua': 5, 'sekretaris': 4, 'bendahara': 3, 'koordinator': 2, 'anggota': 1 };
                 pointField = 'jabatan_organisasi';
                 pointType = 'Organisasi';
                 break;
@@ -364,18 +286,18 @@ router.put('/superadmin/:type/:id', auth, superAdminOnly, async (req, res) => {
             // Calculate points
             let pointChange = 0;
             if (type === 'prestasi') {
-                const juara = data.juara;
-                const kategori = data.kategori;
-                pointChange = points[juara]?.[kategori] || 0;
+                pointChange = calculatePrestasiPoints(data.juara, data.kategori);
+            } else if (type === 'event') {
+                pointChange = calculateEventPoints(data.tingkat);
             } else {
-                pointChange = points[data[pointField]] || 0;
+                pointChange = calculateOrganisasiPoints(data[pointField]);
             }
 
             // Insert to actual table
             let insertQuery, insertParams;
             if (type === 'prestasi') {
                 insertQuery = `INSERT INTO prestasi (user_id, nama, nis, jenis, nama_lomba, jurusan, kelas, pembina, grha, juara, kategori, foto, point, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'approved')`;
-                insertParams = [data.user_id, data.nama || 'Unknown', data.nis || '', data.jenis || 'akademik', data.nama_lomba || '', data.jurusan || '', data.kelas || '', data.pembina || '', data.grha || '', data.juara || '', data.kategori || '', data.foto_path || null, pointChange];
+                insertParams = [data.user_id, data.nama || 'Unknown', data.nis || '', normalizePrestasiJenis(data.jenis || 'akademik'), data.nama_lomba || '', data.jurusan || '', data.kelas || '', data.pembina || '', data.grha || '', data.juara || '', data.kategori || '', data.foto_path || null, pointChange];
             } else if (type === 'event') {
                 insertQuery = `INSERT INTO event (user_id, nama, nis, kelas, grha, jurusan, nama_event, tingkat, foto, point, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'approved')`;
                 insertParams = [data.user_id, data.nama || 'Unknown', data.nis || '', data.kelas || '', data.grha || '', data.jurusan || '', data.nama_event || '', data.tingkat || '', data.foto_path || null, pointChange];
@@ -435,70 +357,67 @@ router.put('/superadmin/:type/:id', auth, superAdminOnly, async (req, res) => {
     }
 });
 
-// Get approvals for Pembina (Guru) - REMOVED: No longer needed
-
-// Handle Siswa Approval
-async function handleSiswaApproval(id, status, notes, res) {
+async function handleLegacyApproval(type, id, status, notes, approverId, res) {
+    const table = type;
     try {
-        const [submission] = await db.query('SELECT * FROM siswa_approvals WHERE id = ?', [id]);
-        if (submission.length === 0) {
+        const [rows] = await db.query(`SELECT * FROM ${table} WHERE id = ?`, [id]);
+        if (rows.length === 0) {
             return res.status(404).json({ message: 'Submission not found' });
         }
-        
-        const data = submission[0];
-        
+
+        const data = rows[0];
+
         if (status === 'approved') {
-            // Check for duplicate
-            const [existing] = await db.query('SELECT id FROM users WHERE nis = ? OR nisn = ?', [data.nis, data.nisn]);
-            if (existing.length > 0) {
-                return res.status(400).json({ message: 'NIS or NISN already exists' });
+            await db.query(`UPDATE ${table} SET status = 'approved' WHERE id = ?`, [id]);
+
+            const [user] = await db.query('SELECT ipc_total FROM users WHERE id = ?', [data.user_id]);
+            const ipcSebelum = user[0].ipc_total;
+
+            if (type === 'pelanggaran') {
+                const ipcSesudah = ipcSebelum - data.point_dikurangi;
+                await db.query('UPDATE users SET ipc_total = ? WHERE id = ?', [ipcSesudah, data.user_id]);
+                await db.query(
+                    `INSERT INTO ipc_history (user_id, jenis_perubahan, point_change, ipc_sebelum, ipc_sesudah, keterangan) VALUES (?, ?, ?, ?, ?, ?)`,
+                    [data.user_id, 'pelanggaran', -data.point_dikurangi, ipcSebelum, ipcSesudah, `Pelanggaran: ${data.jenis_pelanggaran}`]
+                );
+            } else {
+                const ipcSesudah = ipcSebelum + data.point;
+                await db.query('UPDATE users SET ipc_total = ? WHERE id = ?', [ipcSesudah, data.user_id]);
+                await db.query(
+                    `INSERT INTO ipc_history (user_id, jenis_perubahan, point_change, ipc_sebelum, ipc_sesudah, keterangan) VALUES (?, ?, ?, ?, ?, ?)`,
+                    [data.user_id, 'perilaku', data.point, ipcSebelum, ipcSesudah, `Perilaku: ${data.karakter_siswa}`]
+                );
             }
-            
-            // Create user
-            const [result] = await db.query(
-                `INSERT INTO users (nama, nis, nisn, password, role, kelas, jurusan, grha, ipc_total, ipc_awal) 
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [data.nama, data.nis, data.nisn, data.password_hash, 'siswa', data.kelas, data.jurusan, data.grha, data.ipc_awal, data.ipc_awal]
-            );
-            
-            // Create permissions
-            await db.query('INSERT INTO permissions (user_id) VALUES (?)', [result.insertId]);
-            
-            // Log IPC history
+
             await db.query(
-                `INSERT INTO ipc_history (user_id, jenis_perubahan, point_change, ipc_sebelum, ipc_sesudah, keterangan) 
-                 VALUES (?, ?, ?, ?, ?, ?)`,
-                [result.insertId, 'initial', data.ipc_awal, 0, data.ipc_awal, 'IPC awal diberikan']
+                `INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)`,
+                [approverId, `Approve ${type}`, `Approved ${type} ID ${id}`]
             );
-            
-            // Update approval
+
             await db.query(
-                `UPDATE siswa_approvals SET user_id = ?, superadmin_status = 'approved', superadmin_approved_at = NOW(), superadmin_notes = ? WHERE id = ?`,
-                [result.insertId, notes || 'Disetujui oleh SuperAdmin', id]
+                `INSERT INTO notifications (user_id, type, title, message, related_id, related_type) VALUES (?, 'approved', 'Pengajuan Disetujui', ?, ?, ?)`,
+                [data.user_id, `Pengajuan ${type} Anda telah disetujui`, id, type]
             );
-            
-            // Notify guru who created
-            await db.query(
-                `INSERT INTO notifications (user_id, type, title, message, related_id, related_type) 
-                 VALUES (?, 'approved', 'Akun Siswa Disetujui', ?, ?, 'siswa')`,
-                [data.created_by, `Akun siswa ${data.nama} (${data.nis}) telah disetujui dan dibuat.`, id]
-            );
-            
-        } else {
-            await db.query(
-                `UPDATE siswa_approvals SET superadmin_status = 'rejected', superadmin_notes = ? WHERE id = ?`,
-                [notes || 'Ditolak oleh SuperAdmin', id]
-            );
-            
-            // Notify guru who created
-            await db.query(
-                `INSERT INTO notifications (user_id, type, title, message, related_id, related_type) 
-                 VALUES (?, 'rejected', 'Akun Siswa Ditolak', ?, ?, 'siswa')`,
-                [data.created_by, `Pembuatan akun siswa ${data.nama} (${data.nis}) ditolak: ${notes || 'Tidak ada alasan'}`, id]
-            );
+
+            return res.json({ message: `${type} berhasil disetujui` });
         }
-        
-        res.json({ message: `Pengajuan siswa ${status === 'approved' ? 'disetujui' : 'ditolak'}` });
+
+        await db.query(
+            `UPDATE ${table} SET status = 'rejected', rejection_reason = ? WHERE id = ?`,
+            [notes || 'Ditolak oleh SuperAdmin', id]
+        );
+
+        await db.query(
+            `INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)`,
+            [approverId, `Reject ${type}`, `Rejected ${type} ID ${id}`]
+        );
+
+        await db.query(
+            `INSERT INTO notifications (user_id, type, title, message, related_id, related_type) VALUES (?, 'rejected', 'Pengajuan Ditolak', ?, ?, ?)`,
+            [data.user_id, `Pengajuan ${type} Anda ditolak: ${notes || 'Tanpa alasan'}`, id, type]
+        );
+
+        return res.json({ message: `${type} berhasil ditolak` });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error' });
@@ -531,18 +450,26 @@ router.get('/all', auth, superAdminOnly, async (req, res) => {
             WHERE o.status = 'pending'
         `);
 
-        const [siswa] = await db.query(`
-            SELECT s.*, creator.nama as created_by_name
-            FROM siswa_approvals s
-            JOIN users creator ON s.created_by = creator.id
-            WHERE s.superadmin_status = 'pending'
+        const [pelanggaran] = await db.query(`
+            SELECT p.*, u.nama as user_name
+            FROM pelanggaran p
+            JOIN users u ON p.user_id = u.id
+            WHERE p.status = 'pending'
+        `);
+
+        const [perilaku] = await db.query(`
+            SELECT p.*, u.nama as user_name
+            FROM perilaku p
+            JOIN users u ON p.user_id = u.id
+            WHERE p.status = 'pending'
         `);
 
         res.json({
             prestasi: prestasi.map(p => ({ ...p, type: 'prestasi' })),
             event: event.map(e => ({ ...e, type: 'event' })),
             organisasi: organisasi.map(o => ({ ...o, type: 'organisasi' })),
-            siswa: siswa.map(s => ({ ...s, type: 'siswa' }))
+            pelanggaran: pelanggaran.map(p => ({ ...p, type: 'pelanggaran' })),
+            perilaku: perilaku.map(p => ({ ...p, type: 'perilaku' }))
         });
     } catch (error) {
         console.error(error);
@@ -605,7 +532,10 @@ router.get('/notifications', auth, async (req, res) => {
                     WHEN n.related_type = 'prestasi' THEN (SELECT nama_lomba FROM prestasi_approvals WHERE id = n.related_id)
                     WHEN n.related_type = 'event' THEN (SELECT nama_event FROM event_approvals WHERE id = n.related_id)
                     WHEN n.related_type = 'organisasi' THEN (SELECT kategori_organisasi FROM organisasi_approvals WHERE id = n.related_id)
-                    WHEN n.related_type = 'siswa' THEN (SELECT nama FROM siswa_approvals WHERE id = n.related_id)
+                    WHEN n.related_type = 'student_creation' THEN (SELECT nama FROM student_creation_approvals WHERE id = n.related_id)
+                    WHEN n.related_type = 'biodata' THEN (SELECT u.nama FROM biodata_update_approvals b JOIN users u ON b.user_id = u.id WHERE b.id = n.related_id)
+                    WHEN n.related_type = 'pelanggaran' THEN (SELECT keterangan FROM pelanggaran WHERE id = n.related_id)
+                    WHEN n.related_type = 'perilaku' THEN (SELECT karakter_siswa FROM perilaku WHERE id = n.related_id)
                 END as detail_name
              FROM notifications n 
              WHERE n.user_id = ? 
@@ -614,13 +544,38 @@ router.get('/notifications', auth, async (req, res) => {
             [req.user.id]
         );
         
-        // Mark as read
+        res.json(notifications);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Mark single notification as read
+router.put('/notifications/:id/read', auth, async (req, res) => {
+    try {
+        const [result] = await db.query(
+            'UPDATE notifications SET is_read = TRUE WHERE id = ? AND user_id = ?',
+            [req.params.id, req.user.id]
+        );
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Notification not found' });
+        }
+        res.json({ message: 'Notification marked as read' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Mark all notifications as read
+router.put('/notifications/read-all', auth, async (req, res) => {
+    try {
         await db.query(
             'UPDATE notifications SET is_read = TRUE WHERE user_id = ? AND is_read = FALSE',
             [req.user.id]
         );
-        
-        res.json(notifications);
+        res.json({ message: 'All notifications marked as read' });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error' });

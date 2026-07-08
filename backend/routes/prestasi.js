@@ -17,22 +17,7 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage: storage });
-
-// Calculate points for prestasi
-const calculatePrestasiPoints = (juara, kategori) => {
-    const points = {
-        'juara 1': { kecamatan: 8, kabupaten: 12, provinsi: 30, nasional: 40, internasional: 50 },
-        'juara 2': { kecamatan: 7, kabupaten: 10, provinsi: 25, nasional: 35, internasional: 45 },
-        'juara 3': { kecamatan: 6, kabupaten: 8, provinsi: 20, nasional: 30, internasional: 40 },
-        'juara harapan 1': { kecamatan: 5, kabupaten: 7, provinsi: 15, nasional: 25, internasional: 35 },
-        'juara harapan 2': { kecamatan: 4, kabupaten: 6, provinsi: 12, nasional: 20, internasional: 30 },
-        'juara harapan 3': { kecamatan: 3, kabupaten: 5, provinsi: 10, nasional: 15, internasional: 25 },
-        'finalis': { kecamatan: 2, kabupaten: 4, provinsi: 8, nasional: 10, internasional: 20 },
-        'peserta': { kecamatan: 1, kabupaten: 3, provinsi: 5, nasional: 8, internasional: 15 }
-    };
-    
-    return points[juara][kategori] || 0;
-};
+const { calculatePrestasiPoints } = require('../constants/points');
 
 // Get all prestasi (for approvals)
 router.get('/all', auth, async (req, res) => {

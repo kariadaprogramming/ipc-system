@@ -17,17 +17,7 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage: storage });
-
-// Calculate points deduction for pelanggaran
-const calculatePelanggaranPoints = (jenis) => {
-    const points = {
-        'ringan': 1,
-        'sedang': 5,
-        'berat': 25
-    };
-    
-    return points[jenis.toLowerCase()] || 0;
-};
+const { calculatePelanggaranPoints } = require('../constants/points');
 
 // Get all pelanggaran (for approvals)
 router.get('/all', auth, async (req, res) => {
