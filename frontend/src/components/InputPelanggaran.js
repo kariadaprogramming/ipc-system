@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import { KELAS_OPTIONS, JURUSAN_OPTIONS, applyKelasChange, jurusanFromKelas, isJurusanLocked } from '../utils/kelasJurusan';
 
 function InputPelanggaran() {
   const [formData, setFormData] = useState({
@@ -18,15 +19,6 @@ function InputPelanggaran() {
   const [nisLoading, setNisLoading] = useState(false);
   // const [hasPermission, setHasPermission] = useState(true);
   // const [checkingPermission, setCheckingPermission] = useState(true);
-
-  const kelasOptions = [
-    'X TKJ 1', 'X TKJ 2', 'X TO 1', 'X TO 2',
-    'X DPIB 1', 'X DPIB 2',
-    'XI TKJ 1', 'XI TKJ 2', 'XI TO 1', 'XI TO 2',
-    'XI DPIB 1', 'XI DPIB 2',
-    'XII TKJ 1', 'XII TKJ 2', 'XII TO 1', 'XII TO 2',
-    'XII DPIB 1', 'XII DPIB 2'
-  ];
 
   const grhaOptions = [
     'Airsanya', 'Daksina', 'Genya', 'Madhya', 'Nairiti', 'Pascima', 'Purwa', 'Uttara', 'Wayabhya'
@@ -66,7 +58,11 @@ function InputPelanggaran() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
+    if (name === 'kelas') {
+      setFormData(prev => applyKelasChange(prev, value));
+    } else {
+      setFormData({ ...formData, [name]: value });
+    }
 
     // Auto-fill student data when NIS is entered
     if (name === 'nis' && value.length >= 1) {
@@ -87,7 +83,7 @@ function InputPelanggaran() {
           ...prev,
           nama: response.data.nama || '',
           kelas: response.data.kelas || '',
-          jurusan: response.data.jurusan || '',
+          jurusan: jurusanFromKelas(response.data.kelas) || response.data.jurusan || '',
           grha: response.data.grha || ''
         }));
         setIsAutoFilled(true);
@@ -209,7 +205,7 @@ function InputPelanggaran() {
             <label>Kelas</label>
             <select name="kelas" value={formData.kelas} onChange={handleChange} required disabled={isAutoFilled} style={{ backgroundColor: isAutoFilled ? '#f0f0f0' : '' }}>
               <option value="">Pilih Kelas</option>
-              {kelasOptions.map(kelas => (
+              {KELAS_OPTIONS.map(kelas => (
                 <option key={kelas} value={kelas}>{kelas}</option>
               ))}
             </select>
@@ -227,10 +223,8 @@ function InputPelanggaran() {
 
         <div className="form-group">
           <label>Jurusan</label>
-          <select name="jurusan" value={formData.jurusan} onChange={handleChange} disabled={isAutoFilled} style={{ backgroundColor: isAutoFilled ? '#f0f0f0' : '' }}>
-            <option value="TKJ">TKJ</option>
-            <option value="TO">TO</option>
-            <option value="DPIB">DPIB</option>
+          <select name="jurusan" value={formData.jurusan} onChange={handleChange} disabled={isJurusanLocked(formData.kelas, isAutoFilled)} style={{ backgroundColor: isJurusanLocked(formData.kelas, isAutoFilled) ? '#f0f0f0' : '' }}>
+            {JURUSAN_OPTIONS.map(j => <option key={j} value={j}>{j}</option>)}
           </select>
         </div>
 

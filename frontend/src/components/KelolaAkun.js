@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import StudentDetail from './StudentDetail';
+import { KELAS_OPTIONS, JURUSAN_OPTIONS, applyKelasChange, jurusanFromKelas } from '../utils/kelasJurusan';
 
 function KelolaAkun() {
   const [users, setUsers] = useState([]);
@@ -30,15 +31,6 @@ function KelolaAkun() {
   const [ipcEditTarget, setIpcEditTarget] = useState(null);
   const [ipcAwalValue, setIpcAwalValue] = useState('');
   const [ipcSaving, setIpcSaving] = useState(false);
-
-  const kelasOptions = [
-    'X TKJ 1', 'X TKJ 2', 'X TO 1', 'X TO 2',
-    'X DPIB 1', 'X DPIB 2',
-    'XI TKJ 1', 'XI TKJ 2', 'XI TO 1', 'XI TO 2',
-    'XI DPIB 1', 'XI DPIB 2',
-    'XII TKJ 1', 'XII TKJ 2', 'XII TO 1', 'XII TO 2',
-    'XII DPIB 1', 'XII DPIB 2'
-  ];
 
   const grhaOptions = [
     'Airsanya', 'Daksina', 'Genya', 'Madhya', 'Nairiti', 'Pascima', 'Purwa', 'Uttara', 'Wayabhya'
@@ -248,7 +240,7 @@ function KelolaAkun() {
         nis: user.nis,
         nisn: user.nisn,
         kelas: user.kelas,
-        jurusan: user.jurusan,
+        jurusan: jurusanFromKelas(user.kelas) || user.jurusan,
         grha: user.grha
       });
     } else if (user.role === 'guru') {
@@ -317,12 +309,13 @@ function KelolaAkun() {
         try {
           if (importType === 'siswa') {
             // Import student
+            const kelas = row.kelas || row.Kelas || '';
             const studentData = {
               nama: row.nama || row.Nama || '',
               nis: row.nis || row.NIS || '',
               nisn: row.nisn || row.NISN || '',
-              kelas: row.kelas || row.Kelas || '',
-              jurusan: row.jurusan || row.Jurusan || 'TKJ',
+              kelas,
+              jurusan: jurusanFromKelas(kelas) || row.jurusan || row.Jurusan || 'TKJ',
               grha: row.grha || row.Gra || '',
               password: row.password || row.Password || '123456'
             };
@@ -520,7 +513,7 @@ function KelolaAkun() {
               className="form-control"
             >
               <option value="">Semua Kelas</option>
-              {kelasOptions.map(k => <option key={k} value={k}>{k}</option>)}
+              {KELAS_OPTIONS.map(k => <option key={k} value={k}>{k}</option>)}
             </select>
           </div>
           <div style={{ flex: '1', minWidth: '150px' }}>
@@ -572,17 +565,15 @@ function KelolaAkun() {
             </div>
             <div className="form-group">
               <label>Kelas</label>
-              <select value={formData.kelas || ''} onChange={(e) => setFormData({...formData, kelas: e.target.value})} required>
+              <select value={formData.kelas || ''} onChange={(e) => setFormData(prev => applyKelasChange(prev, e.target.value))} required>
                 <option value="">Pilih Kelas</option>
-                {kelasOptions.map(k => <option key={k} value={k}>{k}</option>)}
+                {KELAS_OPTIONS.map(k => <option key={k} value={k}>{k}</option>)}
               </select>
             </div>
             <div className="form-group">
               <label>Jurusan</label>
-              <select value={formData.jurusan || 'TKJ'} onChange={(e) => setFormData({...formData, jurusan: e.target.value})}>
-                <option value="TKJ">TKJ</option>
-                <option value="TO">TO</option>
-                <option value="DPIB">DPIB</option>
+              <select value={formData.jurusan || 'TKJ'} disabled style={{ backgroundColor: '#f0f0f0' }}>
+                {JURUSAN_OPTIONS.map(j => <option key={j} value={j}>{j}</option>)}
               </select>
             </div>
             <div className="form-group">
@@ -651,17 +642,15 @@ function KelolaAkun() {
                 </div>
                 <div className="form-group">
                   <label>Kelas</label>
-                  <select value={formData.kelas || ''} onChange={(e) => setFormData({...formData, kelas: e.target.value})} required>
+                  <select value={formData.kelas || ''} onChange={(e) => setFormData(prev => applyKelasChange(prev, e.target.value))} required>
                     <option value="">Pilih Kelas</option>
-                    {kelasOptions.map(k => <option key={k} value={k}>{k}</option>)}
+                    {KELAS_OPTIONS.map(k => <option key={k} value={k}>{k}</option>)}
                   </select>
                 </div>
                 <div className="form-group">
                   <label>Jurusan</label>
-                  <select value={formData.jurusan || 'TKJ'} onChange={(e) => setFormData({...formData, jurusan: e.target.value})}>
-                    <option value="TKJ">TKJ</option>
-                    <option value="TO">TO</option>
-                    <option value="DPIB">DPIB</option>
+                  <select value={formData.jurusan || 'TKJ'} disabled style={{ backgroundColor: '#f0f0f0' }}>
+                    {JURUSAN_OPTIONS.map(j => <option key={j} value={j}>{j}</option>)}
                   </select>
                 </div>
                 <div className="form-group">

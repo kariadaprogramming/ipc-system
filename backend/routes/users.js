@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const { auth, superAdminOnly, teacherOrSuperAdmin } = require('../middleware/auth');
 const db = require('../config/database');
 const { getStudentRecords } = require('../utils/studentRecords');
+const { resolveJurusan } = require('../utils/kelasJurusan');
 
 async function applyIpcAwalUpdate(userId, newIpcAwal, adminId) {
     const parsedAwal = parseInt(newIpcAwal, 10);
@@ -226,6 +227,7 @@ router.get('/:id', auth, async (req, res) => {
 router.post('/create-student', auth, teacherOrSuperAdmin, async (req, res) => {
     try {
         const { nama, nis, nisn, kelas, jurusan, password, wali_kelas, grha } = req.body;
+        const resolvedJurusan = resolveJurusan(kelas, jurusan);
 
         // Check for duplicate in users table
         const [existing] = await db.query(
@@ -254,7 +256,7 @@ router.post('/create-student', auth, teacherOrSuperAdmin, async (req, res) => {
             const ipc_awal = 80;
             const [result] = await db.query(
                 'INSERT INTO users (nama, nis, nisn, password, role, kelas, jurusan, wali_kelas, grha, ipc_total, ipc_awal) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                [nama, nis, nisn, hashedPassword, 'siswa', kelas, jurusan, wali_kelas, grha, ipc_awal, ipc_awal]
+                [nama, nis, nisn, hashedPassword, 'siswa', kelas, resolvedJurusan, wali_kelas, grha, ipc_awal, ipc_awal]
             );
 
             // Create default permissions
@@ -281,7 +283,7 @@ router.post('/create-student', auth, teacherOrSuperAdmin, async (req, res) => {
         // If Guru, create approval request
         const [result] = await db.query(
             'INSERT INTO student_creation_approvals (nama, nis, nisn, kelas, jurusan, grha, password, requested_by, superadmin_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, "pending")',
-            [nama, nis, nisn, kelas, jurusan, grha, hashedPassword, req.user.id]
+            [nama, nis, nisn, kelas, resolvedJurusan, grha, hashedPassword, req.user.id]
         );
 
         // Notify superadmin
@@ -427,7 +429,8 @@ router.post('/:id/biodata-request', auth, async (req, res) => {
         const userId = parseInt(req.params.id);
         const requestedBy = req.user.id;
         const { nama, nis, nisn, kelas, jurusan, grha } = req.body;
-        
+        const resolvedJurusan = resolveJurusan(kelas, jurusan);
+
         // Only guru can request biodata updates
         if (req.user.role !== 'guru') {
             return res.status(403).json({ message: 'Only teachers can request biodata updates' });
@@ -452,7 +455,7 @@ router.post('/:id/biodata-request', auth, async (req, res) => {
              nama_lama, nis_lama, nisn_lama, kelas_lama, jurusan_lama, grha_lama, requested_by,
              pembina_status, superadmin_status)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'pending')`,
-            [userId, nama, nis, nisn, kelas, jurusan, grha,
+            [userId, nama, nis, nisn, kelas, resolvedJurusan, grha,
              current.nama, current.nis, current.nisn, current.kelas, current.jurusan, current.grha,
              requestedBy]
         );
@@ -540,7 +543,8 @@ router.put('/:id/biodata', auth, superAdminOnly, async (req, res) => {
     try {
         const userId = parseInt(req.params.id);
         const { nama, nis, nisn, kelas, jurusan, grha, nip, jabatan, alamat, no_hp } = req.body;
-        
+        const resolvedJurusan = resolveJurusan(kelas, jurusan);
+
         // Get user current data
         const [user] = await db.query('SELECT role FROM users WHERE id = ?', [userId]);
         if (user.length === 0) {
@@ -553,7 +557,7 @@ router.put('/:id/biodata', auth, superAdminOnly, async (req, res) => {
             // Update siswa biodata
             await db.query(
                 'UPDATE users SET nama = ?, nis = ?, nisn = ?, kelas = ?, jurusan = ?, grha = ? WHERE id = ?',
-                [nama, nis, nisn, kelas, jurusan, grha, userId]
+                [nama, nis, nisn, kelas, resolvedJurusan, grha, userId]
             );
         } else if (role === 'guru') {
             // Update guru biodata
