@@ -105,9 +105,10 @@ function InputPrestasi() {
       const response = await axios.get('/approvals-v2/user-submissions', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setSubmissions(response.data.prestasi || []);
+      setSubmissions(response.data?.prestasi || []);
     } catch (error) {
       console.error('Error fetching submissions:', error);
+      setSubmissions([]);
     }
   };
 
@@ -408,7 +409,7 @@ function InputPrestasi() {
                     <td>{item.nama_lomba}</td>
                     <td>{item.juara}</td>
                     <td>{item.pembina || '-'}</td>
-                    <td>{getStatusBadge(item.status)}</td>
+                    <td>{getStatusBadge(item)}</td>
                   </tr>
                 ))}
               </tbody>
