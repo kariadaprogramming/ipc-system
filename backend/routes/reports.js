@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/database');
 const { auth } = require('../middleware/auth');
+const { buildIpcCardBreakdown } = require('../utils/ipcCardBreakdown');
 
 // Get all students for reports (grouped by class)
 router.get('/students', auth, async (req, res) => {
@@ -89,18 +90,12 @@ router.get('/ipc-card/:userId', auth, async (req, res) => {
             return res.status(400).json({ message: 'ID siswa tidak valid' });
         }
 
-        const [students] = await db.query(
-            `SELECT id, nama, nis, nisn, kelas, jurusan, grha, ipc_total, ipc_awal
-             FROM users
-             WHERE id = ? AND role = 'siswa'`,
-            [userId]
-        );
-
-        if (students.length === 0) {
+        const cardData = await buildIpcCardBreakdown(userId);
+        if (!cardData) {
             return res.status(404).json({ message: 'Siswa tidak ditemukan' });
         }
 
-        const student = students[0];
+        const { student } = cardData;
 
         const [waliRows] = await db.query(
             `SELECT u.nama AS wali_nama, u.nip AS wali_nip, wka.tahun_ajaran
@@ -119,7 +114,7 @@ router.get('/ipc-card/:userId', auth, async (req, res) => {
         const [history] = await db.query(
             `SELECT id, jenis_perubahan, point_change, ipc_sebelum, ipc_sesudah, keterangan, created_at
              FROM ipc_history
-             WHERE user_id = ? AND jenis_perubahan <> 'initial'
+             WHERE user_id = ?
              ORDER BY created_at ASC, id ASC`,
             [userId]
         );
@@ -127,7 +122,10 @@ router.get('/ipc-card/:userId', auth, async (req, res) => {
         res.json({
             student,
             wali,
-            history,
+            points: cardData.points,
+            ipc_total: cardData.ipc_total,
+            breakdown_total: cardData.breakdown_total,
+            history
         });
     } catch (error) {
         console.error('Error fetching IPC card data:', error);

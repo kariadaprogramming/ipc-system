@@ -24,6 +24,12 @@ function KelolaAkun() {
   const [importResults, setImportResults] = useState([]);
   const [importType, setImportType] = useState('siswa');
   const [detailStudent, setDetailStudent] = useState(null);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [selectionRole, setSelectionRole] = useState(null);
+  const [showIpcModal, setShowIpcModal] = useState(false);
+  const [ipcEditTarget, setIpcEditTarget] = useState(null);
+  const [ipcAwalValue, setIpcAwalValue] = useState('');
+  const [ipcSaving, setIpcSaving] = useState(false);
 
   const kelasOptions = [
     'X TKJ 1', 'X TKJ 2', 'X TO 1', 'X TO 2',
@@ -128,20 +134,110 @@ function KelolaAkun() {
     }
   };
 
-  const handleUpdateIPC = async (userId, currentIPC) => {
-    const newIPC = prompt('Masukkan IPC baru:', currentIPC);
-    if (newIPC === null) return;
+  const handleUpdateIPC = (user) => {
+    setIpcEditTarget({ type: 'single', user });
+    setIpcAwalValue(String(user.ipc_awal ?? user.ipc_total ?? 80));
+    setShowIpcModal(true);
+  };
 
+  const openBulkIpcModal = () => {
+    if (selectedIds.length === 0) {
+      setMessage('Pilih minimal satu pengguna');
+      return;
+    }
+    setIpcEditTarget({ type: 'bulk', role: selectionRole, count: selectedIds.length });
+    setIpcAwalValue('80');
+    setShowIpcModal(true);
+  };
+
+  const handleSaveIpcAwal = async (e) => {
+    e.preventDefault();
+    const parsed = parseInt(ipcAwalValue, 10);
+    if (Number.isNaN(parsed) || parsed < 0) {
+      setMessage('IPC awal harus angka valid (min 0)');
+      return;
+    }
+
+    setIpcSaving(true);
     try {
       const token = localStorage.getItem('token');
-      await axios.put(`/users/${userId}/ipc`, { ipc_total: parseInt(newIPC) }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setMessage('IPC berhasil diupdate!');
+      if (ipcEditTarget?.type === 'bulk') {
+        await axios.put('/users/bulk/ipc-awal', {
+          user_ids: selectedIds,
+          ipc_awal: parsed
+        }, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setMessage(`IPC awal berhasil diupdate untuk ${selectedIds.length} pengguna`);
+        setSelectedIds([]);
+        setSelectionRole(null);
+      } else {
+        await axios.put(`/users/${ipcEditTarget.user.id}/ipc`, {
+          ipc_awal: parsed
+        }, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setMessage(`IPC awal ${ipcEditTarget.user.nama} berhasil diupdate`);
+      }
+      setShowIpcModal(false);
+      setIpcEditTarget(null);
       fetchUsers();
     } catch (error) {
-      setMessage(error.response?.data?.message || 'Gagal update IPC');
+      setMessage(error.response?.data?.message || 'Gagal update IPC awal');
+    } finally {
+      setIpcSaving(false);
     }
+  };
+
+  const toggleUserSelection = (user) => {
+    if (user.role === 'superadmin') {
+      return;
+    }
+
+    if (selectedIds.includes(user.id)) {
+      const next = selectedIds.filter((id) => id !== user.id);
+      setSelectedIds(next);
+      if (next.length === 0) {
+        setSelectionRole(null);
+      }
+      return;
+    }
+
+    if (selectionRole && user.role !== selectionRole) {
+      setMessage('Tidak bisa memilih siswa dan guru sekaligus. Kosongkan pilihan terlebih dahulu.');
+      return;
+    }
+
+    setSelectionRole(user.role);
+    setSelectedIds([...selectedIds, user.id]);
+  };
+
+  const clearSelection = () => {
+    setSelectedIds([]);
+    setSelectionRole(null);
+  };
+
+  const selectAllFiltered = () => {
+    const selectable = filteredUsers.filter((u) => u.role !== 'superadmin');
+    if (selectable.length === 0) {
+      return;
+    }
+
+    const roles = [...new Set(selectable.map((u) => u.role))];
+    if (roles.length > 1) {
+      setMessage('Filter menampilkan siswa dan guru. Filter per role dulu sebelum pilih semua.');
+      return;
+    }
+
+    setSelectionRole(roles[0]);
+    setSelectedIds(selectable.map((u) => u.id));
+  };
+
+  const isUserSelectable = (user) => user.role !== 'superadmin';
+  const isUserDisabled = (user) => {
+    if (!isUserSelectable(user)) return true;
+    if (!selectionRole) return false;
+    return user.role !== selectionRole;
   };
 
   const handleEditUser = (user) => {
@@ -600,40 +696,78 @@ function KelolaAkun() {
       )}
 
       <div className="card">
-        <h3>{userRole === 'guru' ? 'Daftar Siswa' : 'Daftar Pengguna'}</h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 10 }}>
+          <h3 style={{ margin: 0 }}>{userRole === 'guru' ? 'Daftar Siswa' : 'Daftar Pengguna'}</h3>
+          {userRole === 'superadmin' && (
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button type="button" className="btn btn-secondary" onClick={selectAllFiltered} style={{ fontSize: 13 }}>
+                Pilih Semua (filter)
+              </button>
+              {selectedIds.length > 0 && (
+                <>
+                  <button type="button" className="btn btn-warning" onClick={openBulkIpcModal} style={{ fontSize: 13 }}>
+                    Edit IPC Awal ({selectedIds.length} {selectionRole === 'guru' ? 'guru' : 'siswa'})
+                  </button>
+                  <button type="button" className="btn btn-secondary" onClick={clearSelection} style={{ fontSize: 13 }}>
+                    Batal Pilih
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+        {userRole === 'superadmin' && selectionRole && (
+          <p style={{ fontSize: 13, color: '#666', marginBottom: 12 }}>
+            Mode pilihan: <strong>{selectionRole === 'siswa' ? 'Siswa' : 'Guru'}</strong> — hanya role yang sama yang bisa dipilih.
+          </p>
+        )}
         <table className="table">
           <thead>
             <tr>
+              {userRole === 'superadmin' && <th style={{ width: 40 }}></th>}
               <th>Nama</th>
               <th>{userRole === 'guru' ? 'NIS' : 'NIS/NIP'}</th>
               {userRole !== 'guru' && <th>NISN</th>}
               <th>Role</th>
               <th>Kelas</th>
               <th>Jurusan</th>
-              <th>IPC</th>
+              <th>IPC Awal</th>
+              <th>IPC Total</th>
               <th>Aksi</th>
             </tr>
           </thead>
           <tbody>
             {filteredUsers.map(user => (
-              <tr key={user.id}>
+              <tr key={user.id} style={isUserDisabled(user) && selectionRole ? { opacity: 0.45 } : undefined}>
+                {userRole === 'superadmin' && (
+                  <td>
+                    {isUserSelectable(user) && (
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(user.id)}
+                        disabled={isUserDisabled(user)}
+                        onChange={() => toggleUserSelection(user)}
+                      />
+                    )}
+                  </td>
+                )}
                 <td>{user.nama}</td>
                 <td>{user.nis || user.nip || '-'}</td>
                 {userRole !== 'guru' && <td>{user.nisn || '-'}</td>}
                 <td><span className={`badge badge-${user.role === 'superadmin' ? 'danger' : user.role === 'guru' ? 'warning' : 'info'}`}>{user.role}</span></td>
                 <td>{user.kelas || '-'}</td>
                 <td>{user.jurusan || '-'}</td>
-                <td>{user.ipc_total || 0}</td>
+                <td>{user.ipc_awal ?? '-'}</td>
+                <td>{user.ipc_total ?? 0}</td>
                 <td>
-                  {/* Debug: {userRole} vs {user.role} */}
                   {userRole === 'superadmin' && user.role !== 'superadmin' && (
                     <>
                       {user.role === 'siswa' && (
                         <button className="btn btn-primary" onClick={() => setDetailStudent(user)} style={{ padding: '5px 10px', marginRight: '5px' }}>Detail</button>
                       )}
                       <button className="btn btn-info" onClick={() => handleEditUser(user)} style={{ padding: '5px 10px', marginRight: '5px' }}>Edit Biodata</button>
-                      {user.role === 'siswa' && (
-                        <button className="btn btn-warning" onClick={() => handleUpdateIPC(user.id, user.ipc_total)} style={{ padding: '5px 10px', marginRight: '5px' }}>Edit IPC</button>
+                      {(user.role === 'siswa' || user.role === 'guru') && (
+                        <button className="btn btn-warning" onClick={() => handleUpdateIPC(user)} style={{ padding: '5px 10px', marginRight: '5px' }}>Edit IPC Awal</button>
                       )}
                       <button className="btn btn-danger" onClick={() => handleDeleteUser(user.id)} style={{ padding: '5px 10px' }}>Hapus</button>
                     </>
@@ -650,6 +784,56 @@ function KelolaAkun() {
           </tbody>
         </table>
       </div>
+
+      {showIpcModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div className="card" style={{ width: 420, maxWidth: '90%' }}>
+            <h3>
+              {ipcEditTarget?.type === 'bulk'
+                ? `Edit IPC Awal — ${ipcEditTarget.count} ${ipcEditTarget.role === 'guru' ? 'guru' : 'siswa'}`
+                : `Edit IPC Awal — ${ipcEditTarget?.user?.nama}`}
+            </h3>
+            <p style={{ fontSize: 14, color: '#666', marginBottom: 16 }}>
+              Mengubah IPC awal juga menyesuaikan IPC total dengan selisih yang sama.
+            </p>
+            <form onSubmit={handleSaveIpcAwal}>
+              <div className="form-group">
+                <label>IPC Awal</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={ipcAwalValue}
+                  onChange={(e) => setIpcAwalValue(e.target.value)}
+                  required
+                />
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button type="submit" className="btn btn-primary" disabled={ipcSaving}>
+                  {ipcSaving ? 'Menyimpan...' : 'Simpan'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => { setShowIpcModal(false); setIpcEditTarget(null); }}
+                >
+                  Batal
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {detailStudent && (
         <StudentDetail student={detailStudent} onClose={() => setDetailStudent(null)} />

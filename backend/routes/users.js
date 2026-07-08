@@ -5,6 +5,60 @@ const { auth, superAdminOnly, teacherOrSuperAdmin } = require('../middleware/aut
 const db = require('../config/database');
 const { getStudentRecords } = require('../utils/studentRecords');
 
+async function applyIpcAwalUpdate(userId, newIpcAwal, adminId) {
+    const parsedAwal = parseInt(newIpcAwal, 10);
+    if (Number.isNaN(parsedAwal) || parsedAwal < 0) {
+        const error = new Error('IPC awal tidak valid');
+        error.statusCode = 400;
+        throw error;
+    }
+
+    const [users] = await db.query(
+        'SELECT id, role, ipc_awal, ipc_total FROM users WHERE id = ?',
+        [userId]
+    );
+
+    if (users.length === 0) {
+        const error = new Error('User not found');
+        error.statusCode = 404;
+        throw error;
+    }
+
+    const user = users[0];
+    if (user.role === 'superadmin') {
+        const error = new Error('Tidak dapat mengubah IPC superadmin');
+        error.statusCode = 400;
+        throw error;
+    }
+
+    const oldAwal = user.ipc_awal ?? 0;
+    const delta = parsedAwal - oldAwal;
+    let newTotal = (user.ipc_total ?? 0) + delta;
+    if (newTotal < 0) {
+        newTotal = 0;
+    }
+
+    await db.query(
+        'UPDATE users SET ipc_awal = ?, ipc_total = ? WHERE id = ?',
+        [parsedAwal, newTotal, userId]
+    );
+
+    if (delta !== 0) {
+        await db.query(
+            `INSERT INTO ipc_history (user_id, jenis_perubahan, point_change, ipc_sebelum, ipc_sesudah, keterangan)
+             VALUES (?, 'manual', ?, ?, ?, ?)`,
+            [userId, delta, user.ipc_total ?? 0, newTotal, 'Penyesuaian IPC awal oleh superadmin']
+        );
+
+        await db.query(
+            'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
+            [adminId, 'Update IPC Awal', `Updated IPC awal for user ID ${userId} to ${parsedAwal}`]
+        );
+    }
+
+    return { ipc_awal: parsedAwal, ipc_total: newTotal };
+}
+
 // Get student data by NIS (for auto-fill in input forms) - MUST BE BEFORE /:id
 router.get('/nis/:nis', auth, async (req, res) => {
     try {
@@ -32,11 +86,11 @@ router.get('/', auth, teacherOrSuperAdmin, async (req, res) => {
     try {
         // If guru, only return students
         if (req.user.role === 'guru') {
-            const [users] = await db.query('SELECT id, nama, nis, nisn, nip, role, kelas, jurusan, grha, wali_kelas, ipc_total, created_at FROM users WHERE role = ?', ['siswa']);
+            const [users] = await db.query('SELECT id, nama, nis, nisn, nip, role, kelas, jurusan, grha, wali_kelas, ipc_total, ipc_awal, created_at FROM users WHERE role = ?', ['siswa']);
             return res.json(users);
         }
         // If superadmin, return all users
-        const [users] = await db.query('SELECT id, nama, nis, nisn, nip, role, kelas, jurusan, grha, wali_kelas, ipc_total, created_at FROM users');
+        const [users] = await db.query('SELECT id, nama, nis, nisn, nip, role, kelas, jurusan, grha, wali_kelas, ipc_total, ipc_awal, created_at FROM users');
         res.json(users);
     } catch (error) {
         console.error(error);
@@ -77,6 +131,36 @@ router.get('/student-creation-approvals', auth, superAdminOnly, async (req, res)
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Bulk update IPC awal (Superadmin only) - MUST BE BEFORE /:id
+router.put('/bulk/ipc-awal', auth, superAdminOnly, async (req, res) => {
+    try {
+        const { user_ids: userIds, ipc_awal: ipcAwal } = req.body;
+
+        if (!Array.isArray(userIds) || userIds.length === 0) {
+            return res.status(400).json({ message: 'Pilih minimal satu pengguna' });
+        }
+
+        const results = [];
+        for (const rawId of userIds) {
+            const userId = parseInt(rawId, 10);
+            if (Number.isNaN(userId)) {
+                continue;
+            }
+            const updated = await applyIpcAwalUpdate(userId, ipcAwal, req.user.id);
+            results.push({ userId, ...updated });
+        }
+
+        res.json({
+            message: `IPC awal berhasil diupdate untuk ${results.length} pengguna`,
+            updated: results.length,
+            results
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(error.statusCode || 500).json({ message: error.message || 'Server error' });
     }
 });
 
@@ -323,38 +407,17 @@ router.delete('/:id', auth, superAdminOnly, async (req, res) => {
     }
 });
 
-// Update student IPC (Superadmin only)
+// Update IPC awal (Superadmin only)
 router.put('/:id/ipc', auth, superAdminOnly, async (req, res) => {
     try {
-        const { ipc_total } = req.body;
-        const userId = parseInt(req.params.id);
+        const userId = parseInt(req.params.id, 10);
+        const { ipc_awal: ipcAwal } = req.body;
 
-        const [user] = await db.query('SELECT ipc_total FROM users WHERE id = ?', [userId]);
-        if (user.length === 0) {
-            return res.status(404).json({ message: 'User not found' });
-        }
-
-        const ipcSebelum = user[0].ipc_total;
-        const pointChange = ipc_total - ipcSebelum;
-
-        await db.query('UPDATE users SET ipc_total = ? WHERE id = ?', [ipc_total, userId]);
-
-        // Log IPC history
-        await db.query(
-            'INSERT INTO ipc_history (user_id, jenis_perubahan, point_change, ipc_sebelum, ipc_sesudah, keterangan) VALUES (?, ?, ?, ?, ?, ?)',
-            [userId, 'manual', pointChange, ipcSebelum, ipc_total, 'Manual adjustment by superadmin']
-        );
-
-        // Log activity
-        await db.query(
-            'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Update IPC', `Updated IPC for user ID ${userId} to ${ipc_total}`]
-        );
-
-        res.json({ message: 'IPC updated successfully' });
+        const updated = await applyIpcAwalUpdate(userId, ipcAwal, req.user.id);
+        res.json({ message: 'IPC awal berhasil diupdate', ...updated });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Server error' });
+        res.status(error.statusCode || 500).json({ message: error.message || 'Server error' });
     }
 });
 

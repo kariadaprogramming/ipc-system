@@ -214,14 +214,16 @@ function LaporanCetak({ user }) {
                   key={card.student.id}
                   student={card.student}
                   wali={card.wali}
-                  history={card.history}
+                  points={card.points}
+                  ipcTotal={card.ipc_total}
                 />
               ))
               : ipcCardData && (
                 <IpcPrintSheet
                   student={ipcCardData.student}
                   wali={ipcCardData.wali}
-                  history={ipcCardData.history}
+                  points={ipcCardData.points}
+                  ipcTotal={ipcCardData.ipc_total}
                 />
               )}
           </div>

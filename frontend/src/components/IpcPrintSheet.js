@@ -10,11 +10,6 @@ function formatTahunPelajaran(date = new Date()) {
   return `${year - 1}/${year}`;
 }
 
-function getSemester(date = new Date()) {
-  const month = date.getMonth() + 1;
-  return month >= 1 && month <= 6 ? 'Genap' : 'Ganjil';
-}
-
 function formatPrintDate(date = new Date()) {
   const options = { day: 'numeric', month: 'long', year: 'numeric' };
   return date.toLocaleDateString('id-ID', options);
@@ -25,103 +20,40 @@ function formatNisNisn(nis, nisn) {
   return nis || nisn || '-';
 }
 
-function IpcPrintSheet({ student, wali, history, printDate = new Date() }) {
-  // Calculate IPC points from history
-  const calculatePoints = () => {
-    const points = {
-      point_awal: 50,
-      prestasi_akademik: 0,
-      prestasi_nonakademik: 0,
-      tanggung_jawab: 3,
-      disiplin: 3,
-      kepedulian: 3,
-      kemandirian: 3,
-      spiritual: 3,
-      kejujuran: 3,
-      kepercayaan_diri: 3,
-      organisasi: 0,
-      kepanitiaan: 0,
-      event: 0,
-      pelanggaran_ringan: 0,
-      pelanggaran_sedang: 0,
-      pelanggaran_berat: 0
-    };
-
-    if (history && history.length > 0) {
-      history.forEach(item => {
-        const category = item.kategori?.toLowerCase() || '';
-        const point = item.point_change || 0;
-
-        if (category.includes('prestasi')) {
-          if (category.includes('akademik')) {
-            points.prestasi_akademik += point;
-          } else {
-            points.prestasi_nonakademik += point;
-          }
-        } else if (category.includes('karakter') || category.includes('perilaku')) {
-          if (category.includes('tanggung')) points.tanggung_jawab += point;
-          else if (category.includes('disiplin')) points.disiplin += point;
-          else if (category.includes('kepedulian')) points.kepedulian += point;
-          else if (category.includes('kemandirian')) points.kemandirian += point;
-          else if (category.includes('spiritual')) points.spiritual += point;
-          else if (category.includes('jujur')) points.kejujuran += point;
-          else if (category.includes('percaya')) points.kepercayaan_diri += point;
-        } else if (category.includes('organisasi')) {
-          points.organisasi += point;
-        } else if (category.includes('kepanitiaan')) {
-          points.kepanitiaan += point;
-        } else if (category.includes('event')) {
-          points.event += point;
-        } else if (category.includes('pelanggaran')) {
-          if (category.includes('ringan')) points.pelanggaran_ringan += Math.abs(point);
-          else if (category.includes('sedang')) points.pelanggaran_sedang += Math.abs(point);
-          else if (category.includes('berat')) points.pelanggaran_berat += Math.abs(point);
-        }
-      });
-    }
-
-    return points;
+function IpcPrintSheet({ student, wali, points, ipcTotal, printDate = new Date() }) {
+  const breakdown = points || {
+    point_awal: student?.ipc_awal ?? 80,
+    prestasi_akademik: 0,
+    prestasi_nonakademik: 0,
+    tanggung_jawab: 0,
+    disiplin: 0,
+    kepedulian: 0,
+    kemandirian: 0,
+    spiritual: 0,
+    kejujuran: 0,
+    kepercayaan_diri: 0,
+    organisasi: 0,
+    kepanitiaan: 0,
+    event: 0,
+    pelanggaran_ringan: 0,
+    pelanggaran_sedang: 0,
+    pelanggaran_berat: 0
   };
 
-  const points = calculatePoints();
-
-  const calculateTotal = () => {
-    let total = points.point_awal;
-    total += points.prestasi_akademik;
-    total += points.prestasi_nonakademik;
-    total += points.tanggung_jawab;
-    total += points.disiplin;
-    total += points.kepedulian;
-    total += points.kemandirian;
-    total += points.spiritual;
-    total += points.kejujuran;
-    total += points.kepercayaan_diri;
-    total += points.organisasi;
-    total += points.kepanitiaan;
-    total += points.event;
-    total -= points.pelanggaran_ringan;
-    total -= points.pelanggaran_sedang;
-    total -= points.pelanggaran_berat;
-    return total;
-  };
-
-  const total = calculateTotal();
+  const total = ipcTotal ?? student?.ipc_total ?? breakdown.point_awal;
 
   return (
     <div className="ipc-print-sheet">
-      {/* Header */}
       <header className="report-header">
         <img src="/header.png" alt="SMK Negeri Bali Mandara Header" className="header-image" />
       </header>
 
-      {/* Title */}
       <div className="report-title">
         <h3>INDIVIDUAL POINT CARD</h3>
         <h3>SMK NEGERI BALI MANDARA</h3>
         <p>Tahun Ajaran {formatTahunPelajaran(printDate)}</p>
       </div>
 
-      {/* Student Information */}
       <section className="student-info">
         <div className="info-column-left">
           <div className="info-row">
@@ -153,7 +85,6 @@ function IpcPrintSheet({ student, wali, history, printDate = new Date() }) {
         </div>
       </section>
 
-      {/* IPC Points Table */}
       <div className="ipc-table-container">
         <table className="ipc-table">
           <thead>
@@ -167,7 +98,7 @@ function IpcPrintSheet({ student, wali, history, printDate = new Date() }) {
             </tr>
             <tr>
               <td></td>
-              <td className="point-value">{points.point_awal}</td>
+              <td className="point-value">{breakdown.point_awal}</td>
             </tr>
 
             <tr className="section-header">
@@ -175,11 +106,11 @@ function IpcPrintSheet({ student, wali, history, printDate = new Date() }) {
             </tr>
             <tr>
               <td>1. Akademik</td>
-              <td className="point-value">{points.prestasi_akademik}</td>
+              <td className="point-value">{breakdown.prestasi_akademik}</td>
             </tr>
             <tr>
               <td>2. Non-Akademik</td>
-              <td className="point-value">{points.prestasi_nonakademik}</td>
+              <td className="point-value">{breakdown.prestasi_nonakademik}</td>
             </tr>
 
             <tr className="section-header">
@@ -187,31 +118,31 @@ function IpcPrintSheet({ student, wali, history, printDate = new Date() }) {
             </tr>
             <tr>
               <td>1. Tanggung Jawab</td>
-              <td className="point-value">{points.tanggung_jawab}</td>
+              <td className="point-value">{breakdown.tanggung_jawab}</td>
             </tr>
             <tr>
               <td>2. Disiplin</td>
-              <td className="point-value">{points.disiplin}</td>
+              <td className="point-value">{breakdown.disiplin}</td>
             </tr>
             <tr>
               <td>3. Kepedulian</td>
-              <td className="point-value">{points.kepedulian}</td>
+              <td className="point-value">{breakdown.kepedulian}</td>
             </tr>
             <tr>
               <td>4. Kemandirian</td>
-              <td className="point-value">{points.kemandirian}</td>
+              <td className="point-value">{breakdown.kemandirian}</td>
             </tr>
             <tr>
               <td>5. Spiritual</td>
-              <td className="point-value">{points.spiritual}</td>
+              <td className="point-value">{breakdown.spiritual}</td>
             </tr>
             <tr>
               <td>6. Kejujuran</td>
-              <td className="point-value">{points.kejujuran}</td>
+              <td className="point-value">{breakdown.kejujuran}</td>
             </tr>
             <tr>
               <td>7. Kepercayaan Diri</td>
-              <td className="point-value">{points.kepercayaan_diri}</td>
+              <td className="point-value">{breakdown.kepercayaan_diri}</td>
             </tr>
 
             <tr className="section-header">
@@ -219,7 +150,7 @@ function IpcPrintSheet({ student, wali, history, printDate = new Date() }) {
             </tr>
             <tr>
               <td></td>
-              <td className="point-value">{points.organisasi}</td>
+              <td className="point-value">{breakdown.organisasi}</td>
             </tr>
 
             <tr className="section-header">
@@ -227,7 +158,7 @@ function IpcPrintSheet({ student, wali, history, printDate = new Date() }) {
             </tr>
             <tr>
               <td></td>
-              <td className="point-value">{points.kepanitiaan}</td>
+              <td className="point-value">{breakdown.kepanitiaan}</td>
             </tr>
 
             <tr className="section-header">
@@ -235,7 +166,7 @@ function IpcPrintSheet({ student, wali, history, printDate = new Date() }) {
             </tr>
             <tr>
               <td></td>
-              <td className="point-value">{points.event}</td>
+              <td className="point-value">{breakdown.event}</td>
             </tr>
 
             <tr className="section-header">
@@ -243,15 +174,15 @@ function IpcPrintSheet({ student, wali, history, printDate = new Date() }) {
             </tr>
             <tr>
               <td>1. Ringan</td>
-              <td className="point-value negative">{points.pelanggaran_ringan}</td>
+              <td className="point-value negative">{breakdown.pelanggaran_ringan}</td>
             </tr>
             <tr>
               <td>2. Sedang</td>
-              <td className="point-value negative">{points.pelanggaran_sedang}</td>
+              <td className="point-value negative">{breakdown.pelanggaran_sedang}</td>
             </tr>
             <tr>
               <td>3. Berat</td>
-              <td className="point-value negative">{points.pelanggaran_berat}</td>
+              <td className="point-value negative">{breakdown.pelanggaran_berat}</td>
             </tr>
 
             <tr className="total-row">
@@ -262,7 +193,6 @@ function IpcPrintSheet({ student, wali, history, printDate = new Date() }) {
         </table>
       </div>
 
-      {/* Signatures */}
       <section className="signatures">
         <div className="signature-block">
           <p>Kubutambahan, {formatPrintDate(printDate)}</p>
@@ -284,4 +214,4 @@ function IpcPrintSheet({ student, wali, history, printDate = new Date() }) {
 }
 
 export default IpcPrintSheet;
-export { formatTahunPelajaran, getSemester, formatPrintDate };
+export { formatTahunPelajaran, formatPrintDate };
