@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { auth } = require('../middleware/auth');
 const db = require('../config/database');
+const { getStudentRecords } = require('../utils/studentRecords');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -131,49 +132,8 @@ router.get('/ipc-history', auth, async (req, res) => {
 // Get user's approved data summary
 router.get('/summary', auth, async (req, res) => {
     try {
-        const userId = req.user.id;
-
-        const [prestasi] = await db.query(
-            'SELECT * FROM prestasi WHERE user_id = ? AND status = ?',
-            [userId, 'approved']
-        );
-
-        const [organisasi] = await db.query(
-            'SELECT * FROM organisasi WHERE user_id = ? AND status = ?',
-            [userId, 'approved']
-        );
-
-        const [event] = await db.query(
-            'SELECT * FROM event WHERE user_id = ? AND status = ?',
-            [userId, 'approved']
-        );
-
-        const [pelanggaran] = await db.query(
-            'SELECT * FROM pelanggaran WHERE user_id = ? AND status = ?',
-            [userId, 'approved']
-        );
-
-        const [perilaku] = await db.query(
-            'SELECT * FROM perilaku WHERE user_id = ? AND status = ?',
-            [userId, 'approved']
-        );
-
-        const akademikCount = prestasi.filter(p => p.jenis === 'akademik').length;
-        const nonakademikCount = prestasi.filter(p => p.jenis === 'nonakademik').length;
-
-        res.json({
-            total_prestasi_akademik: akademikCount,
-            total_prestasi_nonakademik: nonakademikCount,
-            total_organisasi: organisasi.length,
-            total_event: event.length,
-            total_pelanggaran: pelanggaran.length,
-            total_perilaku: perilaku.length,
-            prestasi,
-            organisasi,
-            event,
-            pelanggaran,
-            perilaku
-        });
+        const records = await getStudentRecords(req.user.id);
+        res.json(records);
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error' });

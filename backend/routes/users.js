@@ -3,6 +3,7 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const { auth, superAdminOnly, teacherOrSuperAdmin } = require('../middleware/auth');
 const db = require('../config/database');
+const { getStudentRecords } = require('../utils/studentRecords');
 
 // Get student data by NIS (for auto-fill in input forms) - MUST BE BEFORE /:id
 router.get('/nis/:nis', auth, async (req, res) => {
@@ -73,6 +74,45 @@ router.get('/student-creation-approvals', auth, superAdminOnly, async (req, res)
              ORDER BY s.created_at DESC`
         );
         res.json(approvals);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Get student approved records (Guru/Superadmin)
+router.get('/:id/records', auth, teacherOrSuperAdmin, async (req, res) => {
+    try {
+        const userId = parseInt(req.params.id, 10);
+        const [user] = await db.query('SELECT id, role FROM users WHERE id = ?', [userId]);
+
+        if (user.length === 0 || user[0].role !== 'siswa') {
+            return res.status(404).json({ message: 'Siswa tidak ditemukan' });
+        }
+
+        const records = await getStudentRecords(userId);
+        res.json(records);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Get student IPC history (Guru/Superadmin)
+router.get('/:id/ipc-history', auth, teacherOrSuperAdmin, async (req, res) => {
+    try {
+        const userId = parseInt(req.params.id, 10);
+        const [user] = await db.query('SELECT id, role FROM users WHERE id = ?', [userId]);
+
+        if (user.length === 0 || user[0].role !== 'siswa') {
+            return res.status(404).json({ message: 'Siswa tidak ditemukan' });
+        }
+
+        const [history] = await db.query(
+            'SELECT * FROM ipc_history WHERE user_id = ? ORDER BY created_at DESC',
+            [userId]
+        );
+        res.json(history);
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error' });

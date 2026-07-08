@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import API_BASE_URL from '../config';
+import StudentRecordsHistory from './StudentRecordsHistory';
 
 function Profile() {
   const [profile, setProfile] = useState(null);
@@ -374,6 +375,12 @@ function Profile() {
               <p><strong>Total Perilaku:</strong> {summary.total_perilaku}</p>
             </div>
           )}
+
+          <StudentRecordsHistory
+            records={summary}
+            title="Riwayat Prestasi & Event"
+            showAllTabs={false}
+          />
 
           <div className="card">
             <h3>Riwayat IPC</h3>

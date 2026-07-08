@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import StudentDetail from './StudentDetail';
 
 function KelolaSiswa() {
   const [students, setStudents] = useState([]);
@@ -18,6 +19,7 @@ function KelolaSiswa() {
   });
   const [message, setMessage] = useState('');
   const [userRole, setUserRole] = useState(null);
+  const [detailStudent, setDetailStudent] = useState(null);
 
   const kelasOptions = [
     'X TKJ 1', 'X TKJ 2', 'X TO 1', 'X TO 2',
@@ -270,6 +272,13 @@ function KelolaSiswa() {
                 <td>{student.grha || '-'}</td>
                 <td>{student.ipc_total || 0}</td>
                 <td>
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => setDetailStudent(student)}
+                    style={{ padding: '5px 10px', fontSize: '12px', marginRight: 5 }}
+                  >
+                    Detail
+                  </button>
                   <button 
                     className="btn btn-info" 
                     onClick={() => handleEditClick(student)}
@@ -283,6 +292,10 @@ function KelolaSiswa() {
           </tbody>
         </table>
       </div>
+
+      {detailStudent && (
+        <StudentDetail student={detailStudent} onClose={() => setDetailStudent(null)} />
+      )}
     </div>
   );
 }

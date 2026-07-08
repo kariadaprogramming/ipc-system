@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
+import StudentDetail from './StudentDetail';
 
 function KelolaAkun() {
   const [users, setUsers] = useState([]);
@@ -22,6 +23,7 @@ function KelolaAkun() {
   const [importing, setImporting] = useState(false);
   const [importResults, setImportResults] = useState([]);
   const [importType, setImportType] = useState('siswa');
+  const [detailStudent, setDetailStudent] = useState(null);
 
   const kelasOptions = [
     'X TKJ 1', 'X TKJ 2', 'X TO 1', 'X TO 2',
@@ -626,6 +628,9 @@ function KelolaAkun() {
                   {/* Debug: {userRole} vs {user.role} */}
                   {userRole === 'superadmin' && user.role !== 'superadmin' && (
                     <>
+                      {user.role === 'siswa' && (
+                        <button className="btn btn-primary" onClick={() => setDetailStudent(user)} style={{ padding: '5px 10px', marginRight: '5px' }}>Detail</button>
+                      )}
                       <button className="btn btn-info" onClick={() => handleEditUser(user)} style={{ padding: '5px 10px', marginRight: '5px' }}>Edit Biodata</button>
                       {user.role === 'siswa' && (
                         <button className="btn btn-warning" onClick={() => handleUpdateIPC(user.id, user.ipc_total)} style={{ padding: '5px 10px', marginRight: '5px' }}>Edit IPC</button>
@@ -634,7 +639,10 @@ function KelolaAkun() {
                     </>
                   )}
                   {userRole === 'guru' && user.role === 'siswa' && (
-                    <button className="btn btn-info" onClick={() => handleEditUser(user)} style={{ padding: '5px 10px' }}>Edit Biodata</button>
+                    <>
+                      <button className="btn btn-primary" onClick={() => setDetailStudent(user)} style={{ padding: '5px 10px', marginRight: '5px' }}>Detail</button>
+                      <button className="btn btn-info" onClick={() => handleEditUser(user)} style={{ padding: '5px 10px' }}>Edit Biodata</button>
+                    </>
                   )}
                 </td>
               </tr>
@@ -642,6 +650,10 @@ function KelolaAkun() {
           </tbody>
         </table>
       </div>
+
+      {detailStudent && (
+        <StudentDetail student={detailStudent} onClose={() => setDetailStudent(null)} />
+      )}
     </div>
   );
 }
