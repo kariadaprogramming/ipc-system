@@ -4,6 +4,7 @@ const { auth } = require('../middleware/auth');
 const db = require('../config/database');
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -65,10 +66,22 @@ router.get('/user/:userId', auth, async (req, res) => {
 router.post('/', auth, upload.single('foto'), async (req, res) => {
     try {
         const { nama, nis, kelas, grha, jurusan, jabatan_organisasi, kategori_organisasi } = req.body;
-        const foto = req.file ? req.file.filename : null;
-        
+        let foto = req.file ? req.file.filename : null;
+
+        // Rename file to NIS_Jabatan Organisasi format
+        if (req.file && foto) {
+            const oldPath = path.join('uploads/organisasi', foto);
+            const ext = path.extname(req.file.originalname);
+            const newFileName = `${nis}_${jabatan_organisasi}${ext}`;
+            const newPath = path.join('uploads/organisasi', newFileName);
+
+            // Rename the file
+            fs.renameSync(oldPath, newPath);
+            foto = newFileName;
+        }
+
         const point = calculateOrganisasiPoints(jabatan_organisasi);
-        
+
         const [result] = await db.query(
             'INSERT INTO organisasi (user_id, nama, nis, kelas, grha, jurusan, jabatan_organisasi, foto, kategori_organisasi, point) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [req.user.id, nama, nis, kelas, grha, jurusan, jabatan_organisasi, foto, kategori_organisasi, point]

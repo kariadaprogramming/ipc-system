@@ -4,6 +4,7 @@ const { auth, checkInputAccess } = require('../middleware/auth');
 const db = require('../config/database');
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -62,10 +63,23 @@ router.get('/user/:userId', auth, async (req, res) => {
 router.post('/', auth, checkInputAccess('pelanggaran'), upload.single('foto'), async (req, res) => {
     try {
         const { nama, nis, kelas, jurusan, grha, keterangan, jenis_pelanggaran } = req.body;
-        const foto = req.file ? req.file.filename : null;
-        
+        let foto = req.file ? req.file.filename : null;
+
+        // Rename file to NIS_Keterangan_UniqueId format
+        if (req.file && foto) {
+            const oldPath = path.join('uploads/pelanggaran', foto);
+            const ext = path.extname(req.file.originalname);
+            const uniqueId = Date.now().toString(36);
+            const newFileName = `${nis}_${keterangan}_${uniqueId}${ext}`;
+            const newPath = path.join('uploads/pelanggaran', newFileName);
+
+            // Rename the file
+            fs.renameSync(oldPath, newPath);
+            foto = newFileName;
+        }
+
         const point_dikurangi = calculatePelanggaranPoints(jenis_pelanggaran);
-        
+
         const [result] = await db.query(
             'INSERT INTO pelanggaran (user_id, nama, nis, kelas, jurusan, grha, keterangan, foto, jenis_pelanggaran, point_dikurangi) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [req.user.id, nama, nis, kelas, jurusan, grha, keterangan, foto, jenis_pelanggaran, point_dikurangi]

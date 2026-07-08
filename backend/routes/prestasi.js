@@ -4,6 +4,7 @@ const { auth } = require('../middleware/auth');
 const db = require('../config/database');
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -81,10 +82,22 @@ router.get('/user/:userId', auth, async (req, res) => {
 router.post('/', auth, upload.single('foto'), async (req, res) => {
     try {
         const { nama, nis, jenis, nama_lomba, jurusan, kelas, pembina, grha, juara, kategori } = req.body;
-        const foto = req.file ? req.file.filename : null;
-        
+        let foto = req.file ? req.file.filename : null;
+
+        // Rename file to NIS_Nama Lomba format
+        if (req.file && foto) {
+            const oldPath = path.join('uploads/prestasi', foto);
+            const ext = path.extname(req.file.originalname);
+            const newFileName = `${nis}_${nama_lomba}${ext}`;
+            const newPath = path.join('uploads/prestasi', newFileName);
+
+            // Rename the file
+            fs.renameSync(oldPath, newPath);
+            foto = newFileName;
+        }
+
         const point = calculatePrestasiPoints(juara, kategori);
-        
+
         const [result] = await db.query(
             'INSERT INTO prestasi (user_id, nama, nis, jenis, nama_lomba, jurusan, foto, kelas, pembina, grha, juara, kategori, point) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [req.user.id, nama, nis, jenis, nama_lomba, jurusan, foto, kelas, pembina, grha, juara, kategori, point]
