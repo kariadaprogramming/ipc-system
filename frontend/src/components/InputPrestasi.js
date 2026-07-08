@@ -408,7 +408,7 @@ function InputPrestasi() {
                     <td>{item.nama_lomba}</td>
                     <td>{item.juara}</td>
                     <td>{item.pembina || '-'}</td>
-                    <td>{getStatusBadge(item)}</td>
+                    <td>{getStatusBadge(item.status)}</td>
                   </tr>
                 ))}
               </tbody>
