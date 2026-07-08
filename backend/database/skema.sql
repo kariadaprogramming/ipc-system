@@ -205,12 +205,17 @@ CREATE TABLE prestasi_approvals (
     juara VARCHAR(50),
     kategori VARCHAR(50),
     foto_path VARCHAR(255),
-    status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
-    approved_at TIMESTAMP NULL,
-    notes TEXT,
+    pembina_status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
+    superadmin_status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
+    pembina_id INT NULL,
+    pembina_approved_at TIMESTAMP NULL,
+    superadmin_approved_at TIMESTAMP NULL,
+    pembina_notes TEXT,
+    superadmin_notes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id)
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (pembina_id) REFERENCES users(id)
 );
 
 -- Event Approvals Table
@@ -227,12 +232,17 @@ CREATE TABLE event_approvals (
     nama_event VARCHAR(255) NOT NULL,
     tingkat VARCHAR(50),
     foto_path VARCHAR(255),
-    status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
-    approved_at TIMESTAMP NULL,
-    notes TEXT,
+    pembina_status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
+    superadmin_status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
+    pembina_id INT NULL,
+    pembina_approved_at TIMESTAMP NULL,
+    superadmin_approved_at TIMESTAMP NULL,
+    pembina_notes TEXT,
+    superadmin_notes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id)
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (pembina_id) REFERENCES users(id)
 );
 
 -- Organisasi Approvals Table
@@ -249,12 +259,17 @@ CREATE TABLE organisasi_approvals (
     jabatan_organisasi VARCHAR(100),
     kategori_organisasi VARCHAR(255),
     foto_path VARCHAR(255),
-    status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
-    approved_at TIMESTAMP NULL,
-    notes TEXT,
+    pembina_status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
+    superadmin_status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
+    pembina_id INT NULL,
+    pembina_approved_at TIMESTAMP NULL,
+    superadmin_approved_at TIMESTAMP NULL,
+    pembina_notes TEXT,
+    superadmin_notes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id)
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (pembina_id) REFERENCES users(id)
 );
 
 -- Siswa Approvals Table (for new student accounts created by guru)
@@ -382,15 +397,15 @@ CREATE TABLE input_access_logs (
 
 -- Indexes for Prestasi Approvals
 CREATE INDEX idx_prestasi_user ON prestasi_approvals(user_id);
-CREATE INDEX idx_prestasi_status ON prestasi_approvals(status);
+CREATE INDEX idx_prestasi_status ON prestasi_approvals(pembina_status, superadmin_status);
 
 -- Indexes for Event Approvals
 CREATE INDEX idx_event_user ON event_approvals(user_id);
-CREATE INDEX idx_event_status ON event_approvals(status);
+CREATE INDEX idx_event_status ON event_approvals(pembina_status, superadmin_status);
 
 -- Indexes for Organisasi Approvals
 CREATE INDEX idx_organisasi_user ON organisasi_approvals(user_id);
-CREATE INDEX idx_organisasi_status ON organisasi_approvals(status);
+CREATE INDEX idx_organisasi_status ON organisasi_approvals(pembina_status, superadmin_status);
 
 -- Indexes for Notifications
 CREATE INDEX idx_notifications_user ON notifications(user_id);

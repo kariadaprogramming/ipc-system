@@ -155,6 +155,8 @@ function ApprovalsV2() {
     return <span className="badge badge-secondary">Pending</span>;
   };
 
+  const getApprovalStatus = (item) => item.superadmin_status || item.status || 'pending';
+
   const renderTable = (data, type) => {
     if (data.length === 0) {
       return <p className="text-muted">Tidak ada pengajuan {type}</p>;
@@ -279,9 +281,9 @@ function ApprovalsV2() {
               )}
               {usesApprovalStatus && (
                 <td>
-                  {item.status === 'pending' ? (
+                  {getApprovalStatus(item) === 'pending' ? (
                     <span className="badge badge-warning">⏳ Menunggu</span>
-                  ) : item.status === 'approved' ? (
+                  ) : getApprovalStatus(item) === 'approved' ? (
                     <span className="badge badge-success">✅ Disetujui</span>
                   ) : (
                     <span className="badge badge-danger">❌ Ditolak</span>
@@ -329,58 +331,27 @@ function ApprovalsV2() {
                       </button>
                     </>
                   )
+                ) : getApprovalStatus(item) === 'approved' ? (
+                  <span className="badge badge-success">✅ Disetujui</span>
+                ) : getApprovalStatus(item) === 'rejected' ? (
+                  <span className="badge badge-danger">❌ Ditolak</span>
                 ) : (
-                  item.superadmin_status === 'approved' ? (
-                    <span className="badge badge-success">✅ Disetujui</span>
-                  ) : item.superadmin_status === 'rejected' ? (
-                    <span className="badge badge-danger">❌ Ditolak</span>
-                  ) : (
-                    <>
-                      {usesApprovalStatus && item.status === 'pending' ? (
-                        <>
-                          <button 
-                            className="btn btn-success" 
-                            onClick={() => setSelectedItem({ ...item, type })} 
-                            style={{ marginRight: '5px', padding: '6px 12px', fontSize: '13px' }}
-                          >
-                            ✅ Setuju
-                          </button>
-                          <button 
-                            className="btn btn-danger" 
-                            onClick={() => setSelectedItem({ ...item, type, action: 'reject' })} 
-                            style={{ padding: '6px 12px', fontSize: '13px' }}
-                          >
-                            ❌ Tolak
-                          </button>
-                        </>
-                      ) : usesApprovalStatus ? (
-                        <span className="badge badge-secondary">Selesai</span>
-                      ) : (
-                        <>
-                          {item.pembina_status === 'pending' ? (
-                            <span className="text-muted" style={{ fontSize: '12px' }}>⏳ Menunggu Pembina</span>
-                          ) : (
-                            <>
-                              <button 
-                                className="btn btn-success" 
-                                onClick={() => setSelectedItem({ ...item, type })} 
-                                style={{ marginRight: '5px', padding: '6px 12px', fontSize: '13px' }}
-                              >
-                                ✅ Setuju
-                              </button>
-                              <button 
-                                className="btn btn-danger" 
-                                onClick={() => setSelectedItem({ ...item, type, action: 'reject' })} 
-                                style={{ padding: '6px 12px', fontSize: '13px' }}
-                              >
-                                ❌ Tolak
-                              </button>
-                            </>
-                          )}
-                        </>
-                      )}
-                    </>
-                  )
+                  <>
+                    <button 
+                      className="btn btn-success" 
+                      onClick={() => setSelectedItem({ ...item, type })} 
+                      style={{ marginRight: '5px', padding: '6px 12px', fontSize: '13px' }}
+                    >
+                      ✅ Setuju
+                    </button>
+                    <button 
+                      className="btn btn-danger" 
+                      onClick={() => setSelectedItem({ ...item, type, action: 'reject' })} 
+                      style={{ padding: '6px 12px', fontSize: '13px' }}
+                    >
+                      ❌ Tolak
+                    </button>
+                  </>
                 )}
               </td>
             </tr>

@@ -58,8 +58,52 @@ const calculatePelanggaranPoints = (jenis) => {
     return PELANGGARAN_POINTS[jenis?.toLowerCase()] || 0;
 };
 
+const PERILAKU_CHARACTER_FIELDS = [
+    'tanggung_jawab',
+    'disiplin',
+    'kepedulian',
+    'kemandirian',
+    'spiritual',
+    'kejujuran',
+    'kepercayaan_diri'
+];
+
+const PERILAKU_CHARACTER_LABELS = {
+    tanggung_jawab: 'Tanggung Jawab',
+    disiplin: 'Disiplin',
+    kepedulian: 'Kepedulian',
+    kemandirian: 'Kemandirian',
+    spiritual: 'Spiritual',
+    kejujuran: 'Kejujuran',
+    kepercayaan_diri: 'Kepercayaan Diri'
+};
+
 const calculatePerilakuPoints = (karakter) => {
     return PERILAKU_POINTS[karakter?.toLowerCase()] || 0;
+};
+
+const calculatePerilakuPointsFromFields = (fields) => {
+    const values = PERILAKU_CHARACTER_FIELDS
+        .map((field) => fields[field])
+        .filter(Boolean);
+
+    if (values.length === 0) {
+        return 0;
+    }
+
+    const total = values.reduce(
+        (sum, value) => sum + (PERILAKU_POINTS[value?.toLowerCase()] || 0),
+        0
+    );
+
+    return Math.round(total / values.length);
+};
+
+const formatPerilakuKarakter = (fields) => {
+    return PERILAKU_CHARACTER_FIELDS
+        .filter((field) => fields[field])
+        .map((field) => `${PERILAKU_CHARACTER_LABELS[field]}: ${fields[field]}`)
+        .join(', ');
 };
 
 // Normalize prestasi jenis across tables (legacy non_akademik → nonakademik)
@@ -79,5 +123,8 @@ module.exports = {
     calculateOrganisasiPoints,
     calculatePelanggaranPoints,
     calculatePerilakuPoints,
+    calculatePerilakuPointsFromFields,
+    formatPerilakuKarakter,
+    PERILAKU_CHARACTER_FIELDS,
     normalizePrestasiJenis
 };

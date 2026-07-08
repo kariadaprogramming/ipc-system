@@ -1,8 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const { auth, checkInputAccess } = require('../middleware/auth');
+const { auth, checkInputAccess, superAdminOnly } = require('../middleware/auth');
 const db = require('../config/database');
-const { calculatePerilakuPoints } = require('../constants/points');
+const {
+    calculatePerilakuPoints,
+    calculatePerilakuPointsFromFields,
+    formatPerilakuKarakter
+} = require('../constants/points');
+const { resolveStudentIdByNis, applyIpcChange } = require('../utils/ipc');
 
 // Get all perilaku (for approvals)
 router.get('/all', auth, async (req, res) => {
@@ -37,50 +42,86 @@ router.get('/user/:userId', auth, async (req, res) => {
 // Create perilaku
 router.post('/', auth, checkInputAccess('perilaku'), async (req, res) => {
     try {
-        const { nama, nis, kelas, jurusan, grha, karakter_siswa } = req.body;
-        
-        const point = calculatePerilakuPoints(karakter_siswa);
+        const {
+            nama,
+            nis,
+            kelas,
+            jurusan,
+            grha,
+            karakter_siswa,
+            tanggung_jawab,
+            disiplin,
+            kepedulian,
+            kemandirian,
+            spiritual,
+            kejujuran,
+            kepercayaan_diri
+        } = req.body;
+
+        const userId = await resolveStudentIdByNis(nis, req.user.id);
+        const karakter = karakter_siswa || formatPerilakuKarakter({
+            tanggung_jawab,
+            disiplin,
+            kepedulian,
+            kemandirian,
+            spiritual,
+            kejujuran,
+            kepercayaan_diri
+        });
+        const point = karakter_siswa
+            ? calculatePerilakuPoints(karakter_siswa)
+            : calculatePerilakuPointsFromFields({
+                tanggung_jawab,
+                disiplin,
+                kepedulian,
+                kemandirian,
+                spiritual,
+                kejujuran,
+                kepercayaan_diri
+            });
         
         const [result] = await db.query(
             'INSERT INTO perilaku (user_id, nama, nis, kelas, jurusan, grha, karakter_siswa, point) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            [req.user.id, nama, nis, kelas, jurusan, grha, karakter_siswa, point]
+            [userId, nama, nis, kelas, jurusan, grha, karakter, point]
         );
 
         await db.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Submit Perilaku', `Submitted perilaku: ${karakter_siswa}`]
+            [req.user.id, 'Submit Perilaku', `Submitted perilaku: ${karakter}`]
         );
 
         res.status(201).json({ message: 'Perilaku submitted for approval', id: result.insertId });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Server error' });
+        res.status(error.statusCode || 500).json({ message: error.message || 'Server error' });
     }
 });
 
 // Approve perilaku
-router.put('/:id/approve', auth, async (req, res) => {
+router.put('/:id/approve', auth, superAdminOnly, async (req, res) => {
     try {
         const perilakuId = req.params.id;
         
-        const [perilaku] = await db.query('SELECT * FROM perilaku WHERE id = ?', [perilakuId]);
+        const [perilaku] = await db.query(
+            'SELECT * FROM perilaku WHERE id = ? AND status = ?',
+            [perilakuId, 'pending']
+        );
         if (perilaku.length === 0) {
-            return res.status(404).json({ message: 'Perilaku not found' });
+            return res.status(404).json({ message: 'Perilaku not found or already processed' });
         }
 
         const perilakuData = perilaku[0];
         
-        await db.query('UPDATE perilaku SET status = ? WHERE id = ?', ['approved', perilakuId]);
-        
-        const [user] = await db.query('SELECT ipc_total FROM users WHERE id = ?', [perilakuData.user_id]);
-        const ipcSebelum = user[0].ipc_total;
-        const ipcSesudah = ipcSebelum + perilakuData.point;
-        
-        await db.query('UPDATE users SET ipc_total = ? WHERE id = ?', [ipcSesudah, perilakuData.user_id]);
-        
         await db.query(
-            'INSERT INTO ipc_history (user_id, jenis_perubahan, point_change, ipc_sebelum, ipc_sesudah, keterangan) VALUES (?, ?, ?, ?, ?, ?)',
-            [perilakuData.user_id, 'perilaku', perilakuData.point, ipcSebelum, ipcSesudah, `Perilaku: ${perilakuData.karakter_siswa}`]
+            'UPDATE perilaku SET status = ? WHERE id = ? AND status = ?',
+            ['approved', perilakuId, 'pending']
+        );
+        
+        await applyIpcChange(
+            perilakuData.user_id,
+            'perilaku',
+            perilakuData.point,
+            `Perilaku: ${perilakuData.karakter_siswa}`
         );
 
         await db.query(
@@ -96,7 +137,7 @@ router.put('/:id/approve', auth, async (req, res) => {
 });
 
 // Reject perilaku
-router.put('/:id/reject', auth, async (req, res) => {
+router.put('/:id/reject', auth, superAdminOnly, async (req, res) => {
     try {
         const { rejection_reason } = req.body;
         const perilakuId = req.params.id;

@@ -1,10 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const { auth, checkInputAccess } = require('../middleware/auth');
+const { auth, checkInputAccess, superAdminOnly } = require('../middleware/auth');
 const db = require('../config/database');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { calculatePelanggaranPoints } = require('../constants/points');
+const { resolveStudentIdByNis, applyIpcChange } = require('../utils/ipc');
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -17,7 +19,6 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage: storage });
-const { calculatePelanggaranPoints } = require('../constants/points');
 
 // Get all pelanggaran (for approvals)
 router.get('/all', auth, async (req, res) => {
@@ -69,10 +70,11 @@ router.post('/', auth, checkInputAccess('pelanggaran'), upload.single('foto'), a
         }
 
         const point_dikurangi = calculatePelanggaranPoints(jenis_pelanggaran);
+        const userId = await resolveStudentIdByNis(nis, req.user.id);
 
         const [result] = await db.query(
             'INSERT INTO pelanggaran (user_id, nama, nis, kelas, jurusan, grha, keterangan, foto, jenis_pelanggaran, point_dikurangi) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [req.user.id, nama, nis, kelas, jurusan, grha, keterangan, foto, jenis_pelanggaran, point_dikurangi]
+            [userId, nama, nis, kelas, jurusan, grha, keterangan, foto, jenis_pelanggaran, point_dikurangi]
         );
 
         await db.query(
@@ -83,33 +85,35 @@ router.post('/', auth, checkInputAccess('pelanggaran'), upload.single('foto'), a
         res.status(201).json({ message: 'Pelanggaran submitted for approval', id: result.insertId });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Server error' });
+        res.status(error.statusCode || 500).json({ message: error.message || 'Server error' });
     }
 });
 
 // Approve pelanggaran
-router.put('/:id/approve', auth, async (req, res) => {
+router.put('/:id/approve', auth, superAdminOnly, async (req, res) => {
     try {
         const pelanggaranId = req.params.id;
         
-        const [pelanggaran] = await db.query('SELECT * FROM pelanggaran WHERE id = ?', [pelanggaranId]);
+        const [pelanggaran] = await db.query(
+            'SELECT * FROM pelanggaran WHERE id = ? AND status = ?',
+            [pelanggaranId, 'pending']
+        );
         if (pelanggaran.length === 0) {
-            return res.status(404).json({ message: 'Pelanggaran not found' });
+            return res.status(404).json({ message: 'Pelanggaran not found or already processed' });
         }
 
         const pelanggaranData = pelanggaran[0];
         
-        await db.query('UPDATE pelanggaran SET status = ? WHERE id = ?', ['approved', pelanggaranId]);
-        
-        const [user] = await db.query('SELECT ipc_total FROM users WHERE id = ?', [pelanggaranData.user_id]);
-        const ipcSebelum = user[0].ipc_total;
-        const ipcSesudah = ipcSebelum - pelanggaranData.point_dikurangi;
-        
-        await db.query('UPDATE users SET ipc_total = ? WHERE id = ?', [ipcSesudah, pelanggaranData.user_id]);
-        
         await db.query(
-            'INSERT INTO ipc_history (user_id, jenis_perubahan, point_change, ipc_sebelum, ipc_sesudah, keterangan) VALUES (?, ?, ?, ?, ?, ?)',
-            [pelanggaranData.user_id, 'pelanggaran', -pelanggaranData.point_dikurangi, ipcSebelum, ipcSesudah, `Pelanggaran: ${pelanggaranData.jenis_pelanggaran}`]
+            'UPDATE pelanggaran SET status = ? WHERE id = ? AND status = ?',
+            ['approved', pelanggaranId, 'pending']
+        );
+        
+        await applyIpcChange(
+            pelanggaranData.user_id,
+            'pelanggaran',
+            -pelanggaranData.point_dikurangi,
+            `Pelanggaran: ${pelanggaranData.jenis_pelanggaran}`
         );
 
         await db.query(
@@ -125,7 +129,7 @@ router.put('/:id/approve', auth, async (req, res) => {
 });
 
 // Reject pelanggaran
-router.put('/:id/reject', auth, async (req, res) => {
+router.put('/:id/reject', auth, superAdminOnly, async (req, res) => {
     try {
         const { rejection_reason } = req.body;
         const pelanggaranId = req.params.id;

@@ -11,6 +11,7 @@ const {
     calculateOrganisasiPoints,
     normalizePrestasiJenis
 } = require('../constants/points');
+const { resolveStudentIdByNis, applyIpcChange } = require('../utils/ipc');
 // Local file storage only - Google Drive removed
 
 // Configure multer for file uploads
@@ -41,9 +42,9 @@ const saveFileLocally = (filePath) => {
 // Submit Prestasi for Approval (or Direct Submit for Superadmin)
 router.post('/prestasi/submit', auth, checkInputAccess('prestasi'), upload.single('foto'), async (req, res) => {
     try {
-        const userId = req.user.id;
         const userRole = req.user.role;
         const { nama, nis, jenis, nama_lomba, jurusan, kelas, pembina, grha, juara, kategori } = req.body;
+        const userId = await resolveStudentIdByNis(nis, req.user.id);
         let fotoPath = req.file ? saveFileLocally(req.file.path) : null;
         console.log('Prestasi - Using local path:', fotoPath);
         
@@ -59,12 +60,7 @@ router.post('/prestasi/submit', auth, checkInputAccess('prestasi'), upload.singl
                 [userId, nama, nis, jenis, nama_lomba, jurusan, kelas, pembina, grha, juara, kategori, fotoPath, point]
             );
             
-            // Add to IPC History
-            await db.query(
-                `INSERT INTO ipc_history (user_id, jenis_perubahan, point_change, keterangan) 
-                 VALUES (?, 'prestasi', ?, ?)`,
-                [userId, point, `Prestasi: ${nama_lomba} - ${juara} ${kategori}`]
-            );
+            await applyIpcChange(userId, 'prestasi', point, `Prestasi: ${nama_lomba} - ${juara} ${kategori}`);
             
             console.log('Prestasi - Directly added by superadmin:', result.insertId);
             
@@ -100,16 +96,16 @@ router.post('/prestasi/submit', auth, checkInputAccess('prestasi'), upload.singl
         });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Server error' });
+        res.status(error.statusCode || 500).json({ message: error.message || 'Server error' });
     }
 });
 
 // Submit Event for Approval (or Direct Submit for Superadmin)
 router.post('/event/submit', auth, checkInputAccess('event'), upload.single('foto'), async (req, res) => {
     try {
-        const userId = req.user.id;
         const userRole = req.user.role;
         const { nama, nis, kelas, grha, jurusan, pembina, nama_event, tingkat } = req.body;
+        const userId = await resolveStudentIdByNis(nis, req.user.id);
         let foto_path = req.file ? saveFileLocally(req.file.path) : null;
         console.log('Event - Using local path:', foto_path);
         
@@ -125,12 +121,7 @@ router.post('/event/submit', auth, checkInputAccess('event'), upload.single('fot
                 [userId, nama, nis, kelas, grha, jurusan, nama_event, tingkat, foto_path, point]
             );
             
-            // Add to IPC History
-            await db.query(
-                `INSERT INTO ipc_history (user_id, jenis_perubahan, point_change, keterangan) 
-                 VALUES (?, 'event', ?, ?)`,
-                [userId, point, `Event: ${nama_event} - ${tingkat}`]
-            );
+            await applyIpcChange(userId, 'event', point, `Event: ${nama_event} - ${tingkat}`);
             
             console.log('Event - Directly added by superadmin:', result.insertId);
             
@@ -166,16 +157,16 @@ router.post('/event/submit', auth, checkInputAccess('event'), upload.single('fot
         });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Server error' });
+        res.status(error.statusCode || 500).json({ message: error.message || 'Server error' });
     }
 });
 
 // Submit Organisasi for Approval (or Direct Submit for Superadmin)
 router.post('/organisasi/submit', auth, checkInputAccess('organisasi'), upload.single('foto'), async (req, res) => {
     try {
-        const userId = req.user.id;
         const userRole = req.user.role;
         const { nama, nis, kelas, grha, jurusan, pembina, jabatan_organisasi, kategori_organisasi } = req.body;
+        const userId = await resolveStudentIdByNis(nis, req.user.id);
         let foto_path = req.file ? saveFileLocally(req.file.path) : null;
         console.log('Organisasi - Using local path:', foto_path);
         
@@ -191,11 +182,11 @@ router.post('/organisasi/submit', auth, checkInputAccess('organisasi'), upload.s
                 [userId, nama, nis, kelas, grha, jurusan, jabatan_organisasi, foto_path, kategori_organisasi, point]
             );
             
-            // Add to IPC History
-            await db.query(
-                `INSERT INTO ipc_history (user_id, jenis_perubahan, point_change, keterangan) 
-                 VALUES (?, 'organisasi', ?, ?)`,
-                [userId, point, `Organisasi: ${kategori_organisasi} - ${jabatan_organisasi}`]
+            await applyIpcChange(
+                userId,
+                'organisasi',
+                point,
+                `Organisasi: ${kategori_organisasi} - ${jabatan_organisasi}`
             );
             
             console.log('Organisasi - Directly added by superadmin:', result.insertId);
@@ -232,7 +223,7 @@ router.post('/organisasi/submit', auth, checkInputAccess('organisasi'), upload.s
         });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Server error' });
+        res.status(error.statusCode || 500).json({ message: error.message || 'Server error' });
     }
 });
 
@@ -282,6 +273,11 @@ router.put('/superadmin/:type/:id', auth, superAdminOnly, async (req, res) => {
         const data = submission[0];
         console.log('Submission data:', data);
 
+        const approvalStatus = data.superadmin_status || data.status;
+        if (approvalStatus !== 'pending') {
+            return res.status(400).json({ message: 'Pengajuan ini sudah diproses' });
+        }
+
         if (status === 'approved') {
             // Calculate points
             let pointChange = 0;
@@ -308,24 +304,20 @@ router.put('/superadmin/:type/:id', auth, superAdminOnly, async (req, res) => {
 
             await db.query(insertQuery, insertParams);
 
-            // Update IPC
-            const [user] = await db.query('SELECT ipc_total FROM users WHERE id = ?', [data.user_id]);
-            if (user.length > 0) {
-                const ipcSebelum = user[0].ipc_total;
-                const ipcBaru = ipcSebelum + pointChange;
-                await db.query('UPDATE users SET ipc_total = ? WHERE id = ?', [ipcBaru, data.user_id]);
-
-                // Log IPC history
-                await db.query(
-                    `INSERT INTO ipc_history (user_id, jenis_perubahan, point_change, ipc_sebelum, ipc_sesudah, keterangan)
-                     VALUES (?, ?, ?, ?, ?, ?)`,
-                    [data.user_id, type, pointChange, ipcSebelum, ipcBaru, `Poin dari ${pointType}: ${data[pointField]}`]
-                );
-            }
+            await applyIpcChange(
+                data.user_id,
+                type,
+                pointChange,
+                `Poin dari ${pointType}: ${data[pointField]}`
+            );
 
             // Update approval status
             await db.query(
-                `UPDATE ${table} SET status = 'approved', approved_at = NOW(), notes = ? WHERE id = ?`,
+                `UPDATE ${table}
+                 SET superadmin_status = 'approved',
+                     superadmin_approved_at = NOW(),
+                     superadmin_notes = ?
+                 WHERE id = ?`,
                 [notes || 'Disetujui oleh SuperAdmin', id]
             );
 
@@ -339,7 +331,10 @@ router.put('/superadmin/:type/:id', auth, superAdminOnly, async (req, res) => {
         } else {
             // Update approval status to rejected
             await db.query(
-                `UPDATE ${table} SET status = 'rejected', notes = ? WHERE id = ?`,
+                `UPDATE ${table}
+                 SET superadmin_status = 'rejected',
+                     superadmin_notes = ?
+                 WHERE id = ?`,
                 [notes || 'Ditolak oleh SuperAdmin', id]
             );
 
@@ -353,7 +348,7 @@ router.put('/superadmin/:type/:id', auth, superAdminOnly, async (req, res) => {
         }
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Server error' });
+        res.status(error.statusCode || 500).json({ message: error.message || 'Server error' });
     }
 });
 
@@ -367,25 +362,26 @@ async function handleLegacyApproval(type, id, status, notes, approverId, res) {
 
         const data = rows[0];
 
-        if (status === 'approved') {
-            await db.query(`UPDATE ${table} SET status = 'approved' WHERE id = ?`, [id]);
+        if (data.status !== 'pending') {
+            return res.status(400).json({ message: 'Pengajuan ini sudah diproses' });
+        }
 
-            const [user] = await db.query('SELECT ipc_total FROM users WHERE id = ?', [data.user_id]);
-            const ipcSebelum = user[0].ipc_total;
+        if (status === 'approved') {
+            await db.query(`UPDATE ${table} SET status = 'approved' WHERE id = ? AND status = 'pending'`, [id]);
 
             if (type === 'pelanggaran') {
-                const ipcSesudah = ipcSebelum - data.point_dikurangi;
-                await db.query('UPDATE users SET ipc_total = ? WHERE id = ?', [ipcSesudah, data.user_id]);
-                await db.query(
-                    `INSERT INTO ipc_history (user_id, jenis_perubahan, point_change, ipc_sebelum, ipc_sesudah, keterangan) VALUES (?, ?, ?, ?, ?, ?)`,
-                    [data.user_id, 'pelanggaran', -data.point_dikurangi, ipcSebelum, ipcSesudah, `Pelanggaran: ${data.jenis_pelanggaran}`]
+                await applyIpcChange(
+                    data.user_id,
+                    'pelanggaran',
+                    -data.point_dikurangi,
+                    `Pelanggaran: ${data.jenis_pelanggaran}`
                 );
             } else {
-                const ipcSesudah = ipcSebelum + data.point;
-                await db.query('UPDATE users SET ipc_total = ? WHERE id = ?', [ipcSesudah, data.user_id]);
-                await db.query(
-                    `INSERT INTO ipc_history (user_id, jenis_perubahan, point_change, ipc_sebelum, ipc_sesudah, keterangan) VALUES (?, ?, ?, ?, ?, ?)`,
-                    [data.user_id, 'perilaku', data.point, ipcSebelum, ipcSesudah, `Perilaku: ${data.karakter_siswa}`]
+                await applyIpcChange(
+                    data.user_id,
+                    'perilaku',
+                    data.point,
+                    `Perilaku: ${data.karakter_siswa}`
                 );
             }
 
@@ -433,21 +429,21 @@ router.get('/all', auth, superAdminOnly, async (req, res) => {
             SELECT p.*, u.nama as user_name
             FROM prestasi_approvals p
             JOIN users u ON p.user_id = u.id
-            WHERE p.status = 'pending'
+            WHERE p.superadmin_status = 'pending'
         `);
 
         const [event] = await db.query(`
             SELECT e.*, u.nama as user_name
             FROM event_approvals e
             JOIN users u ON e.user_id = u.id
-            WHERE e.status = 'pending'
+            WHERE e.superadmin_status = 'pending'
         `);
 
         const [organisasi] = await db.query(`
             SELECT o.*, u.nama as user_name
             FROM organisasi_approvals o
             JOIN users u ON o.user_id = u.id
-            WHERE o.status = 'pending'
+            WHERE o.superadmin_status = 'pending'
         `);
 
         const [pelanggaran] = await db.query(`
@@ -465,15 +461,15 @@ router.get('/all', auth, superAdminOnly, async (req, res) => {
         `);
 
         res.json({
-            prestasi: prestasi.map(p => ({ ...p, type: 'prestasi' })),
-            event: event.map(e => ({ ...e, type: 'event' })),
-            organisasi: organisasi.map(o => ({ ...o, type: 'organisasi' })),
+            prestasi: prestasi.map(p => ({ ...p, type: 'prestasi', status: p.superadmin_status || p.status })),
+            event: event.map(e => ({ ...e, type: 'event', status: e.superadmin_status || e.status })),
+            organisasi: organisasi.map(o => ({ ...o, type: 'organisasi', status: o.superadmin_status || o.status })),
             pelanggaran: pelanggaran.map(p => ({ ...p, type: 'pelanggaran' })),
             perilaku: perilaku.map(p => ({ ...p, type: 'perilaku' }))
         });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Server error' });
+        res.status(error.statusCode || 500).json({ message: error.message || 'Server error' });
     }
 });
 
@@ -503,7 +499,7 @@ router.get('/user-submissions', auth, async (req, res) => {
         });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Server error' });
+        res.status(error.statusCode || 500).json({ message: error.message || 'Server error' });
     }
 });
 
@@ -519,7 +515,7 @@ router.get('/notifications/count', auth, async (req, res) => {
         res.json({ count: result[0].count });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Server error' });
+        res.status(error.statusCode || 500).json({ message: error.message || 'Server error' });
     }
 });
 
@@ -547,7 +543,7 @@ router.get('/notifications', auth, async (req, res) => {
         res.json(notifications);
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Server error' });
+        res.status(error.statusCode || 500).json({ message: error.message || 'Server error' });
     }
 });
 
@@ -564,7 +560,7 @@ router.put('/notifications/:id/read', auth, async (req, res) => {
         res.json({ message: 'Notification marked as read' });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Server error' });
+        res.status(error.statusCode || 500).json({ message: error.message || 'Server error' });
     }
 });
 
@@ -578,7 +574,7 @@ router.put('/notifications/read-all', auth, async (req, res) => {
         res.json({ message: 'All notifications marked as read' });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Server error' });
+        res.status(error.statusCode || 500).json({ message: error.message || 'Server error' });
     }
 });
 
