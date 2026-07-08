@@ -11,7 +11,7 @@ const {
     calculateOrganisasiPoints,
     normalizePrestasiJenis
 } = require('../constants/points');
-const { resolveStudentIdByNis, applyIpcChange } = require('../utils/ipc');
+const { resolveStudentIdByNis, applyIpcChange, applyPerilakuIpcChange } = require('../utils/ipc');
 const {
     getRowApprovalStatus,
     fetchPendingApprovals,
@@ -368,11 +368,11 @@ async function handleLegacyApproval(type, id, status, notes, approverId, res) {
                     `Pelanggaran: ${data.jenis_pelanggaran}`
                 );
             } else {
-                await applyIpcChange(
+                await applyPerilakuIpcChange(
                     data.user_id,
-                    'perilaku',
                     data.point,
-                    `Perilaku: ${data.karakter_siswa}`
+                    `Perilaku: ${data.karakter_siswa}`,
+                    id
                 );
             }
 

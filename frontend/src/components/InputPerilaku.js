@@ -112,11 +112,11 @@ function InputPerilaku() {
 
     try {
       const token = localStorage.getItem('token');
-      await axios.post('/perilaku', formData, {
+      const response = await axios.post('/perilaku', formData, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      setMessage('Perilaku berhasil dikirim untuk approval!');
+      setMessage(response.data.message || 'Perilaku berhasil dikirim!');
       setFormData({
         nama: '',
         nis: '',

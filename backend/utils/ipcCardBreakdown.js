@@ -132,10 +132,14 @@ async function buildIpcCardBreakdown(userId) {
     });
 
     const [perilaku] = await db.query(
-        `SELECT karakter_siswa FROM perilaku WHERE user_id = ? AND status = 'approved'`,
+        `SELECT karakter_siswa, point FROM perilaku
+         WHERE user_id = ? AND status = 'approved'
+         ORDER BY created_at DESC LIMIT 1`,
         [userId]
     );
-    perilaku.forEach((row) => addPerilakuPoints(points, row.karakter_siswa));
+    if (perilaku.length > 0) {
+        addPerilakuPoints(points, perilaku[0].karakter_siswa);
+    }
 
     const breakdownTotal = calculateBreakdownTotal(points);
 

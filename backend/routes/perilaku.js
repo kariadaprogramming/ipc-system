@@ -7,7 +7,7 @@ const {
     calculatePerilakuPointsFromFields,
     formatPerilakuKarakter
 } = require('../constants/points');
-const { resolveStudentIdByNis, applyIpcChange } = require('../utils/ipc');
+const { resolveStudentIdByNis, applyPerilakuIpcChange } = require('../utils/ipc');
 
 // Get all perilaku (for approvals)
 router.get('/all', auth, async (req, res) => {
@@ -42,6 +42,7 @@ router.get('/user/:userId', auth, async (req, res) => {
 // Create perilaku
 router.post('/', auth, checkInputAccess('perilaku'), async (req, res) => {
     try {
+        const userRole = req.user.role;
         const {
             nama,
             nis,
@@ -79,18 +80,52 @@ router.post('/', auth, checkInputAccess('perilaku'), async (req, res) => {
                 kejujuran,
                 kepercayaan_diri
             });
-        
+
+        if (userRole === 'superadmin') {
+            const [result] = await db.query(
+                `INSERT INTO perilaku (user_id, nama, nis, kelas, jurusan, grha, karakter_siswa, point, status)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'approved')`,
+                [userId, nama, nis, kelas, jurusan, grha, karakter, point]
+            );
+
+            await applyPerilakuIpcChange(
+                userId,
+                point,
+                `Perilaku: ${karakter}`,
+                result.insertId
+            );
+
+            await db.query(
+                'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
+                [req.user.id, 'Submit Perilaku', `Directly added perilaku: ${karakter}`]
+            );
+
+            return res.status(201).json({
+                message: 'Perilaku berhasil ditambahkan',
+                id: result.insertId
+            });
+        }
+
         const [result] = await db.query(
             'INSERT INTO perilaku (user_id, nama, nis, kelas, jurusan, grha, karakter_siswa, point) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
             [userId, nama, nis, kelas, jurusan, grha, karakter, point]
         );
+
+        const [superadmins] = await db.query('SELECT id FROM users WHERE role = "superadmin"');
+        for (const admin of superadmins) {
+            await db.query(
+                `INSERT INTO notifications (user_id, type, title, message, related_id, related_type)
+                 VALUES (?, 'approval_needed', 'Persetujuan Perilaku', ?, ?, 'perilaku')`,
+                [admin.id, `${nama} (${nis}) mengajukan perilaku`, result.insertId]
+            );
+        }
 
         await db.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
             [req.user.id, 'Submit Perilaku', `Submitted perilaku: ${karakter}`]
         );
 
-        res.status(201).json({ message: 'Perilaku submitted for approval', id: result.insertId });
+        res.status(201).json({ message: 'Perilaku berhasil diajukan untuk persetujuan', id: result.insertId });
     } catch (error) {
         console.error(error);
         res.status(error.statusCode || 500).json({ message: error.message || 'Server error' });
@@ -117,16 +152,22 @@ router.put('/:id/approve', auth, superAdminOnly, async (req, res) => {
             ['approved', perilakuId, 'pending']
         );
         
-        await applyIpcChange(
+        await applyPerilakuIpcChange(
             perilakuData.user_id,
-            'perilaku',
             perilakuData.point,
-            `Perilaku: ${perilakuData.karakter_siswa}`
+            `Perilaku: ${perilakuData.karakter_siswa}`,
+            perilakuId
         );
 
         await db.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
             [req.user.id, 'Approve Perilaku', `Approved perilaku ID ${perilakuId}`]
+        );
+
+        await db.query(
+            `INSERT INTO notifications (user_id, type, title, message, related_id, related_type)
+             VALUES (?, 'approved', 'Pengajuan Disetujui', ?, ?, 'perilaku')`,
+            [perilakuData.user_id, 'Pengajuan perilaku Anda telah disetujui', perilakuId]
         );
 
         res.json({ message: 'Perilaku approved successfully' });

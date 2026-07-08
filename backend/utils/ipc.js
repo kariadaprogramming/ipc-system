@@ -41,4 +41,31 @@ async function applyIpcChange(userId, jenis, pointChange, keterangan) {
     return { ipcSebelum, ipcBaru };
 }
 
-module.exports = { resolveStudentIdByNis, applyIpcChange };
+async function applyPerilakuIpcChange(userId, newPoint, keterangan, excludePerilakuId = null) {
+    const params = [userId, 'approved'];
+    let sql = 'SELECT id, point FROM perilaku WHERE user_id = ? AND status = ?';
+    if (excludePerilakuId) {
+        sql += ' AND id <> ?';
+        params.push(excludePerilakuId);
+    }
+
+    const [previous] = await db.query(sql, params);
+    let reversedPoints = 0;
+
+    for (const old of previous) {
+        reversedPoints += old.point || 0;
+        await db.query(
+            `UPDATE perilaku SET status = 'rejected', rejection_reason = ? WHERE id = ?`,
+            ['Diganti oleh penilaian perilaku baru', old.id]
+        );
+    }
+
+    const netChange = (newPoint || 0) - reversedPoints;
+    if (netChange !== 0) {
+        await applyIpcChange(userId, 'perilaku', netChange, keterangan);
+    }
+
+    return { netChange, supersededCount: previous.length };
+}
+
+module.exports = { resolveStudentIdByNis, applyIpcChange, applyPerilakuIpcChange };
