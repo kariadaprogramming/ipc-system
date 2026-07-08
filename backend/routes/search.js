@@ -192,7 +192,7 @@ router.get('/leaderboard/nonakademik', auth, async (req, res) => {
                 const [competitions] = await db.query(`
                     SELECT 
                         nama_lomba,
-                        tingkat,
+                        kategori,
                         juara
                     FROM prestasi
                     WHERE user_id = ? 
@@ -203,17 +203,17 @@ router.get('/leaderboard/nonakademik', auth, async (req, res) => {
 
                 // Format competitions list
                 const keterangan = competitions.map(c => 
-                    `${c.nama_lomba} (${c.tingkat}) - Juara ${c.juara}`
+                    `${c.nama_lomba} (${c.kategori}) - Juara ${c.juara}`
                 ).join(', ');
 
-                // Get unique tingkat levels
-                const tingkatSet = new Set(competitions.map(c => c.tingkat));
-                const tingkatList = Array.from(tingkatSet).join(', ');
+                // Get unique kategori levels
+                const kategoriSet = new Set(competitions.map(c => c.kategori));
+                const kategoriList = Array.from(kategoriSet).join(', ');
 
                 return {
                     ...student,
                     rank: index + 1,
-                    tingkat: tingkatList,
+                    tingkat: kategoriList,
                     keterangan: keterangan,
                     detail_prestasi: competitions
                 };
