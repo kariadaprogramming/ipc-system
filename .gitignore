@@ -13,6 +13,7 @@ test.html
 backend/uploads/*
 !backend/uploads/.gitkeep
 
+TODO
 # Logs
 *.log
 npm-debug.log*

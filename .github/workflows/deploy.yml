@@ -15,5 +15,4 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
           port: ${{ secrets.SERVER_PORT || 22 }}
-          script_stop: true
           script: "D: && cd ${{ secrets.PROJECT_PATH }} && git pull && cd frontend && npm install && npm run build && cd ../backend && npm install && pm2 start ecosystem.config.js || pm2 restart ecosystem.config.js && pm2 save && cd ../frontend && taskkill /F /IM node.exe 2>nul || echo No node processes && echo Deployment completed successfully"

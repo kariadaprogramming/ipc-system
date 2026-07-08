@@ -11,7 +11,7 @@ function KelolaSiswa() {
     nama: '',
     nis: '',
     nisn: '',
-    kelas: 'KELAS 10 TKJ 1',
+    kelas: 'X TKJ 1',
     jurusan: 'TKJ',
     grha: 'Airsanya',
     password: ''
@@ -20,12 +20,12 @@ function KelolaSiswa() {
   const [userRole, setUserRole] = useState(null);
 
   const kelasOptions = [
-    'KELAS 10 TKJ 1', 'KELAS 10 TKJ 2', 'KELAS 10 TO 1', 'KELAS 10 TO 2',
-    'KELAS 10 DPIB 1', 'KELAS 10 DPIB 2',
-    'KELAS 11 TKJ 1', 'KELAS 11 TKJ 2', 'KELAS 11 TO 1', 'KELAS 11 TO 2',
-    'KELAS 11 DPIB 1', 'KELAS 11 DPIB 2',
-    'KELAS 12 TKJ 1', 'KELAS 12 TKJ 2', 'KELAS 12 TO 1', 'KELAS 12 TO 2',
-    'KELAS 12 DPIB 1', 'KELAS 12 DPIB 2'
+    'X TKJ 1', 'X TKJ 2', 'X TO 1', 'X TO 2',
+    'X DPIB 1', 'X DPIB 2',
+    'XI TKJ 1', 'XI TKJ 2', 'XI TO 1', 'XI TO 2',
+    'XI DPIB 1', 'XI DPIB 2',
+    'XII TKJ 1', 'XII TKJ 2', 'XII TO 1', 'XII TO 2',
+    'XII DPIB 1', 'XII DPIB 2'
   ];
 
   const grhaOptions = [
@@ -70,7 +70,7 @@ function KelolaSiswa() {
         nama: '',
         nis: '',
         nisn: '',
-        kelas: 'KELAS 10 TKJ 1',
+        kelas: 'X TKJ 1',
         jurusan: 'TKJ',
         grha: 'Airsanya',
         password: ''
@@ -140,7 +140,7 @@ function KelolaSiswa() {
           nama: '',
           nis: '',
           nisn: '',
-          kelas: 'KELAS 10 TKJ 1',
+          kelas: 'X TKJ 1',
           jurusan: 'TKJ',
           grha: 'Airsanya',
           password: ''
