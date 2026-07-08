@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import API_BASE_URL from '../config';
 
 function Leaderboard() {
   const [activeTab, setActiveTab] = useState('akademik'); // 'akademik' or 'nonakademik'
@@ -207,7 +208,7 @@ function Leaderboard() {
                           }}>
                             {student.foto ? (
                               <img 
-                                src={`http://localhost:5000${student.foto}`} 
+                                src={`${API_BASE_URL.replace('/api', '')}${student.foto}`} 
                                 alt={student.nama} 
                                 style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
                               />

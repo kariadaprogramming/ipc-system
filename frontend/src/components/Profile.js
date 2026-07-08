@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import API_BASE_URL from '../config';
 
 function Profile() {
   const [profile, setProfile] = useState(null);
@@ -127,7 +128,7 @@ function Profile() {
     console.error('Error parsing user from localStorage:', e);
   }
   
-  const avatarUrl = profile?.foto ? `http://localhost:5000${profile.foto}` : null;
+  const avatarUrl = profile?.foto ? `${API_BASE_URL.replace('/api', '')}${profile.foto}` : null;
 
   return (
     <div>

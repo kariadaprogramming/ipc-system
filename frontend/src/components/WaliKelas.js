@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import API_BASE_URL from '../config';
 
 function WaliKelas() {
   const [assignments, setAssignments] = useState([]);
@@ -251,7 +252,7 @@ function WaliKelas() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   {cls.wali.foto ? (
                     <img 
-                      src={`http://localhost:5000${cls.wali.foto}`} 
+                      src={`${API_BASE_URL.replace('/api', '')}${cls.wali.foto}`} 
                       alt={cls.wali.nama} 
                       style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--primary-color)' }}
                     />

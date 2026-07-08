@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import API_BASE_URL from '../config';
 
 function ApprovalsV2() {
   const [activeTab, setActiveTab] = useState('prestasi');
@@ -181,7 +182,7 @@ function ApprovalsV2() {
         // If it's a relative path without leading slash, add it
         cleanPath = `/${path}`;
       }
-      return `http://localhost:5000${cleanPath}`;
+      return `${API_BASE_URL.replace('/api', '')}${cleanPath}`;
     };
 
     return (
