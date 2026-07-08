@@ -1,14 +1,14 @@
 // Single source of truth for IPC point calculations
 
 const PRESTASI_POINTS = {
-    'juara 1': { kecamatan: 15, kabupaten: 20, provinsi: 30, nasional: 50, internasional: 100 },
-    'juara 2': { kecamatan: 12, kabupaten: 17, provinsi: 27, nasional: 45, internasional: 90 },
-    'juara 3': { kecamatan: 10, kabupaten: 15, provinsi: 25, nasional: 40, internasional: 80 },
-    'juara harapan 1': { kecamatan: 8, kabupaten: 12, provinsi: 20, nasional: 35, internasional: 70 },
-    'juara harapan 2': { kecamatan: 6, kabupaten: 10, provinsi: 18, nasional: 30, internasional: 60 },
-    'juara harapan 3': { kecamatan: 5, kabupaten: 8, provinsi: 15, nasional: 25, internasional: 50 },
-    'finalis': { kecamatan: 4, kabupaten: 6, provinsi: 12, nasional: 20, internasional: 40 },
-    'peserta': { kecamatan: 3, kabupaten: 5, provinsi: 10, nasional: 15, internasional: 30 }
+    'juara 1': { kecamatan: 8, kabupaten: 12, provinsi: 30, nasional: 40, internasional: 50 },
+    'juara 2': { kecamatan: 7, kabupaten: 10, provinsi: 25, nasional: 35, internasional: 45 },
+    'juara 3': { kecamatan: 6, kabupaten: 8, provinsi: 20, nasional: 30, internasional: 40 },
+    'juara harapan 1': { kecamatan: 5, kabupaten: 7, provinsi: 15, nasional: 25, internasional: 35 },
+    'juara harapan 2': { kecamatan: 4, kabupaten: 5, provinsi: 12, nasional: 20, internasional: 30 },
+    'juara harapan 3': { kecamatan: 3, kabupaten: 5, provinsi: 10, nasional: 15, internasional: 25 },
+    'finalis': { kecamatan: 2, kabupaten: 4, provinsi: 8, nasional: 15, internasional: 20 },
+    'peserta': { kecamatan: 1, kabupaten: 3, provinsi: 5, nasional: 10, internasional: 15 }
 };
 
 const EVENT_POINTS = {
@@ -21,8 +21,8 @@ const EVENT_POINTS = {
 };
 
 const ORGANISASI_POINTS = {
-    'ketua': 6,
-    'wakil ketua': 5,
+    'ketua': 5,
+    'wakil ketua': 4,
     'sekretaris': 4,
     'bendahara': 3,
     'koordinator': 2,
