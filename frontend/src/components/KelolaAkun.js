@@ -3,6 +3,7 @@ import axios from 'axios';
 import * as XLSX from 'xlsx';
 import StudentDetail from './StudentDetail';
 import { KELAS_OPTIONS, JURUSAN_OPTIONS, applyKelasChange, jurusanFromKelas } from '../utils/kelasJurusan';
+import { GRHA_OPTIONS, getRowField, normalizeGrha } from '../utils/excelImport';
 
 function KelolaAkun() {
   const [users, setUsers] = useState([]);
@@ -32,9 +33,7 @@ function KelolaAkun() {
   const [ipcAwalValue, setIpcAwalValue] = useState('');
   const [ipcSaving, setIpcSaving] = useState(false);
 
-  const grhaOptions = [
-    'Airsanya', 'Daksina', 'Genya', 'Madhya', 'Nairiti', 'Pascima', 'Purwa', 'Uttara', 'Wayabhya'
-  ];
+  const grhaOptions = GRHA_OPTIONS;
 
   const filteredUsers = users.filter(user => {
     if (filters.role && user.role !== filters.role) return false;
@@ -309,15 +308,15 @@ function KelolaAkun() {
         try {
           if (importType === 'siswa') {
             // Import student
-            const kelas = row.kelas || row.Kelas || '';
+            const kelas = getRowField(row, 'kelas', 'Kelas');
             const studentData = {
-              nama: row.nama || row.Nama || '',
-              nis: row.nis || row.NIS || '',
-              nisn: row.nisn || row.NISN || '',
+              nama: getRowField(row, 'nama', 'Nama'),
+              nis: getRowField(row, 'nis', 'NIS'),
+              nisn: getRowField(row, 'nisn', 'NISN'),
               kelas,
-              jurusan: jurusanFromKelas(kelas) || row.jurusan || row.Jurusan || 'TKJ',
-              grha: row.grha || row.Gra || '',
-              password: row.password || row.Password || '123456'
+              jurusan: jurusanFromKelas(kelas) || getRowField(row, 'jurusan', 'Jurusan') || 'TKJ',
+              grha: normalizeGrha(getRowField(row, 'grha', 'Grha', 'Gra', 'GRHA')),
+              password: getRowField(row, 'password', 'Password') || '123456'
             };
 
             await axios.post('/users/create-student', studentData, {
@@ -327,11 +326,11 @@ function KelolaAkun() {
           } else {
             // Import teacher
             const teacherData = {
-              nama: row.nama || row.Nama || '',
-              nip: row.nip || row.NIP || '',
-              jabatan: row.jabatan || row.Jabatan || '',
-              no_hp: row.no_hp || row.NoHP || row['No HP'] || '',
-              password: row.password || row.Password || '123456'
+              nama: getRowField(row, 'nama', 'Nama'),
+              nip: getRowField(row, 'nip', 'NIP'),
+              jabatan: getRowField(row, 'jabatan', 'Jabatan'),
+              no_hp: getRowField(row, 'no_hp', 'NoHP', 'No HP', 'no hp'),
+              password: getRowField(row, 'password', 'Password') || '123456'
             };
 
             await axios.post('/users/create-teacher', teacherData, {
