@@ -110,6 +110,12 @@ async function buildIpcCardBreakdown(userId) {
     );
     points.organisasi = organisasi.reduce((sum, row) => sum + (row.point || 0), 0);
 
+    const [kepanitiaan] = await db.query(
+        `SELECT point FROM kepanitiaan WHERE user_id = ? AND status = 'approved'`,
+        [userId]
+    );
+    points.kepanitiaan = kepanitiaan.reduce((sum, row) => sum + (row.point || 0), 0);
+
     const [event] = await db.query(
         `SELECT point FROM event WHERE user_id = ? AND status = 'approved'`,
         [userId]

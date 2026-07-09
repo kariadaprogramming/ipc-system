@@ -140,6 +140,7 @@ function WaliKelas() {
   const totalPrestasi = classStats.reduce((sum, cls) => sum + cls.totalPrestasi, 0);
   const totalEvent = classStats.reduce((sum, cls) => sum + cls.totalEvent, 0);
   const totalOrganisasi = classStats.reduce((sum, cls) => sum + cls.totalOrganisasi, 0);
+  const totalKepanitiaan = classStats.reduce((sum, cls) => sum + cls.totalKepanitiaan, 0);
   const totalPelanggaran = classStats.reduce((sum, cls) => sum + cls.totalPelanggaran, 0);
 
   return (
@@ -189,6 +190,10 @@ function WaliKelas() {
         <div className="stat-card">
           <h3 style={{ color: 'var(--warning-color)', fontSize: '2rem', margin: '0 0 8px 0' }}>{totalOrganisasi}</h3>
           <p>Total Organisasi</p>
+        </div>
+        <div className="stat-card">
+          <h3 style={{ color: '#e67e22', fontSize: '2rem', margin: '0 0 8px 0' }}>{totalKepanitiaan}</h3>
+          <p>Total Kepanitiaan</p>
         </div>
         <div className="stat-card">
           <h3 style={{ 
@@ -279,7 +284,7 @@ function WaliKelas() {
 
               <div style={{ 
                 display: 'grid', 
-                gridTemplateColumns: 'repeat(3, 1fr)',
+                gridTemplateColumns: 'repeat(4, 1fr)',
                 gap: '10px',
                 marginBottom: '16px'
               }}>
@@ -315,6 +320,17 @@ function WaliKelas() {
                     {cls.totalOrganisasi}
                   </div>
                   <small style={{ color: 'var(--text-secondary)' }}>Organisasi</small>
+                </div>
+                <div style={{ 
+                  textAlign: 'center', 
+                  padding: '10px', 
+                  background: '#ffe0b2', 
+                  borderRadius: 'var(--border-radius-sm)'
+                }}>
+                  <div style={{ fontSize: '1.3rem', fontWeight: '700', color: '#e67e22' }}>
+                    {cls.totalKepanitiaan}
+                  </div>
+                  <small style={{ color: 'var(--text-secondary)' }}>Kepanitiaan</small>
                 </div>
               </div>
 
@@ -602,6 +618,17 @@ function WaliKelas() {
                   {selectedClass.totalOrganisasi}
                 </div>
                 <small style={{ color: 'var(--text-secondary)', fontWeight: '600' }}>Organisasi</small>
+              </div>
+              <div style={{ 
+                textAlign: 'center', 
+                padding: '12px', 
+                background: '#ffe0b2', 
+                borderRadius: 'var(--border-radius-md)'
+              }}>
+                <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#e67e22' }}>
+                  {selectedClass.totalKepanitiaan}
+                </div>
+                <small style={{ color: 'var(--text-secondary)', fontWeight: '600' }}>Kepanitiaan</small>
               </div>
               <div style={{ 
                 textAlign: 'center', 

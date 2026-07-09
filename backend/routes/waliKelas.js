@@ -101,6 +101,17 @@ router.get('/class-statistics', auth, superAdminOnly, async (req, res) => {
                     totalOrganisasi = orgResult[0]?.total || 0;
                 }
 
+                // Get total kepanitiaan
+                let totalKepanitiaan = 0;
+                if (studentIds.length > 0) {
+                    const [kepResult] = await db.query(`
+                        SELECT COUNT(*) as total 
+                        FROM kepanitiaan 
+                        WHERE user_id IN (?) AND status = 'approved'
+                    `, [studentIds]);
+                    totalKepanitiaan = kepResult[0]?.total || 0;
+                }
+
                 // Get total pelanggaran
                 let totalPelanggaran = 0;
                 if (studentIds.length > 0) {
@@ -131,6 +142,7 @@ router.get('/class-statistics', auth, superAdminOnly, async (req, res) => {
                     totalPrestasi,
                     totalEvent,
                     totalOrganisasi,
+                    totalKepanitiaan,
                     totalPelanggaran,
                     rataRataIPC: avgIpc,
                     students
@@ -194,6 +206,12 @@ router.get('/my-class', auth, teacherOnly, async (req, res) => {
                     WHERE user_id = ? AND status = 'approved'
                 `, [student.id]);
 
+                // Kepanitiaan count
+                const [kepCount] = await db.query(`
+                    SELECT COUNT(*) as total FROM kepanitiaan 
+                    WHERE user_id = ? AND status = 'approved'
+                `, [student.id]);
+
                 // Pelanggaran count
                 const [pelanggaranCount] = await db.query(`
                     SELECT COUNT(*) as total FROM pelanggaran 
@@ -212,6 +230,7 @@ router.get('/my-class', auth, teacherOnly, async (req, res) => {
                         prestasi: prestasiCount[0].total,
                         event: eventCount[0].total,
                         organisasi: orgCount[0].total,
+                        kepanitiaan: kepCount[0].total,
                         pelanggaran: pelanggaranCount[0].total,
                         perilaku: perilakuCount[0].total
                     }
@@ -223,6 +242,7 @@ router.get('/my-class', auth, teacherOnly, async (req, res) => {
         const totalPrestasi = studentsWithStats.reduce((sum, s) => sum + s.stats.prestasi, 0);
         const totalEvent = studentsWithStats.reduce((sum, s) => sum + s.stats.event, 0);
         const totalOrganisasi = studentsWithStats.reduce((sum, s) => sum + s.stats.organisasi, 0);
+        const totalKepanitiaan = studentsWithStats.reduce((sum, s) => sum + s.stats.kepanitiaan, 0);
         const totalPelanggaran = studentsWithStats.reduce((sum, s) => sum + s.stats.pelanggaran, 0);
         const avgIpc = students.length > 0 
             ? Math.round(students.reduce((sum, s) => sum + (s.ipc_total || 80), 0) / students.length)
@@ -235,6 +255,7 @@ router.get('/my-class', auth, teacherOnly, async (req, res) => {
             totalPrestasi,
             totalEvent,
             totalOrganisasi,
+            totalKepanitiaan,
             totalPelanggaran,
             rataRataIPC: avgIpc,
             students: studentsWithStats
