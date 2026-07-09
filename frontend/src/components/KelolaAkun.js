@@ -271,7 +271,7 @@ function KelolaAkun() {
       setFormData({
         nama: user.nama,
         nip: user.nip,
-        jabatan: user.jabatan,
+        detail: user.detail,
         no_hp: user.no_hp
       });
     }
@@ -353,7 +353,7 @@ function KelolaAkun() {
             const teacherData = {
               nama: getRowField(row, 'nama', 'Nama'),
               nip: getRowField(row, 'nip', 'NIP'),
-              jabatan: getRowField(row, 'jabatan', 'Jabatan'),
+              detail: getRowField(row, 'detail', 'Detail'),
               no_hp: getRowField(row, 'no_hp', 'NoHP', 'No HP', 'no hp'),
               password: getRowField(row, 'password', 'Password') || '123456'
             };
@@ -389,7 +389,7 @@ function KelolaAkun() {
           { Nama: '', NIS: '', NISN: '', Kelas: 'X TKJ 1', Jurusan: 'TKJ', Grha: '', Password: '123456' }
         ]
       : [
-          { Nama: '', NIP: '', Jabatan: '', NoHP: '', Password: '123456' }
+          { Nama: '', NIP: '', Detail: '', NoHP: '', Password: '123456' }
         ];
 
     const ws = XLSX.utils.json_to_sheet(templateData);
@@ -626,8 +626,8 @@ function KelolaAkun() {
                 <input type="text" value={formData.nip || ''} onChange={(e) => setFormData({...formData, nip: e.target.value})} required />
               </div>
               <div className="form-group">
-                <label>Jabatan</label>
-                <input type="text" value={formData.jabatan || ''} onChange={(e) => setFormData({...formData, jabatan: e.target.value})} />
+                <label>Detail</label>
+                <input type="text" value={formData.detail || ''} onChange={(e) => setFormData({...formData, detail: e.target.value})} />
               </div>
               <div className="form-group">
                 <label>No HP</label>
@@ -694,8 +694,8 @@ function KelolaAkun() {
                   <input type="text" value={formData.nip || ''} onChange={(e) => setFormData({...formData, nip: e.target.value})} required />
                 </div>
                 <div className="form-group">
-                  <label>Jabatan</label>
-                  <input type="text" value={formData.jabatan || ''} onChange={(e) => setFormData({...formData, jabatan: e.target.value})} />
+                  <label>Detail</label>
+                  <input type="text" value={formData.detail || ''} onChange={(e) => setFormData({...formData, detail: e.target.value})} />
                 </div>
                 <div className="form-group">
                   <label>No HP</label>

@@ -419,7 +419,7 @@ function WaliKelas() {
                   <option value="">Pilih Guru</option>
                   {teachers.map(teacher => (
                     <option key={teacher.id} value={teacher.id}>
-                      {teacher.nama} ({teacher.nip}) - {teacher.jabatan}
+                      {teacher.nama} ({teacher.nip}) - {teacher.detail}
                     </option>
                   ))}
                 </select>

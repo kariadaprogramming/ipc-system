@@ -23,7 +23,7 @@ router.get('/', auth, superAdminOnly, async (req, res) => {
 router.get('/available-teachers', auth, superAdminOnly, async (req, res) => {
     try {
         const [teachers] = await db.query(`
-            SELECT u.id, u.nama, u.nip, u.jabatan 
+            SELECT u.id, u.nama, u.nip, u.detail 
             FROM users u
             WHERE u.role = 'guru'
             AND u.id NOT IN (

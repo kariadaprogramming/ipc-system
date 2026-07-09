@@ -188,8 +188,8 @@ function Profile() {
                 <input type="text" value={editData.no_hp || ''} onChange={(e) => setEditData({...editData, no_hp: e.target.value})} />
               </div>
               <div className="form-group">
-                <label>Jabatan</label>
-                <input type="text" value={editData.jabatan || ''} onChange={(e) => setEditData({...editData, jabatan: e.target.value})} />
+                <label>Detail</label>
+                <input type="text" value={editData.detail || ''} onChange={(e) => setEditData({...editData, detail: e.target.value})} />
               </div>
             </>
           )}
@@ -231,7 +231,7 @@ function Profile() {
         {user.role === 'guru' && (
           <>
             <p><strong>NIP:</strong> {profile?.nip || '-'}</p>
-            <p><strong>Jabatan:</strong> {profile?.jabatan || '-'}</p>
+            <p><strong>Detail:</strong> {profile?.detail || '-'}</p>
           </>
         )}
         {user.role === 'superadmin' && (

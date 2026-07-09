@@ -23,7 +23,7 @@ CREATE TABLE users (
     ipc_awal INT DEFAULT 80,
     alamat TEXT,
     no_hp VARCHAR(20),
-    jabatan VARCHAR(100),
+    detail VARCHAR(100),
     foto VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP

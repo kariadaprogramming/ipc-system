@@ -208,7 +208,7 @@ router.get('/:id/ipc-history', auth, teacherOrSuperAdmin, async (req, res) => {
 router.get('/:id', auth, async (req, res) => {
     try {
         const [users] = await db.query(
-            'SELECT id, nama, nis, nisn, nip, role, kelas, jurusan, grha, wali_kelas, ipc_total, alamat, no_hp, jabatan, created_at FROM users WHERE id = ?',
+            'SELECT id, nama, nis, nisn, nip, role, kelas, jurusan, grha, wali_kelas, ipc_total, alamat, no_hp, detail, created_at FROM users WHERE id = ?',
             [req.params.id]
         );
         
@@ -306,7 +306,7 @@ router.post('/create-student', auth, teacherOrSuperAdmin, async (req, res) => {
 // Create teacher account
 router.post('/create-teacher', auth, superAdminOnly, async (req, res) => {
     try {
-        const { nama, nip, password, jabatan, alamat, no_hp, wali_kelas } = req.body;
+        const { nama, nip, password, detail, alamat, no_hp, wali_kelas } = req.body;
 
         // Check for duplicate
         const [existing] = await db.query(
@@ -321,8 +321,8 @@ router.post('/create-teacher', auth, superAdminOnly, async (req, res) => {
         const hashedPassword = bcrypt.hashSync(password, 10);
 
         const [result] = await db.query(
-            'INSERT INTO users (nama, nip, password, role, jabatan, alamat, no_hp, wali_kelas, ipc_total, ipc_awal) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [nama, nip, hashedPassword, 'guru', jabatan, alamat, no_hp, wali_kelas, 0, 0]
+            'INSERT INTO users (nama, nip, password, role, detail, alamat, no_hp, wali_kelas, ipc_total, ipc_awal) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [nama, nip, hashedPassword, 'guru', detail, alamat, no_hp, wali_kelas, 0, 0]
         );
 
         // Create default permissions
@@ -363,11 +363,11 @@ router.put('/:id', auth, async (req, res) => {
             }
         }
 
-        const { nama, alamat, no_hp, jabatan } = req.body;
+        const { nama, alamat, no_hp, detail } = req.body;
         
         await db.query(
-            'UPDATE users SET nama = ?, alamat = ?, no_hp = ?, jabatan = ? WHERE id = ?',
-            [nama, alamat, no_hp, jabatan, userId]
+            'UPDATE users SET nama = ?, alamat = ?, no_hp = ?, detail = ? WHERE id = ?',
+            [nama, alamat, no_hp, detail, userId]
         );
 
         // Log activity
@@ -639,7 +639,7 @@ router.put('/biodata-approvals/:id', auth, superAdminOnly, async (req, res) => {
 router.put('/:id/biodata', auth, superAdminOnly, async (req, res) => {
     try {
         const userId = parseInt(req.params.id);
-        const { nama, nis, nisn, kelas, jurusan, grha, nip, jabatan, alamat, no_hp } = req.body;
+        const { nama, nis, nisn, kelas, jurusan, grha, nip, detail, alamat, no_hp } = req.body;
         const resolvedJurusan = resolveJurusan(kelas, jurusan);
 
         // Get user current data
@@ -659,8 +659,8 @@ router.put('/:id/biodata', auth, superAdminOnly, async (req, res) => {
         } else if (role === 'guru') {
             // Update guru biodata
             await db.query(
-                'UPDATE users SET nama = ?, nip = ?, jabatan = ?, alamat = ?, no_hp = ? WHERE id = ?',
-                [nama, nip, jabatan, alamat, no_hp, userId]
+                'UPDATE users SET nama = ?, nip = ?, detail = ?, alamat = ?, no_hp = ? WHERE id = ?',
+                [nama, nip, detail, alamat, no_hp, userId]
             );
         }
         
