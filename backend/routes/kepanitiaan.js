@@ -1,0 +1,147 @@
+const express = require('express');
+const router = express.Router();
+const { auth } = require('../middleware/auth');
+const db = require('../config/database');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, 'uploads/kepanitiaan/');
+    },
+    filename: (req, file, cb) => {
+        cb(null, Date.now() + path.extname(file.originalname));
+    }
+});
+
+const upload = multer({ storage: storage });
+const { calculateKepanitiaanPoints } = require('../constants/points');
+
+// Get all kepanitiaan (for approvals)
+router.get('/all', auth, async (req, res) => {
+    try {
+        const [kepanitiaan] = await db.query(`
+            SELECT k.*, u.nama as user_name 
+            FROM kepanitiaan k 
+            JOIN users u ON k.user_id = u.id 
+            ORDER BY k.created_at DESC
+        `);
+        res.json(kepanitiaan);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Get user's kepanitiaan
+router.get('/user/:userId', auth, async (req, res) => {
+    try {
+        const [kepanitiaan] = await db.query(
+            'SELECT * FROM kepanitiaan WHERE user_id = ? AND status = ? ORDER BY created_at DESC',
+            [req.params.userId, 'approved']
+        );
+        res.json(kepanitiaan);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Create kepanitiaan
+router.post('/', auth, upload.single('foto'), async (req, res) => {
+    try {
+        const { nama, nis, kelas, grha, jurusan, jabatan_kepanitiaan, kategori_kepanitiaan } = req.body;
+        let foto = req.file ? req.file.filename : null;
+
+        // Rename file to NIS_Jabatan Kepanitiaan format
+        if (req.file && foto) {
+            const oldPath = path.join('uploads/kepanitiaan', foto);
+            const ext = path.extname(req.file.originalname);
+            const newFileName = `${nis}_${jabatan_kepanitiaan}${ext}`;
+            const newPath = path.join('uploads/kepanitiaan', newFileName);
+
+            // Rename the file
+            fs.renameSync(oldPath, newPath);
+            foto = newFileName;
+        }
+
+        const point = calculateKepanitiaanPoints(jabatan_kepanitiaan);
+
+        const [result] = await db.query(
+            'INSERT INTO kepanitiaan (user_id, nama, nis, kelas, grha, jurusan, jabatan_kepanitiaan, foto, kategori_kepanitiaan, point) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [req.user.id, nama, nis, kelas, grha, jurusan, jabatan_kepanitiaan, foto, kategori_kepanitiaan, point]
+        );
+
+        // Log activity
+        await db.query(
+            'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
+            [req.user.id, 'Submit Kepanitiaan', `Submitted kepanitiaan: ${jabatan_kepanitiaan}`]
+        );
+
+        res.status(201).json({ message: 'Kepanitiaan submitted for approval', id: result.insertId });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Approve kepanitiaan
+router.put('/:id/approve', auth, async (req, res) => {
+    try {
+        const kepanitiaanId = req.params.id;
+        
+        const [kepanitiaan] = await db.query('SELECT * FROM kepanitiaan WHERE id = ?', [kepanitiaanId]);
+        if (kepanitiaan.length === 0) {
+            return res.status(404).json({ message: 'Kepanitiaan not found' });
+        }
+
+        const kepanitiaanData = kepanitiaan[0];
+        
+        await db.query('UPDATE kepanitiaan SET status = ? WHERE id = ?', ['approved', kepanitiaanId]);
+        
+        const [user] = await db.query('SELECT ipc_total FROM users WHERE id = ?', [kepanitiaanData.user_id]);
+        const ipcSebelum = user[0].ipc_total;
+        const ipcSesudah = ipcSebelum + kepanitiaanData.point;
+        
+        await db.query('UPDATE users SET ipc_total = ? WHERE id = ?', [ipcSesudah, kepanitiaanData.user_id]);
+        
+        await db.query(
+            'INSERT INTO ipc_history (user_id, jenis_perubahan, point_change, ipc_sebelum, ipc_sesudah, keterangan) VALUES (?, ?, ?, ?, ?, ?)',
+            [kepanitiaanData.user_id, 'kepanitiaan', kepanitiaanData.point, ipcSebelum, ipcSesudah, `Kepanitiaan: ${kepanitiaanData.jabatan_kepanitiaan}`]
+        );
+
+        await db.query(
+            'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
+            [req.user.id, 'Approve Kepanitiaan', `Approved kepanitiaan ID ${kepanitiaanId}`]
+        );
+
+        res.json({ message: 'Kepanitiaan approved successfully' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Reject kepanitiaan
+router.put('/:id/reject', auth, async (req, res) => {
+    try {
+        const { rejection_reason } = req.body;
+        const kepanitiaanId = req.params.id;
+        
+        await db.query('UPDATE kepanitiaan SET status = ?, rejection_reason = ? WHERE id = ?', ['rejected', rejection_reason, kepanitiaanId]);
+
+        await db.query(
+            'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
+            [req.user.id, 'Reject Kepanitiaan', `Rejected kepanitiaan ID ${kepanitiaanId}`]
+        );
+
+        res.json({ message: 'Kepanitiaan rejected' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+module.exports = router;

@@ -229,10 +229,6 @@ function Login() {
             {loading ? 'Loading...' : 'Login'}
           </button>
         </form>
-
-        <div style={{ textAlign: 'center', marginTop: '24px', fontSize: '0.75rem', color: '#999' }}>
-          <p>SuperAdmin: ADMIN001 / admin123</p>
-        </div>
         </div>
       </div>
     </div>

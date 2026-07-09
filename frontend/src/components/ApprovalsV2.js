@@ -8,6 +8,7 @@ function ApprovalsV2() {
     prestasi: [],
     event: [],
     organisasi: [],
+    kepanitiaan: [],
     pelanggaran: [],
     perilaku: [],
     biodata: [],
@@ -82,6 +83,7 @@ function ApprovalsV2() {
         prestasi: 'Prestasi',
         event: 'Event',
         organisasi: 'Organisasi',
+        kepanitiaan: 'Kepanitiaan',
         pelanggaran: 'Pelanggaran',
         perilaku: 'Perilaku'
       };
@@ -127,6 +129,7 @@ function ApprovalsV2() {
         prestasi: 'Prestasi',
         event: 'Event',
         organisasi: 'Organisasi',
+        kepanitiaan: 'Kepanitiaan',
         pelanggaran: 'Pelanggaran',
         perilaku: 'Perilaku'
       };
@@ -166,6 +169,7 @@ function ApprovalsV2() {
       prestasi: ['Nama', 'NIS', 'Lomba', 'Juara', 'Kategori', 'Foto', 'Status', 'Aksi'],
       event: ['Nama', 'NIS', 'Event', 'Tingkat', 'Foto', 'Status', 'Aksi'],
       organisasi: ['Nama', 'NIS', 'Organisasi', 'Jabatan', 'Foto', 'Status', 'Aksi'],
+      kepanitiaan: ['Nama', 'NIS', 'Kepanitiaan', 'Jabatan', 'Foto', 'Status', 'Aksi'],
       pelanggaran: ['Nama', 'NIS', 'Keterangan', 'Jenis', 'Foto', 'Status', 'Aksi'],
       perilaku: ['Nama', 'NIS', 'Karakter', 'Status', 'Aksi'],
       biodata: ['Siswa', 'NIS Lama', 'NIS Baru', 'Perubahan', 'Diajukan Oleh', 'Status', 'Aksi'],
@@ -225,6 +229,12 @@ function ApprovalsV2() {
                 <>
                   <td>{item.kategori_organisasi}</td>
                   <td>{item.jabatan_organisasi}</td>
+                </>
+              )}
+              {type === 'kepanitiaan' && (
+                <>
+                  <td>{item.kategori_kepanitiaan}</td>
+                  <td>{item.jabatan_kepanitiaan}</td>
                 </>
               )}
               {type === 'pelanggaran' && (
@@ -369,6 +379,7 @@ function ApprovalsV2() {
     { key: 'prestasi', label: 'Prestasi', count: approvals.prestasi.length },
     { key: 'event', label: 'Event', count: approvals.event.length },
     { key: 'organisasi', label: 'Organisasi', count: approvals.organisasi.length },
+    { key: 'kepanitiaan', label: 'Kepanitiaan', count: approvals.kepanitiaan.length },
     { key: 'pelanggaran', label: 'Pelanggaran', count: approvals.pelanggaran?.length || 0 },
     { key: 'perilaku', label: 'Perilaku', count: approvals.perilaku?.length || 0 },
     { key: 'biodata', label: 'Update Biodata', count: approvals.biodata?.length || 0 },

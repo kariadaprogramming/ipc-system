@@ -29,6 +29,15 @@ const ORGANISASI_POINTS = {
     'anggota': 1
 };
 
+const KEPANITIAAN_POINTS = {
+    'ketua': 5,
+    'wakil ketua': 4,
+    'sekretaris': 4,
+    'bendahara': 3,
+    'koordinator': 2,
+    'anggota': 1
+};
+
 const PELANGGARAN_POINTS = {
     'ringan': 1,
     'sedang': 5,
@@ -52,6 +61,10 @@ const calculateEventPoints = (tingkat) => {
 
 const calculateOrganisasiPoints = (jabatan) => {
     return ORGANISASI_POINTS[jabatan?.toLowerCase()] || ORGANISASI_POINTS[jabatan] || 0;
+};
+
+const calculateKepanitiaanPoints = (jabatan) => {
+    return KEPANITIAAN_POINTS[jabatan?.toLowerCase()] || KEPANITIAAN_POINTS[jabatan] || 0;
 };
 
 const calculatePelanggaranPoints = (jenis) => {
@@ -116,11 +129,13 @@ module.exports = {
     PRESTASI_POINTS,
     EVENT_POINTS,
     ORGANISASI_POINTS,
+    KEPANITIAAN_POINTS,
     PELANGGARAN_POINTS,
     PERILAKU_POINTS,
     calculatePrestasiPoints,
     calculateEventPoints,
     calculateOrganisasiPoints,
+    calculateKepanitiaanPoints,
     calculatePelanggaranPoints,
     calculatePerilakuPoints,
     calculatePerilakuPointsFromFields,

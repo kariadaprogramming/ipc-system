@@ -9,6 +9,7 @@ const {
     calculatePrestasiPoints,
     calculateEventPoints,
     calculateOrganisasiPoints,
+    calculateKepanitiaanPoints,
     normalizePrestasiJenis
 } = require('../constants/points');
 const { resolveStudentIdByNis, applyIpcChange, applyPerilakuIpcChange } = require('../utils/ipc');
@@ -233,6 +234,72 @@ router.post('/organisasi/submit', auth, checkInputAccess('organisasi'), upload.s
     }
 });
 
+// Submit Kepanitiaan for Approval (or Direct Submit for Superadmin)
+router.post('/kepanitiaan/submit', auth, checkInputAccess('kepanitiaan'), upload.single('foto'), async (req, res) => {
+    try {
+        const userRole = req.user.role;
+        const { nama, nis, kelas, grha, jurusan, pembina, jabatan_kepanitiaan, kategori_kepanitiaan } = req.body;
+        const userId = await resolveStudentIdByNis(nis, req.user.id);
+        let foto_path = req.file ? saveFileLocally(req.file.path) : null;
+        console.log('Kepanitiaan - Using local path:', foto_path);
+        
+        // SUPERADMIN: Direct submit to main table
+        if (userRole === 'superadmin') {
+            console.log('Kepanitiaan - Superadmin direct submission');
+            const point = calculateKepanitiaanPoints(jabatan_kepanitiaan);
+            
+            const [result] = await db.query(
+                `INSERT INTO kepanitiaan 
+                (user_id, nama, nis, kelas, grha, jurusan, jabatan_kepanitiaan, foto, kategori_kepanitiaan, point, status) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'approved')`,
+                [userId, nama, nis, kelas, grha, jurusan, jabatan_kepanitiaan, foto_path, kategori_kepanitiaan, point]
+            );
+            
+            await applyIpcChange(
+                userId,
+                'kepanitiaan',
+                point,
+                `Kepanitiaan: ${kategori_kepanitiaan} - ${jabatan_kepanitiaan}`
+            );
+            
+            console.log('Kepanitiaan - Directly added by superadmin:', result.insertId);
+            
+            return res.status(201).json({ 
+                message: 'Kepanitiaan berhasil ditambahkan', 
+                id: result.insertId 
+            });
+        }
+        
+        // SISWA/GURU: Submit for approval (superadmin only)
+        const [result] = await db.query(
+            `INSERT INTO kepanitiaan_approvals
+            (user_id, nama, nis, kelas, grha, jurusan, pembina, jabatan_kepanitiaan, kategori_kepanitiaan, foto_path)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [userId, nama, nis, kelas, grha, jurusan, pembina, jabatan_kepanitiaan, kategori_kepanitiaan, foto_path]
+        );
+
+        // Create notification for superadmin only
+        const [superadmins] = await db.query('SELECT id FROM users WHERE role = "superadmin"');
+        console.log('Kepanitiaan - Superadmins found:', superadmins.length);
+        for (const admin of superadmins) {
+            await db.query(
+                `INSERT INTO notifications (user_id, type, title, message, related_id, related_type)
+                 VALUES (?, 'approval_needed', 'Persetujuan Kepanitiaan', ?, ?, 'kepanitiaan')`,
+                [admin.id, `${nama} (${nis}) mengajukan kepanitiaan: ${kategori_kepanitiaan}`, result.insertId]
+            );
+            console.log('Kepanitiaan - Notification sent to superadmin:', admin.id);
+        }
+
+        res.status(201).json({
+            message: 'Kepanitiaan berhasil diajukan untuk persetujuan',
+            id: result.insertId
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(error.statusCode || 500).json({ message: error.message || 'Server error' });
+    }
+});
+
 // ==================== APPROVAL ACTIONS ====================
 
 // REMOVED: Pembina approval route - now only superadmin approval
@@ -266,6 +333,11 @@ router.put('/superadmin/:type/:id', auth, superAdminOnly, async (req, res) => {
                 pointField = 'jabatan_organisasi';
                 pointType = 'Organisasi';
                 break;
+            case 'kepanitiaan':
+                table = 'kepanitiaan_approvals';
+                pointField = 'jabatan_kepanitiaan';
+                pointType = 'Kepanitiaan';
+                break;
             default:
                 return res.status(400).json({ message: 'Invalid type' });
         }
@@ -291,6 +363,8 @@ router.put('/superadmin/:type/:id', auth, superAdminOnly, async (req, res) => {
                 pointChange = calculatePrestasiPoints(data.juara, data.kategori);
             } else if (type === 'event') {
                 pointChange = calculateEventPoints(data.tingkat);
+            } else if (type === 'kepanitiaan') {
+                pointChange = calculateKepanitiaanPoints(data[pointField]);
             } else {
                 pointChange = calculateOrganisasiPoints(data[pointField]);
             }
@@ -303,6 +377,9 @@ router.put('/superadmin/:type/:id', auth, superAdminOnly, async (req, res) => {
             } else if (type === 'event') {
                 insertQuery = `INSERT INTO event (user_id, nama, nis, kelas, grha, jurusan, nama_event, tingkat, foto, point, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'approved')`;
                 insertParams = [data.user_id, data.nama || 'Unknown', data.nis || '', data.kelas || '', data.grha || '', data.jurusan || '', data.nama_event || '', data.tingkat || '', data.foto_path || null, pointChange];
+            } else if (type === 'kepanitiaan') {
+                insertQuery = `INSERT INTO kepanitiaan (user_id, nama, nis, kelas, grha, jurusan, jabatan_kepanitiaan, kategori_kepanitiaan, foto, point, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'approved')`;
+                insertParams = [data.user_id, data.nama || 'Unknown', data.nis || '', data.kelas || '', data.grha || '', data.jurusan || '', data.jabatan_kepanitiaan || '', data.kategori_kepanitiaan || '', data.foto_path || null, pointChange];
             } else {
                 insertQuery = `INSERT INTO organisasi (user_id, nama, nis, kelas, grha, jurusan, jabatan_organisasi, kategori_organisasi, foto, point, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'approved')`;
                 insertParams = [data.user_id, data.nama || 'Unknown', data.nis || '', data.kelas || '', data.grha || '', data.jurusan || '', data.jabatan_organisasi || '', data.kategori_organisasi || '', data.foto_path || null, pointChange];
@@ -416,10 +493,11 @@ async function handleLegacyApproval(type, id, status, notes, approverId, res) {
 // Get all approvals for SuperAdmin
 router.get('/all', auth, superAdminOnly, async (req, res) => {
     try {
-        const [prestasi, event, organisasi] = await Promise.all([
+        const [prestasi, event, organisasi, kepanitiaan] = await Promise.all([
             fetchPendingApprovals('prestasi_approvals', 'p'),
             fetchPendingApprovals('event_approvals', 'e'),
-            fetchPendingApprovals('organisasi_approvals', 'o')
+            fetchPendingApprovals('organisasi_approvals', 'o'),
+            fetchPendingApprovals('kepanitiaan_approvals', 'k')
         ]);
 
         const [pelanggaran] = await db.query(`
@@ -440,6 +518,7 @@ router.get('/all', auth, superAdminOnly, async (req, res) => {
             prestasi: prestasi.map(p => ({ ...p, type: 'prestasi', status: getRowApprovalStatus(p) })),
             event: event.map(e => ({ ...e, type: 'event', status: getRowApprovalStatus(e) })),
             organisasi: organisasi.map(o => ({ ...o, type: 'organisasi', status: getRowApprovalStatus(o) })),
+            kepanitiaan: kepanitiaan.map(k => ({ ...k, type: 'kepanitiaan', status: getRowApprovalStatus(k) })),
             pelanggaran: pelanggaran.map(p => ({ ...p, type: 'pelanggaran' })),
             perilaku: perilaku.map(p => ({ ...p, type: 'perilaku' }))
         });
@@ -468,10 +547,15 @@ router.get('/user-submissions', auth, async (req, res) => {
             SELECT *, 'organisasi' as type FROM organisasi_approvals WHERE user_id = ? ORDER BY created_at DESC
         `, [userId]);
         
+        const [kepanitiaan] = await db.query(`
+            SELECT *, 'kepanitiaan' as type FROM kepanitiaan_approvals WHERE user_id = ? ORDER BY created_at DESC
+        `, [userId]);
+        
         res.json({
             prestasi,
             event,
-            organisasi
+            organisasi,
+            kepanitiaan
         });
     } catch (error) {
         console.error(error);

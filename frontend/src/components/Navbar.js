@@ -33,6 +33,7 @@ function Navbar({ user, onLogout, isMobileMenuOpen, toggleMobileMenu }) {
     { path: '/dashboard', label: 'Dashboard', show: true },
     { path: '/input-prestasi', label: 'Prestasi', show: true },
     { path: '/input-organisasi', label: 'Organisasi', show: true },
+    { path: '/input-kepanitiaan', label: 'Kepanitiaan', show: true },
     { path: '/input-event', label: 'Event', show: true },
     // Pelanggaran and Perilaku only for superadmin
     { path: '/input-pelanggaran', label: 'Pelanggaran', show: user?.role === 'superadmin' },

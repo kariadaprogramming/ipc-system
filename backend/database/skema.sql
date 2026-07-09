@@ -87,6 +87,26 @@ CREATE TABLE organisasi (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+-- Kepanitiaan Table
+DROP TABLE IF EXISTS kepanitiaan;
+CREATE TABLE kepanitiaan (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    nama VARCHAR(100) NOT NULL,
+    nis VARCHAR(20) NOT NULL,
+    kelas VARCHAR(50),
+    grha VARCHAR(50),
+    jurusan ENUM('TKJ', 'TO', 'DPIB'),
+    jabatan_kepanitiaan VARCHAR(100) NOT NULL,
+    foto VARCHAR(255),
+    kategori_kepanitiaan VARCHAR(100),
+    point INT NOT NULL,
+    status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
+    rejection_reason TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 -- Event Table
 DROP TABLE IF EXISTS event;
 CREATE TABLE event (
@@ -164,7 +184,7 @@ DROP TABLE IF EXISTS ipc_history;
 CREATE TABLE ipc_history (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
-    jenis_perubahan ENUM('prestasi', 'organisasi', 'event', 'pelanggaran', 'perilaku', 'initial', 'manual') NOT NULL,
+    jenis_perubahan ENUM('prestasi', 'organisasi', 'kepanitiaan', 'event', 'pelanggaran', 'perilaku', 'initial', 'manual') NOT NULL,
     point_change INT NOT NULL,
     ipc_sebelum INT NOT NULL,
     ipc_sesudah INT NOT NULL,
@@ -272,6 +292,33 @@ CREATE TABLE organisasi_approvals (
     FOREIGN KEY (pembina_id) REFERENCES users(id)
 );
 
+-- Kepanitiaan Approvals Table
+DROP TABLE IF EXISTS kepanitiaan_approvals;
+CREATE TABLE kepanitiaan_approvals (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    nama VARCHAR(255) NOT NULL,
+    nis VARCHAR(50) NOT NULL,
+    kelas VARCHAR(50),
+    grha VARCHAR(50),
+    jurusan VARCHAR(50),
+    pembina VARCHAR(255),
+    jabatan_kepanitiaan VARCHAR(100),
+    kategori_kepanitiaan VARCHAR(255),
+    foto_path VARCHAR(255),
+    pembina_status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
+    superadmin_status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
+    pembina_id INT NULL,
+    pembina_approved_at TIMESTAMP NULL,
+    superadmin_approved_at TIMESTAMP NULL,
+    pembina_notes TEXT,
+    superadmin_notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (pembina_id) REFERENCES users(id)
+);
+
 -- Siswa Approvals Table (for new student accounts created by guru)
 DROP TABLE IF EXISTS siswa_approvals;
 CREATE TABLE siswa_approvals (
@@ -354,7 +401,7 @@ CREATE TABLE notifications (
     title VARCHAR(255) NOT NULL,
     message TEXT NOT NULL,
     related_id INT,
-    related_type ENUM('prestasi', 'event', 'organisasi', 'siswa', 'student_creation', 'biodata', 'input_access', 'wali_kelas', 'pelanggaran', 'perilaku') NOT NULL,
+    related_type ENUM('prestasi', 'event', 'organisasi', 'kepanitiaan', 'siswa', 'student_creation', 'biodata', 'input_access', 'wali_kelas', 'pelanggaran', 'perilaku') NOT NULL,
     is_read BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id)
@@ -426,6 +473,7 @@ INSERT INTO users (nama, nis, password, role, ipc_total, ipc_awal) VALUES
 INSERT INTO input_access_control (control_type, role_target, jenis_input, is_enabled, updated_by) VALUES
 ('global', 'all', 'prestasi', TRUE, 1),
 ('global', 'all', 'organisasi', TRUE, 1),
+('global', 'all', 'kepanitiaan', TRUE, 1),
 ('global', 'all', 'event', TRUE, 1),
 ('global', 'all', 'pelanggaran', TRUE, 1),
 ('global', 'all', 'perilaku', TRUE, 1);

@@ -94,6 +94,7 @@ app.use('/api/auth', loginLimiter, require('./routes/auth'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/prestasi', require('./routes/prestasi'));
 app.use('/api/organisasi', require('./routes/organisasi'));
+app.use('/api/kepanitiaan', require('./routes/kepanitiaan'));
 app.use('/api/event', require('./routes/event'));
 app.use('/api/pelanggaran', require('./routes/pelanggaran'));
 app.use('/api/perilaku', require('./routes/perilaku'));

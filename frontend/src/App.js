@@ -5,6 +5,7 @@ import Dashboard from './components/Dashboard';
 import Navbar from './components/Navbar';
 import InputPrestasi from './components/InputPrestasi';
 import InputOrganisasi from './components/InputOrganisasi';
+import InputKepanitiaan from './components/InputKepanitiaan';
 import InputEvent from './components/InputEvent';
 import InputPelanggaran from './components/InputPelanggaran';
 import InputPerilaku from './components/InputPerilaku';
@@ -111,6 +112,11 @@ function App() {
         <Route path="/input-organisasi" element={
           <ProtectedRoute>
             {(user) => <MainLayout user={user}><InputOrganisasi /></MainLayout>}
+          </ProtectedRoute>
+        } />
+        <Route path="/input-kepanitiaan" element={
+          <ProtectedRoute>
+            {(user) => <MainLayout user={user}><InputKepanitiaan /></MainLayout>}
           </ProtectedRoute>
         } />
         <Route path="/input-event" element={
