@@ -3,6 +3,7 @@ import axios from 'axios';
 import { KELAS_OPTIONS, JURUSAN_OPTIONS, applyKelasChange, jurusanFromKelas, isJurusanLocked } from '../utils/kelasJurusan';
 import EditModal from './EditModal';
 import useEditModal from '../hooks/useEditModal';
+import API_BASE_URL from '../config';
 
 function InputEvent() {
   const [formData, setFormData] = useState({
@@ -529,7 +530,7 @@ function InputEvent() {
         onClose={editModal.closeEditModal}
         onSave={handleUpdate}
         isLoading={editModal.isLoading}
-        photoPreview={editModal.editingItem?.foto ? `/uploads/event/${editModal.editingItem.foto}` : null}
+        photoPreview={editModal.editingItem?.foto ? `${API_BASE_URL.replace('/api', '')}uploads/event/${editModal.editingItem.foto}` : null}
       >
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <div className="form-group">
