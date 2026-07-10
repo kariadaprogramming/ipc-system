@@ -162,9 +162,9 @@ function WaliKelas() {
             <h2 style={{ margin: 0, fontSize: '1.8rem', fontWeight: '700' }}>
               Manajemen Wali Kelas
             </h2>
-            <p style={{ margin: '4px 0 0 0', fontSize: '1rem', opacity: 0.9 }}>
+            <h3 style={{ margin: '4px 0 0 0', fontSize: '1rem', opacity: 0.9 }}>
               Kelola wali kelas dan lihat statistik seluruh kelas
-            </p>
+            </h3>
           </div>
         </div>
       </div>
@@ -360,7 +360,7 @@ function WaliKelas() {
                     fontSize: '0.8rem',
                     fontWeight: '600'
                   }}>
-                    IPC: {cls.rataRataIPC}
+                    Rata-rata IPC: {cls.rataRataIPC}
                   </span>
                 </div>
                 <button

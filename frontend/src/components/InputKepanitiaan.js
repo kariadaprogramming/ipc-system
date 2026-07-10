@@ -24,6 +24,9 @@ function InputKepanitiaan() {
   const [accessMessage, setAccessMessage] = useState('');
   const [isAutoFilled, setIsAutoFilled] = useState(false);
   const [nisLoading, setNisLoading] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [allKepanitiaan, setAllKepanitiaan] = useState([]);
+  const [loadingIndex, setLoadingIndex] = useState(false);
 
   const grhaOptions = [
     'Airsanya', 'Daksina', 'Genya', 'Madhya', 'Nairiti', 'Pascima', 'Purwa', 'Uttara', 'Wayabhya'
@@ -45,7 +48,25 @@ function InputKepanitiaan() {
     // Get user role from localStorage
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     setUserRole(user.role || '');
+    if (user.role === 'superadmin') {
+      fetchAllKepanitiaan();
+    }
   }, []);
+
+  const fetchAllKepanitiaan = async () => {
+    try {
+      setLoadingIndex(true);
+      const token = localStorage.getItem('token');
+      const response = await axios.get('/kepanitiaan/all', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setAllKepanitiaan(response.data);
+    } catch (error) {
+      console.error('Error fetching all kepanitiaan:', error);
+    } finally {
+      setLoadingIndex(false);
+    }
+  };
 
   const checkAccess = async () => {
     try {
@@ -172,6 +193,9 @@ function InputKepanitiaan() {
       });
 
       setMessage(userRole === 'superadmin' ? 'Kepanitiaan berhasil ditambahkan!' : 'Kepanitiaan berhasil diajukan untuk persetujuan!');
+      if (userRole === 'superadmin') {
+        fetchAllKepanitiaan();
+      }
       setFormData({
         nama: '',
         nis: '',
@@ -184,6 +208,7 @@ function InputKepanitiaan() {
       });
       setFoto(null);
       setIsAutoFilled(false);
+      setShowForm(false);
       fetchUserSubmissions(); // Refresh submissions list
     } catch (error) {
       setMessage(error.response?.data?.message || 'Gagal mengirim kepanitiaan');
@@ -233,7 +258,14 @@ function InputKepanitiaan() {
 
   return (
     <div className="card">
-      <h2>Input Kepanitiaan</h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <h2>Input Kepanitiaan</h2>
+        {userRole === 'superadmin' && (
+          <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>
+            {showForm ? 'Tutup Form' : '+ Input Kepanitiaan Baru'}
+          </button>
+        )}
+      </div>
       
       {message && (
         <div className="alert alert-success" style={{ marginBottom: '16px' }}>
@@ -241,7 +273,53 @@ function InputKepanitiaan() {
         </div>
       )}
       
-      <form onSubmit={handleSubmit}>
+      {/* Index Display for Superadmin */}
+      {userRole === 'superadmin' && (
+        <div style={{ marginBottom: '30px' }}>
+          <h3 style={{ marginBottom: '15px', fontSize: '18px' }}>📋 Index Kepanitiaan</h3>
+          {loadingIndex ? (
+            <div className="loading"><div className="spinner"></div></div>
+          ) : (
+            <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Tanggal</th>
+                    <th>Nama</th>
+                    <th>NIS</th>
+                    <th>Kategori</th>
+                    <th>Jabatan</th>
+                    <th>Pembina</th>
+                    <th>Point</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {allKepanitiaan.map(item => (
+                    <tr key={item.id}>
+                      <td>{new Date(item.created_at).toLocaleDateString('id-ID')}</td>
+                      <td>{item.nama}</td>
+                      <td>{item.nis}</td>
+                      <td>{item.kategori_kepanitiaan}</td>
+                      <td>{item.jabatan_kepanitiaan}</td>
+                      <td>{item.pembina || '-'}</td>
+                      <td>{item.point}</td>
+                      <td>{getStatusBadge(item.status)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {allKepanitiaan.length === 0 && (
+                <p className="text-muted">Belum ada data kepanitiaan</p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+      
+      {/* Input Form - Show for non-superadmin or when showForm is true */}
+      {(userRole !== 'superadmin' || showForm) && (
+        <form onSubmit={handleSubmit}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <div className="form-group">
             <label>Nama <span className="required">*</span></label>
@@ -338,6 +416,7 @@ function InputKepanitiaan() {
           {loading ? 'Mengirim...' : (userRole === 'superadmin' ? 'Kirim' : 'Ajukan untuk Persetujuan')}
         </button>
       </form>
+      )}
 
       {/* Submission History */}
       {submissions.length > 0 && (

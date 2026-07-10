@@ -32,6 +32,11 @@ function KelolaAkun() {
   const [ipcEditTarget, setIpcEditTarget] = useState(null);
   const [ipcAwalValue, setIpcAwalValue] = useState('');
   const [ipcSaving, setIpcSaving] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createModalType, setCreateModalType] = useState('');
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importModalType, setImportModalType] = useState('');
+  const [showEditBiodataModal, setShowEditBiodataModal] = useState(false);
 
   const grhaOptions = GRHA_OPTIONS;
 
@@ -425,14 +430,14 @@ function KelolaAkun() {
         
         {/* Buat Akun Siswa - available for superadmin and guru */}
         {(userRole === 'superadmin' || userRole === 'guru') && (
-          <button className="btn btn-primary" onClick={() => { setShowForm(true); setFormType('student'); setFormData({}); }} style={{ marginRight: '10px' }}>
+          <button className="btn btn-primary" onClick={() => { setShowCreateModal(true); setCreateModalType('student'); setFormData({}); }} style={{ marginRight: '10px' }}>
             + Buat Akun Siswa
           </button>
         )}
         
         {/* Buat Akun Guru - only for superadmin */}
         {userRole === 'superadmin' && (
-          <button className="btn btn-success" onClick={() => { setShowForm(true); setFormType('teacher'); setFormData({}); }} style={{ marginRight: '10px' }}>
+          <button className="btn btn-success" onClick={() => { setShowCreateModal(true); setCreateModalType('teacher'); setFormData({}); }} style={{ marginRight: '10px' }}>
             + Buat Akun Guru
           </button>
         )}
@@ -440,75 +445,16 @@ function KelolaAkun() {
         {/* Import from Excel - only for superadmin */}
         {userRole === 'superadmin' && (
           <>
-            <button className="btn btn-info" onClick={() => { setImportType('siswa'); setExcelFile({}); }} style={{ marginRight: '10px' }}>
+            <button className="btn btn-info" onClick={() => { setShowImportModal(true); setImportModalType('siswa'); setExcelFile(null); setImportResults([]); }} style={{ marginRight: '10px' }}>
               📥 Import Siswa
             </button>
-            <button className="btn btn-info" onClick={() => { setImportType('guru'); setExcelFile({}); }} style={{ marginRight: '10px' }}>
+            <button className="btn btn-info" onClick={() => { setShowImportModal(true); setImportModalType('guru'); setExcelFile(null); setImportResults([]); }} style={{ marginRight: '10px' }}>
               📥 Import Guru
             </button>
           </>
         )}
       </div>
 
-      {/* Excel Import Section */}
-      {userRole === 'superadmin' && excelFile && (
-        <div className="card" style={{ marginBottom: '20px', padding: '15px' }}>
-          <h4>Import {importType === 'siswa' ? 'Siswa' : 'Guru'} dari Excel</h4>
-          <div style={{ marginBottom: '15px' }}>
-            <button
-              className="btn btn-secondary"
-              onClick={() => downloadTemplate(importType)}
-              style={{ marginBottom: '10px' }}
-            >
-              📥 Download Template {importType === 'siswa' ? 'Siswa' : 'Guru'}
-            </button>
-            <input
-              type="file"
-              accept=".xlsx,.xls"
-              onChange={handleExcelFileChange}
-              style={{ marginBottom: '10px' }}
-            />
-            <div style={{ fontSize: '12px', color: '#666', marginBottom: '10px' }}>
-              {importType === 'siswa' ? (
-                <strong>Format Siswa:</strong>
-              ) : (
-                <strong>Format Guru:</strong>
-              )} {importType === 'siswa' ? 'nama, nis, nisn, kelas, jurusan, grha, password' : 'nama, nip, jabatan, no_hp, password'}
-            </div>
-            <button
-              className="btn btn-primary"
-              onClick={handleExcelImport}
-              disabled={importing || !excelFile}
-            >
-              {importing ? 'Importing...' : 'Import'}
-            </button>
-            <button
-              className="btn btn-secondary"
-              onClick={() => { setExcelFile(null); setImportResults([]); }}
-              style={{ marginLeft: '10px' }}
-            >
-              Cancel
-            </button>
-          </div>
-
-          {importResults.length > 0 && (
-            <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid #ddd', padding: '10px', borderRadius: '4px' }}>
-              <h5>Import Results:</h5>
-              {importResults.map((result, index) => (
-                <div key={index} style={{ 
-                  padding: '5px', 
-                  marginBottom: '5px', 
-                  backgroundColor: result.status === 'success' ? '#d4edda' : '#f8d7da',
-                  borderRadius: '4px',
-                  fontSize: '12px'
-                }}>
-                  {result.status === 'success' ? '✅' : '❌'} {result.name} ({result.type}) - {result.status === 'error' ? result.error : 'Success'}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Filters */}
       <div className="card" style={{ marginBottom: '20px', padding: '15px' }}>
@@ -568,145 +514,7 @@ function KelolaAkun() {
         </div>
       </div>
 
-      {showForm && (
-        <div className="card">
-          <h3>{formType === 'student' ? 'Buat Akun Siswa' : 'Buat Akun Guru'}</h3>
-          <button className="btn btn-danger" onClick={() => setShowForm(false)} style={{ marginBottom: '10px' }}>Tutup</button>
 
-          {formType === 'student' ? (
-            <form onSubmit={handleCreateStudent}>
-            <div className="form-group">
-              <label>Nama</label>
-              <input type="text" value={formData.nama || ''} onChange={(e) => setFormData({...formData, nama: e.target.value})} required />
-            </div>
-            <div className="form-group">
-              <label>NIS</label>
-              <input type="text" value={formData.nis || ''} onChange={(e) => setFormData({...formData, nis: e.target.value})} required />
-            </div>
-            <div className="form-group">
-              <label>NISN</label>
-              <input type="text" value={formData.nisn || ''} onChange={(e) => setFormData({...formData, nisn: e.target.value})} required />
-            </div>
-            <div className="form-group">
-              <label>Kelas</label>
-              <select value={formData.kelas || ''} onChange={(e) => setFormData(prev => applyKelasChange(prev, e.target.value))} required>
-                <option value="">Pilih Kelas</option>
-                {KELAS_OPTIONS.map(k => <option key={k} value={k}>{k}</option>)}
-              </select>
-            </div>
-            <div className="form-group">
-              <label>Jurusan</label>
-              <select value={formData.jurusan || 'TKJ'} disabled style={{ backgroundColor: '#f0f0f0' }}>
-                {JURUSAN_OPTIONS.map(j => <option key={j} value={j}>{j}</option>)}
-              </select>
-            </div>
-            <div className="form-group">
-              <label>Grha</label>
-              <select value={formData.grha || ''} onChange={(e) => setFormData({...formData, grha: e.target.value})}>
-                <option value="">Pilih Grha</option>
-                {grhaOptions.map(grha => (
-                  <option key={grha} value={grha}>{grha}</option>
-                ))}
-              </select>
-            </div>
-            <div className="form-group">
-              <label>Password</label>
-              <input type="password" value={formData.password || ''} onChange={(e) => setFormData({...formData, password: e.target.value})} required />
-            </div>
-            <button type="submit" className="btn btn-primary">Buat Akun Siswa</button>
-          </form>
-          ) : (
-            <form onSubmit={handleCreateTeacher}>
-              <div className="form-group">
-                <label>Nama</label>
-                <input type="text" value={formData.nama || ''} onChange={(e) => setFormData({...formData, nama: e.target.value})} required />
-              </div>
-              <div className="form-group">
-                <label>NIP</label>
-                <input type="text" value={formData.nip || ''} onChange={(e) => setFormData({...formData, nip: e.target.value})} required />
-              </div>
-              <div className="form-group">
-                <label>Detail</label>
-                <input type="text" value={formData.detail || ''} onChange={(e) => setFormData({...formData, detail: e.target.value})} />
-              </div>
-              <div className="form-group">
-                <label>No HP</label>
-                <input type="text" value={formData.no_hp || ''} onChange={(e) => setFormData({...formData, no_hp: e.target.value})} />
-              </div>
-              <div className="form-group">
-                <label>Password</label>
-                <input type="password" value={formData.password || ''} onChange={(e) => setFormData({...formData, password: e.target.value})} required />
-              </div>
-              <button type="submit" className="btn btn-success">Buat Akun Guru</button>
-            </form>
-          )}
-        </div>
-      )}
-
-      {showEditForm && (
-        <div className="card">
-          <h3>Edit Data {editStudent?.role === 'siswa' ? 'Siswa' : 'Guru'}</h3>
-          <button className="btn btn-danger" onClick={() => setShowEditForm(false)} style={{ marginBottom: '10px' }}>Tutup</button>
-
-          <form onSubmit={handleUpdateUser}>
-            <div className="form-group">
-              <label>Nama</label>
-              <input type="text" value={formData.nama || ''} onChange={(e) => setFormData({...formData, nama: e.target.value})} required />
-            </div>
-            
-            {editStudent?.role === 'siswa' ? (
-              <>
-                <div className="form-group">
-                  <label>NIS</label>
-                  <input type="text" value={formData.nis || ''} onChange={(e) => setFormData({...formData, nis: e.target.value})} required />
-                </div>
-                <div className="form-group">
-                  <label>NISN</label>
-                  <input type="text" value={formData.nisn || ''} onChange={(e) => setFormData({...formData, nisn: e.target.value})} required />
-                </div>
-                <div className="form-group">
-                  <label>Kelas</label>
-                  <select value={formData.kelas || ''} onChange={(e) => setFormData(prev => applyKelasChange(prev, e.target.value))} required>
-                    <option value="">Pilih Kelas</option>
-                    {KELAS_OPTIONS.map(k => <option key={k} value={k}>{k}</option>)}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Jurusan</label>
-                  <select value={formData.jurusan || 'TKJ'} disabled style={{ backgroundColor: '#f0f0f0' }}>
-                    {JURUSAN_OPTIONS.map(j => <option key={j} value={j}>{j}</option>)}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Grha</label>
-                  <select value={formData.grha || ''} onChange={(e) => setFormData({...formData, grha: e.target.value})}>
-                    <option value="">Pilih Grha</option>
-                    {grhaOptions.map(grha => (
-                      <option key={grha} value={grha}>{grha}</option>
-                    ))}
-                  </select>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="form-group">
-                  <label>NIP</label>
-                  <input type="text" value={formData.nip || ''} onChange={(e) => setFormData({...formData, nip: e.target.value})} required />
-                </div>
-                <div className="form-group">
-                  <label>Detail</label>
-                  <input type="text" value={formData.detail || ''} onChange={(e) => setFormData({...formData, detail: e.target.value})} />
-                </div>
-                <div className="form-group">
-                  <label>No HP</label>
-                  <input type="text" value={formData.no_hp || ''} onChange={(e) => setFormData({...formData, no_hp: e.target.value})} />
-                </div>
-              </>
-            )}
-            <button type="submit" className="btn btn-primary">Update Data</button>
-          </form>
-        </div>
-      )}
 
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 10 }}>
@@ -781,7 +589,7 @@ function KelolaAkun() {
                       {user.role === 'siswa' && (
                         <button className="btn btn-primary" onClick={() => setDetailStudent(user)} style={{ padding: '5px 10px', marginRight: '5px' }}>Detail</button>
                       )}
-                      <button className="btn btn-info" onClick={() => handleEditUser(user)} style={{ padding: '5px 10px', marginRight: '5px' }}>Edit Biodata</button>
+                      <button className="btn btn-info" onClick={() => { handleEditUser(user); setShowEditBiodataModal(true); }} style={{ padding: '5px 10px', marginRight: '5px' }}>Edit Biodata</button>
                       {(user.role === 'siswa' || user.role === 'guru') && (
                         <button className="btn btn-warning" onClick={() => handleUpdateIPC(user)} style={{ padding: '5px 10px', marginRight: '5px' }}>Edit IPC Awal</button>
                       )}
@@ -791,7 +599,7 @@ function KelolaAkun() {
                   {userRole === 'guru' && user.role === 'siswa' && (
                     <>
                       <button className="btn btn-primary" onClick={() => setDetailStudent(user)} style={{ padding: '5px 10px', marginRight: '5px' }}>Detail</button>
-                      <button className="btn btn-info" onClick={() => handleEditUser(user)} style={{ padding: '5px 10px' }}>Edit Biodata</button>
+                      <button className="btn btn-info" onClick={() => { handleEditUser(user); setShowEditBiodataModal(true); }} style={{ padding: '5px 10px' }}>Edit Biodata</button>
                     </>
                   )}
                 </td>
@@ -853,6 +661,241 @@ function KelolaAkun() {
 
       {detailStudent && (
         <StudentDetail student={detailStudent} onClose={() => setDetailStudent(null)} />
+      )}
+
+      {/* Create Account Modal */}
+      {showCreateModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div className="card" style={{ width: 500, maxWidth: '90%', maxHeight: '90vh', overflowY: 'auto' }}>
+            <h3>{createModalType === 'student' ? 'Buat Akun Siswa' : 'Buat Akun Guru'}</h3>
+            <button className="btn btn-danger" onClick={() => { setShowCreateModal(false); setFormData({}); }} style={{ marginBottom: '10px' }}>Tutup</button>
+
+            {createModalType === 'student' ? (
+              <form onSubmit={handleCreateStudent}>
+                <div className="form-group">
+                  <label>Nama</label>
+                  <input type="text" value={formData.nama || ''} onChange={(e) => setFormData({...formData, nama: e.target.value})} required />
+                </div>
+                <div className="form-group">
+                  <label>NIS</label>
+                  <input type="text" value={formData.nis || ''} onChange={(e) => setFormData({...formData, nis: e.target.value})} required />
+                </div>
+                <div className="form-group">
+                  <label>NISN</label>
+                  <input type="text" value={formData.nisn || ''} onChange={(e) => setFormData({...formData, nisn: e.target.value})} required />
+                </div>
+                <div className="form-group">
+                  <label>Kelas</label>
+                  <select value={formData.kelas || ''} onChange={(e) => setFormData(prev => applyKelasChange(prev, e.target.value))} required>
+                    <option value="">Pilih Kelas</option>
+                    {KELAS_OPTIONS.map(k => <option key={k} value={k}>{k}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Jurusan</label>
+                  <select value={formData.jurusan || 'TKJ'} disabled style={{ backgroundColor: '#f0f0f0' }}>
+                    {JURUSAN_OPTIONS.map(j => <option key={j} value={j}>{j}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Grha</label>
+                  <select value={formData.grha || ''} onChange={(e) => setFormData({...formData, grha: e.target.value})}>
+                    <option value="">Pilih Grha</option>
+                    {grhaOptions.map(grha => (
+                      <option key={grha} value={grha}>{grha}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Password</label>
+                  <input type="password" value={formData.password || ''} onChange={(e) => setFormData({...formData, password: e.target.value})} required />
+                </div>
+                <button type="submit" className="btn btn-primary">Buat Akun Siswa</button>
+              </form>
+            ) : (
+              <form onSubmit={handleCreateTeacher}>
+                <div className="form-group">
+                  <label>Nama</label>
+                  <input type="text" value={formData.nama || ''} onChange={(e) => setFormData({...formData, nama: e.target.value})} required />
+                </div>
+                <div className="form-group">
+                  <label>NIP</label>
+                  <input type="text" value={formData.nip || ''} onChange={(e) => setFormData({...formData, nip: e.target.value})} required />
+                </div>
+                <div className="form-group">
+                  <label>Detail</label>
+                  <input type="text" value={formData.detail || ''} onChange={(e) => setFormData({...formData, detail: e.target.value})} />
+                </div>
+                <div className="form-group">
+                  <label>No HP</label>
+                  <input type="text" value={formData.no_hp || ''} onChange={(e) => setFormData({...formData, no_hp: e.target.value})} />
+                </div>
+                <div className="form-group">
+                  <label>Password</label>
+                  <input type="password" value={formData.password || ''} onChange={(e) => setFormData({...formData, password: e.target.value})} required />
+                </div>
+                <button type="submit" className="btn btn-success">Buat Akun Guru</button>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Import Modal */}
+      {showImportModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div className="card" style={{ width: 500, maxWidth: '90%', maxHeight: '90vh', overflowY: 'auto' }}>
+            <h4>Import {importModalType === 'siswa' ? 'Siswa' : 'Guru'} dari Excel</h4>
+            <button className="btn btn-danger" onClick={() => { setShowImportModal(false); setExcelFile(null); setImportResults([]); }} style={{ marginBottom: '10px' }}>Tutup</button>
+            <div style={{ marginBottom: '15px' }}>
+              <button
+                className="btn btn-secondary"
+                onClick={() => downloadTemplate(importModalType)}
+                style={{ marginBottom: '10px' }}
+              >
+                📥 Download Template {importModalType === 'siswa' ? 'Siswa' : 'Guru'}
+              </button>
+              <input
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={handleExcelFileChange}
+                style={{ marginBottom: '10px' }}
+              />
+              <div style={{ fontSize: '12px', color: '#666', marginBottom: '10px' }}>
+                {importModalType === 'siswa' ? (
+                  <strong>Format Siswa:</strong>
+                ) : (
+                  <strong>Format Guru:</strong>
+                )} {importModalType === 'siswa' ? 'nama, nis, nisn, kelas, jurusan, grha, password' : 'nama, nip, jabatan, no_hp, password'}
+              </div>
+              <button
+                className="btn btn-primary"
+                onClick={() => { setImportType(importModalType); handleExcelImport(); }}
+                disabled={importing || !excelFile}
+              >
+                {importing ? 'Importing...' : 'Import'}
+              </button>
+            </div>
+
+            {importResults.length > 0 && (
+              <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid #ddd', padding: '10px', borderRadius: '4px' }}>
+                <h5>Import Results:</h5>
+                {importResults.map((result, index) => (
+                  <div key={index} style={{ 
+                    padding: '5px', 
+                    marginBottom: '5px', 
+                    backgroundColor: result.status === 'success' ? '#d4edda' : '#f8d7da',
+                    borderRadius: '4px',
+                    fontSize: '12px'
+                  }}>
+                    {result.status === 'success' ? '✅' : '❌'} {result.name} ({result.type}) - {result.status === 'error' ? result.error : 'Success'}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Edit Biodata Modal */}
+      {showEditBiodataModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div className="card" style={{ width: 500, maxWidth: '90%', maxHeight: '90vh', overflowY: 'auto' }}>
+            <h3>Edit Data {editStudent?.role === 'siswa' ? 'Siswa' : 'Guru'}</h3>
+            <button className="btn btn-danger" onClick={() => { setShowEditBiodataModal(false); setEditStudent(null); setFormData({}); }} style={{ marginBottom: '10px' }}>Tutup</button>
+
+            <form onSubmit={handleUpdateUser}>
+              <div className="form-group">
+                <label>Nama</label>
+                <input type="text" value={formData.nama || ''} onChange={(e) => setFormData({...formData, nama: e.target.value})} required />
+              </div>
+              
+              {editStudent?.role === 'siswa' ? (
+                <>
+                  <div className="form-group">
+                    <label>NIS</label>
+                    <input type="text" value={formData.nis || ''} onChange={(e) => setFormData({...formData, nis: e.target.value})} required />
+                  </div>
+                  <div className="form-group">
+                    <label>NISN</label>
+                    <input type="text" value={formData.nisn || ''} onChange={(e) => setFormData({...formData, nisn: e.target.value})} required />
+                  </div>
+                  <div className="form-group">
+                    <label>Kelas</label>
+                    <select value={formData.kelas || ''} onChange={(e) => setFormData(prev => applyKelasChange(prev, e.target.value))} required>
+                      <option value="">Pilih Kelas</option>
+                      {KELAS_OPTIONS.map(k => <option key={k} value={k}>{k}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Jurusan</label>
+                    <select value={formData.jurusan || 'TKJ'} disabled style={{ backgroundColor: '#f0f0f0' }}>
+                      {JURUSAN_OPTIONS.map(j => <option key={j} value={j}>{j}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Grha</label>
+                    <select value={formData.grha || ''} onChange={(e) => setFormData({...formData, grha: e.target.value})}>
+                      <option value="">Pilih Grha</option>
+                      {grhaOptions.map(grha => (
+                        <option key={grha} value={grha}>{grha}</option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="form-group">
+                    <label>NIP</label>
+                    <input type="text" value={formData.nip || ''} onChange={(e) => setFormData({...formData, nip: e.target.value})} required />
+                  </div>
+                  <div className="form-group">
+                    <label>Detail</label>
+                    <input type="text" value={formData.detail || ''} onChange={(e) => setFormData({...formData, detail: e.target.value})} />
+                  </div>
+                  <div className="form-group">
+                    <label>No HP</label>
+                    <input type="text" value={formData.no_hp || ''} onChange={(e) => setFormData({...formData, no_hp: e.target.value})} />
+                  </div>
+                </>
+              )}
+              <button type="submit" className="btn btn-primary">Update Data</button>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

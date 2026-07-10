@@ -255,7 +255,7 @@ function Leaderboard() {
                                   🏆 {comp.nama_lomba}
                                 </strong>
                                 <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>
-                                  Juara {comp.juara}
+                                  {comp.juara}
                                 </span>
                               </div>
                             ))}

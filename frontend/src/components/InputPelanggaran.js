@@ -17,6 +17,10 @@ function InputPelanggaran() {
   const [loading, setLoading] = useState(false);
   const [isAutoFilled, setIsAutoFilled] = useState(false);
   const [nisLoading, setNisLoading] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [allPelanggaran, setAllPelanggaran] = useState([]);
+  const [loadingIndex, setLoadingIndex] = useState(false);
+  const [userRole, setUserRole] = useState('');
   // const [hasPermission, setHasPermission] = useState(true);
   // const [checkingPermission, setCheckingPermission] = useState(true);
 
@@ -29,6 +33,29 @@ function InputPelanggaran() {
     { value: 'sedang', label: 'Sedang (-5 point)' },
     { value: 'berat', label: 'Berat (-25 point)' }
   ];
+
+  useEffect(() => {
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    setUserRole(user.role || '');
+    if (user.role === 'superadmin') {
+      fetchAllPelanggaran();
+    }
+  }, []);
+
+  const fetchAllPelanggaran = async () => {
+    try {
+      setLoadingIndex(true);
+      const token = localStorage.getItem('token');
+      const response = await axios.get('/pelanggaran/all', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setAllPelanggaran(response.data);
+    } catch (error) {
+      console.error('Error fetching all pelanggaran:', error);
+    } finally {
+      setLoadingIndex(false);
+    }
+  };
 
   // useEffect(() => {
   //   checkPermission();
@@ -127,6 +154,9 @@ function InputPelanggaran() {
       });
 
       setMessage('Pelanggaran berhasil dikirim untuk approval!');
+      if (userRole === 'superadmin') {
+        fetchAllPelanggaran();
+      }
       setFormData({
         nama: '',
         nis: '',
@@ -138,6 +168,7 @@ function InputPelanggaran() {
       });
       setFoto(null);
       setIsAutoFilled(false);
+      setShowForm(false);
     } catch (error) {
       setMessage(error.response?.data?.message || 'Gagal mengirim pelanggaran');
     } finally {
@@ -161,7 +192,14 @@ function InputPelanggaran() {
 
   return (
     <div className="card">
-      <h2>Input Pelanggaran</h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <h2>Input Pelanggaran</h2>
+        {userRole === 'superadmin' && (
+          <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>
+            {showForm ? 'Tutup Form' : '+ Input Pelanggaran Baru'}
+          </button>
+        )}
+      </div>
       
       {message && (
         <div className="alert alert-success" style={{ marginBottom: '16px' }}>
@@ -169,7 +207,49 @@ function InputPelanggaran() {
         </div>
       )}
       
-      <form onSubmit={handleSubmit}>
+      {/* Index Display for Superadmin */}
+      {userRole === 'superadmin' && (
+        <div style={{ marginBottom: '30px' }}>
+          <h3 style={{ marginBottom: '15px', fontSize: '18px' }}>📋 Index Pelanggaran</h3>
+          {loadingIndex ? (
+            <div className="loading"><div className="spinner"></div></div>
+          ) : (
+            <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Tanggal</th>
+                    <th>Nama</th>
+                    <th>NIS</th>
+                    <th>Keterangan</th>
+                    <th>Jenis</th>
+                    <th>Point</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {allPelanggaran.map(item => (
+                    <tr key={item.id}>
+                      <td>{new Date(item.created_at).toLocaleDateString('id-ID')}</td>
+                      <td>{item.nama}</td>
+                      <td>{item.nis}</td>
+                      <td>{item.keterangan}</td>
+                      <td>{item.jenis_pelanggaran}</td>
+                      <td style={{ color: 'red' }}>-{item.point}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {allPelanggaran.length === 0 && (
+                <p className="text-muted">Belum ada data pelanggaran</p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+      
+      {/* Input Form - Show for non-superadmin or when showForm is true */}
+      {(userRole !== 'superadmin' || showForm) && (
+        <form onSubmit={handleSubmit}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <div className="form-group">
             <label>Nama <span className="required">*</span></label>
@@ -266,6 +346,7 @@ function InputPelanggaran() {
           {loading ? 'Mengirim...' : 'Kirim'}
         </button>
       </form>
+      )}
     </div>
   );
 }

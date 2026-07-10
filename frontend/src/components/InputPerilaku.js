@@ -21,6 +21,10 @@ function InputPerilaku() {
   const [loading, setLoading] = useState(false);
   const [isAutoFilled, setIsAutoFilled] = useState(false);
   const [nisLoading, setNisLoading] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [allPerilaku, setAllPerilaku] = useState([]);
+  const [loadingIndex, setLoadingIndex] = useState(false);
+  const [userRole, setUserRole] = useState('');
   // const [hasPermission, setHasPermission] = useState(true);
   // const [checkingPermission, setCheckingPermission] = useState(true);
 
@@ -34,6 +38,29 @@ function InputPerilaku() {
     { value: 'baik', label: 'Baik (3 point)' },
     { value: 'sangat baik', label: 'Sangat Baik (4 point)' }
   ];
+
+  useEffect(() => {
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    setUserRole(user.role || '');
+    if (user.role === 'superadmin') {
+      fetchAllPerilaku();
+    }
+  }, []);
+
+  const fetchAllPerilaku = async () => {
+    try {
+      setLoadingIndex(true);
+      const token = localStorage.getItem('token');
+      const response = await axios.get('/perilaku/all', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setAllPerilaku(response.data);
+    } catch (error) {
+      console.error('Error fetching all perilaku:', error);
+    } finally {
+      setLoadingIndex(false);
+    }
+  };
 
   // useEffect(() => {
   //   checkPermission();
@@ -113,6 +140,9 @@ function InputPerilaku() {
       });
 
       setMessage(response.data.message || 'Perilaku berhasil dikirim!');
+      if (userRole === 'superadmin') {
+        fetchAllPerilaku();
+      }
       setFormData({
         nama: '',
         nis: '',
@@ -128,6 +158,7 @@ function InputPerilaku() {
         kepercayaan_diri: ''
       });
       setIsAutoFilled(false);
+      setShowForm(false);
     } catch (error) {
       setMessage(error.response?.data?.message || 'Gagal mengirim perilaku');
     } finally {
@@ -151,7 +182,14 @@ function InputPerilaku() {
 
   return (
     <div className="card">
-      <h2>Input Perilaku</h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <h2>Input Perilaku</h2>
+        {userRole === 'superadmin' && (
+          <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>
+            {showForm ? 'Tutup Form' : '+ Input Perilaku Baru'}
+          </button>
+        )}
+      </div>
       
       {message && (
         <div className="alert alert-success" style={{ marginBottom: '16px' }}>
@@ -159,7 +197,57 @@ function InputPerilaku() {
         </div>
       )}
       
-      <form onSubmit={handleSubmit}>
+      {/* Index Display for Superadmin */}
+      {userRole === 'superadmin' && (
+        <div style={{ marginBottom: '30px' }}>
+          <h3 style={{ marginBottom: '15px', fontSize: '18px' }}>📋 Index Perilaku</h3>
+          {loadingIndex ? (
+            <div className="loading"><div className="spinner"></div></div>
+          ) : (
+            <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Tanggal</th>
+                    <th>Nama</th>
+                    <th>NIS</th>
+                    <th>Tanggung Jawab</th>
+                    <th>Disiplin</th>
+                    <th>Kepedulian</th>
+                    <th>Kemandirian</th>
+                    <th>Spiritual</th>
+                    <th>Kejujuran</th>
+                    <th>Kepercayaan Diri</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {allPerilaku.map(item => (
+                    <tr key={item.id}>
+                      <td>{new Date(item.created_at).toLocaleDateString('id-ID')}</td>
+                      <td>{item.nama}</td>
+                      <td>{item.nis}</td>
+                      <td>{item.tanggung_jawab}</td>
+                      <td>{item.disiplin}</td>
+                      <td>{item.kepedulian}</td>
+                      <td>{item.kemandirian}</td>
+                      <td>{item.spiritual}</td>
+                      <td>{item.kejujuran}</td>
+                      <td>{item.kepercayaan_diri}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {allPerilaku.length === 0 && (
+                <p className="text-muted">Belum ada data perilaku</p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+      
+      {/* Input Form - Show for non-superadmin or when showForm is true */}
+      {(userRole !== 'superadmin' || showForm) && (
+        <form onSubmit={handleSubmit}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <div className="form-group">
             <label>Nama <span className="required">*</span></label>
@@ -295,6 +383,7 @@ function InputPerilaku() {
           {loading ? 'Mengirim...' : 'Kirim'}
         </button>
       </form>
+      )}
     </div>
   );
 }

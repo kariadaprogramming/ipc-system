@@ -58,6 +58,7 @@ CREATE TABLE prestasi (
     foto VARCHAR(255),
     kelas VARCHAR(50),
     pembina VARCHAR(100),
+    grha VARCHAR(50),
     juara ENUM('juara 1', 'juara 2', 'juara 3', 'juara harapan 1', 'juara harapan 2', 'juara harapan 3', 'finalis', 'peserta') NOT NULL,
     kategori ENUM('kecamatan', 'kabupaten', 'provinsi', 'nasional', 'internasional') NOT NULL,
     point INT NOT NULL,
