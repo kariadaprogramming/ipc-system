@@ -148,4 +148,70 @@ router.put('/:id/reject', auth, superAdminOnly, async (req, res) => {
     }
 });
 
+// Update pelanggaran
+router.put('/:id', auth, upload.single('foto'), async (req, res) => {
+    try {
+        const pelanggaranId = req.params.id;
+        const { nama, nis, kelas, jurusan, grha, keterangan, jenis_pelanggaran } = req.body;
+        
+        const [pelanggaran] = await db.query('SELECT * FROM pelanggaran WHERE id = ?', [pelanggaranId]);
+        if (pelanggaran.length === 0) {
+            return res.status(404).json({ message: 'Pelanggaran not found' });
+        }
+
+        const pelanggaranData = pelanggaran[0];
+        let foto = pelanggaranData.foto;
+
+        // Handle new photo upload
+        if (req.file) {
+            // Delete old photo if exists
+            if (foto) {
+                const oldPath = path.join('uploads/pelanggaran', foto);
+                if (fs.existsSync(oldPath)) {
+                    fs.unlinkSync(oldPath);
+                }
+            }
+            
+            // Rename new file
+            const ext = path.extname(req.file.originalname);
+            const uniqueId = Date.now().toString(36);
+            const newFileName = `${nis}_${keterangan}_${uniqueId}${ext}`;
+            const oldPath = path.join('uploads/pelanggaran', req.file.filename);
+            const newPath = path.join('uploads/pelanggaran', newFileName);
+            fs.renameSync(oldPath, newPath);
+            foto = newFileName;
+        }
+
+        // Recalculate points if jenis_pelanggaran changed
+        const point_dikurangi = calculatePelanggaranPoints(jenis_pelanggaran);
+
+        await db.query(
+            'UPDATE pelanggaran SET nama = ?, nis = ?, kelas = ?, jurusan = ?, grha = ?, keterangan = ?, foto = ?, jenis_pelanggaran = ?, point_dikurangi = ? WHERE id = ?',
+            [nama, nis, kelas, jurusan, grha, keterangan, foto, jenis_pelanggaran, point_dikurangi, pelanggaranId]
+        );
+
+        // If status is approved and point changed, update user IPC
+        if (pelanggaranData.status === 'approved' && pelanggaranData.point_dikurangi !== point_dikurangi) {
+            const pointDiff = point_dikurangi - pelanggaranData.point_dikurangi;
+            await db.query('UPDATE users SET ipc_total = ipc_total - ? WHERE id = ?', [pointDiff, pelanggaranData.user_id]);
+            
+            await db.query(
+                'INSERT INTO ipc_history (user_id, jenis_perubahan, point_change, ipc_sebelum, ipc_sesudah, keterangan) VALUES (?, ?, ?, ?, ?, ?)',
+                [pelanggaranData.user_id, 'pelanggaran_update', -pointDiff, pelanggaranData.ipc_sebelum || pelanggaranData.ipc_total, pelanggaranData.ipc_total - pointDiff, `Update Pelanggaran: ${jenis_pelanggaran}`]
+            );
+        }
+
+        // Log activity
+        await db.query(
+            'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
+            [req.user.id, 'Update Pelanggaran', `Updated pelanggaran ID ${pelanggaranId}`]
+        );
+
+        res.json({ message: 'Pelanggaran updated successfully' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
 module.exports = router;

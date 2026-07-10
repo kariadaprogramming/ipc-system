@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { KELAS_OPTIONS, JURUSAN_OPTIONS, applyKelasChange, jurusanFromKelas, isJurusanLocked } from '../utils/kelasJurusan';
+import EditModal from './EditModal';
+import useEditModal from '../hooks/useEditModal';
 
 function InputPerilaku() {
   const [formData, setFormData] = useState({
@@ -25,8 +27,7 @@ function InputPerilaku() {
   const [allPerilaku, setAllPerilaku] = useState([]);
   const [loadingIndex, setLoadingIndex] = useState(false);
   const [userRole, setUserRole] = useState('');
-  // const [hasPermission, setHasPermission] = useState(true);
-  // const [checkingPermission, setCheckingPermission] = useState(true);
+  const editModal = useEditModal();
 
   const grhaOptions = [
     'Airsanya', 'Daksina', 'Genya', 'Madhya', 'Nairiti', 'Pascima', 'Purwa', 'Uttara', 'Wayabhya'
@@ -166,6 +167,37 @@ function InputPerilaku() {
     }
   };
 
+  const handleEdit = (item) => {
+    editModal.openEditModal(item);
+  };
+
+  const handleUpdate = async () => {
+    editModal.setIsLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const updateData = {};
+      Object.keys(editModal.editFormData).forEach(key => {
+        if (key !== 'id' && key !== 'created_at' && key !== 'status' && key !== 'user_id') {
+          updateData[key] = editModal.editFormData[key];
+        }
+      });
+
+      await axios.put(`/perilaku/${editModal.editingItem.id}`, updateData, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      setMessage('Perilaku berhasil diperbarui!');
+      fetchAllPerilaku();
+      editModal.closeEditModal();
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Gagal memperbarui perilaku');
+    } finally {
+      editModal.setIsLoading(false);
+    }
+  };
+
   // Permission checking disabled for now
   // if (checkingPermission) {
   //   return <div className="loading"><div className="spinner"></div></div>;
@@ -218,6 +250,7 @@ function InputPerilaku() {
                     <th>Spiritual</th>
                     <th>Kejujuran</th>
                     <th>Kepercayaan Diri</th>
+                    <th>Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -233,6 +266,15 @@ function InputPerilaku() {
                       <td>{item.spiritual}</td>
                       <td>{item.kejujuran}</td>
                       <td>{item.kepercayaan_diri}</td>
+                      <td>
+                        <button 
+                          className="btn btn-info" 
+                          onClick={() => handleEdit(item)} 
+                          style={{ padding: '3px 8px', fontSize: '12px' }}
+                        >
+                          Edit
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -384,6 +426,90 @@ function InputPerilaku() {
         </button>
       </form>
       )}
+
+      <EditModal
+        isOpen={editModal.showEditModal}
+        title="Edit Perilaku"
+        onClose={editModal.closeEditModal}
+        onSave={handleUpdate}
+        isLoading={editModal.isLoading}
+      >
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          <div className="form-group">
+            <label>Nama</label>
+            <input
+              type="text"
+              value={editModal.editFormData.nama || ''}
+              onChange={(e) => editModal.setEditFormData({ ...editModal.editFormData, nama: e.target.value })}
+              placeholder="Nama siswa"
+            />
+          </div>
+          <div className="form-group">
+            <label>NIS</label>
+            <input
+              type="text"
+              value={editModal.editFormData.nis || ''}
+              onChange={(e) => editModal.setEditFormData({ ...editModal.editFormData, nis: e.target.value })}
+              placeholder="NIS"
+              disabled
+            />
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          <div className="form-group">
+            <label>Kelas</label>
+            <select 
+              value={editModal.editFormData.kelas || ''} 
+              onChange={(e) => editModal.setEditFormData({ ...editModal.editFormData, kelas: e.target.value })}
+            >
+              <option value="">Pilih Kelas</option>
+              {KELAS_OPTIONS.map(kelas => (
+                <option key={kelas} value={kelas}>{kelas}</option>
+              ))}
+            </select>
+          </div>
+          <div className="form-group">
+            <label>Jurusan</label>
+            <select 
+              value={editModal.editFormData.jurusan || ''} 
+              onChange={(e) => editModal.setEditFormData({ ...editModal.editFormData, jurusan: e.target.value })}
+            >
+              {JURUSAN_OPTIONS.map(j => <option key={j} value={j}>{j}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <div className="form-group">
+          <label>Grha</label>
+          <select 
+            value={editModal.editFormData.grha || ''} 
+            onChange={(e) => editModal.setEditFormData({ ...editModal.editFormData, grha: e.target.value })}
+          >
+            <option value="">Pilih Grha</option>
+            {grhaOptions.map(grha => (
+              <option key={grha} value={grha}>{grha}</option>
+            ))}
+          </select>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          {['tanggung_jawab', 'disiplin', 'kepedulian', 'kemandirian', 'spiritual', 'kejujuran', 'kepercayaan_diri'].map(field => (
+            <div key={field} className="form-group">
+              <label>{field.replace(/_/g, ' ').charAt(0).toUpperCase() + field.replace(/_/g, ' ').slice(1)}</label>
+              <select 
+                value={editModal.editFormData[field] || ''} 
+                onChange={(e) => editModal.setEditFormData({ ...editModal.editFormData, [field]: e.target.value })}
+              >
+                <option value="">Pilih Nilai</option>
+                {karakterOptions.map(karakter => (
+                  <option key={karakter.value} value={karakter.value}>{karakter.label}</option>
+                ))}
+              </select>
+            </div>
+          ))}
+        </div>
+      </EditModal>
     </div>
   );
 }

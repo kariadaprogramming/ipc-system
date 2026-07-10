@@ -144,4 +144,69 @@ router.put('/:id/reject', auth, async (req, res) => {
     }
 });
 
+// Update kepanitiaan
+router.put('/:id', auth, upload.single('foto'), async (req, res) => {
+    try {
+        const kepanitiaanId = req.params.id;
+        const { nama, nis, kelas, grha, jurusan, jabatan_kepanitiaan, kategori_kepanitiaan } = req.body;
+        
+        const [kepanitiaan] = await db.query('SELECT * FROM kepanitiaan WHERE id = ?', [kepanitiaanId]);
+        if (kepanitiaan.length === 0) {
+            return res.status(404).json({ message: 'Kepanitiaan not found' });
+        }
+
+        const kepanitiaanData = kepanitiaan[0];
+        let foto = kepanitiaanData.foto;
+
+        // Handle new photo upload
+        if (req.file) {
+            // Delete old photo if exists
+            if (foto) {
+                const oldPath = path.join('uploads/kepanitiaan', foto);
+                if (fs.existsSync(oldPath)) {
+                    fs.unlinkSync(oldPath);
+                }
+            }
+            
+            // Rename new file
+            const ext = path.extname(req.file.originalname);
+            const newFileName = `${nis}_${jabatan_kepanitiaan}${ext}`;
+            const oldPath = path.join('uploads/kepanitiaan', req.file.filename);
+            const newPath = path.join('uploads/kepanitiaan', newFileName);
+            fs.renameSync(oldPath, newPath);
+            foto = newFileName;
+        }
+
+        // Recalculate points if jabatan_kepanitiaan changed
+        const point = calculateKepanitiaanPoints(jabatan_kepanitiaan);
+
+        await db.query(
+            'UPDATE kepanitiaan SET nama = ?, nis = ?, kelas = ?, grha = ?, jurusan = ?, jabatan_kepanitiaan = ?, kategori_kepanitiaan = ?, foto = ?, point = ? WHERE id = ?',
+            [nama, nis, kelas, grha, jurusan, jabatan_kepanitiaan, kategori_kepanitiaan, foto, point, kepanitiaanId]
+        );
+
+        // If status is approved and point changed, update user IPC
+        if (kepanitiaanData.status === 'approved' && kepanitiaanData.point !== point) {
+            const pointDiff = point - kepanitiaanData.point;
+            await db.query('UPDATE users SET ipc_total = ipc_total + ? WHERE id = ?', [pointDiff, kepanitiaanData.user_id]);
+            
+            await db.query(
+                'INSERT INTO ipc_history (user_id, jenis_perubahan, point_change, ipc_sebelum, ipc_sesudah, keterangan) VALUES (?, ?, ?, ?, ?, ?)',
+                [kepanitiaanData.user_id, 'kepanitiaan_update', pointDiff, kepanitiaanData.ipc_sebelum || kepanitiaanData.ipc_total, kepanitiaanData.ipc_total + pointDiff, `Update Kepanitiaan: ${jabatan_kepanitiaan}`]
+            );
+        }
+
+        // Log activity
+        await db.query(
+            'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
+            [req.user.id, 'Update Kepanitiaan', `Updated kepanitiaan ID ${kepanitiaanId}`]
+        );
+
+        res.json({ message: 'Kepanitiaan updated successfully' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
 module.exports = router;

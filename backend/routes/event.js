@@ -143,4 +143,69 @@ router.put('/:id/reject', auth, async (req, res) => {
     }
 });
 
+// Update event
+router.put('/:id', auth, upload.single('foto'), async (req, res) => {
+    try {
+        const eventId = req.params.id;
+        const { nama, nis, kelas, grha, jurusan, nama_event, tingkat } = req.body;
+        
+        const [event] = await db.query('SELECT * FROM event WHERE id = ?', [eventId]);
+        if (event.length === 0) {
+            return res.status(404).json({ message: 'Event not found' });
+        }
+
+        const eventData = event[0];
+        let foto = eventData.foto;
+
+        // Handle new photo upload
+        if (req.file) {
+            // Delete old photo if exists
+            if (foto) {
+                const oldPath = path.join('uploads/event', foto);
+                if (fs.existsSync(oldPath)) {
+                    fs.unlinkSync(oldPath);
+                }
+            }
+            
+            // Rename new file
+            const ext = path.extname(req.file.originalname);
+            const newFileName = `${nis}_${nama_event}${ext}`;
+            const oldPath = path.join('uploads/event', req.file.filename);
+            const newPath = path.join('uploads/event', newFileName);
+            fs.renameSync(oldPath, newPath);
+            foto = newFileName;
+        }
+
+        // Recalculate points if tingkat changed
+        const point = calculateEventPoints(tingkat);
+
+        await db.query(
+            'UPDATE event SET nama = ?, nis = ?, kelas = ?, grha = ?, jurusan = ?, nama_event = ?, tingkat = ?, foto = ?, point = ? WHERE id = ?',
+            [nama, nis, kelas, grha, jurusan, nama_event, tingkat, foto, point, eventId]
+        );
+
+        // If status is approved and point changed, update user IPC
+        if (eventData.status === 'approved' && eventData.point !== point) {
+            const pointDiff = point - eventData.point;
+            await db.query('UPDATE users SET ipc_total = ipc_total + ? WHERE id = ?', [pointDiff, eventData.user_id]);
+            
+            await db.query(
+                'INSERT INTO ipc_history (user_id, jenis_perubahan, point_change, ipc_sebelum, ipc_sesudah, keterangan) VALUES (?, ?, ?, ?, ?, ?)',
+                [eventData.user_id, 'event_update', pointDiff, eventData.ipc_sebelum || eventData.ipc_total, eventData.ipc_total + pointDiff, `Update Event: ${nama_event}`]
+            );
+        }
+
+        // Log activity
+        await db.query(
+            'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
+            [req.user.id, 'Update Event', `Updated event ID ${eventId}`]
+        );
+
+        res.json({ message: 'Event updated successfully' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
 module.exports = router;

@@ -197,4 +197,66 @@ router.put('/:id/reject', auth, superAdminOnly, async (req, res) => {
     }
 });
 
+// Update perilaku
+router.put('/:id', auth, async (req, res) => {
+    try {
+        const perilakuId = req.params.id;
+        const { nama, nis, kelas, jurusan, grha, karakter_siswa, tanggung_jawab, disiplin, kepedulian, kemandirian, spiritual, kejujuran, kepercayaan_diri } = req.body;
+        
+        const [perilaku] = await db.query('SELECT * FROM perilaku WHERE id = ?', [perilakuId]);
+        if (perilaku.length === 0) {
+            return res.status(404).json({ message: 'Perilaku not found' });
+        }
+
+        const perilakuData = perilaku[0];
+        const karakter = karakter_siswa || formatPerilakuKarakter({
+            tanggung_jawab,
+            disiplin,
+            kepedulian,
+            kemandirian,
+            spiritual,
+            kejujuran,
+            kepercayaan_diri
+        });
+        const point = karakter_siswa
+            ? calculatePerilakuPoints(karakter_siswa)
+            : calculatePerilakuPointsFromFields({
+                tanggung_jawab,
+                disiplin,
+                kepedulian,
+                kemandirian,
+                spiritual,
+                kejujuran,
+                kepercayaan_diri
+            });
+
+        await db.query(
+            'UPDATE perilaku SET nama = ?, nis = ?, kelas = ?, jurusan = ?, grha = ?, karakter_siswa = ?, point = ? WHERE id = ?',
+            [nama, nis, kelas, jurusan, grha, karakter, point, perilakuId]
+        );
+
+        // If status is approved and point changed, update user IPC
+        if (perilakuData.status === 'approved' && perilakuData.point !== point) {
+            const pointDiff = point - perilakuData.point;
+            await db.query('UPDATE users SET ipc_total = ipc_total + ? WHERE id = ?', [pointDiff, perilakuData.user_id]);
+            
+            await db.query(
+                'INSERT INTO ipc_history (user_id, jenis_perubahan, point_change, ipc_sebelum, ipc_sesudah, keterangan) VALUES (?, ?, ?, ?, ?, ?)',
+                [perilakuData.user_id, 'perilaku_update', pointDiff, perilakuData.ipc_sebelum || perilakuData.ipc_total, perilakuData.ipc_total + pointDiff, `Update Perilaku: ${karakter}`]
+            );
+        }
+
+        // Log activity
+        await db.query(
+            'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
+            [req.user.id, 'Update Perilaku', `Updated perilaku ID ${perilakuId}`]
+        );
+
+        res.json({ message: 'Perilaku updated successfully' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
 module.exports = router;

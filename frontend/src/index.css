@@ -185,7 +185,6 @@ body {
 
 .card:hover {
   box-shadow: var(--shadow-lg);
-  transform: translateY(-2px);
 }
 
 /* Forms */
@@ -302,22 +301,20 @@ body {
 }
 
 .btn:hover {
-  transform: translateY(-2px);
   box-shadow: var(--shadow-lg);
 }
 
 .btn:active {
-  transform: translateY(0);
+  opacity: 0.8;
 }
 
 .btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
-  transform: none;
 }
 
 .btn:disabled:hover {
-  transform: none;
+  box-shadow: var(--shadow-md);
   box-shadow: var(--shadow-md);
 }
 

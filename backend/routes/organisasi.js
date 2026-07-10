@@ -144,4 +144,69 @@ router.put('/:id/reject', auth, async (req, res) => {
     }
 });
 
+// Update organisasi
+router.put('/:id', auth, upload.single('foto'), async (req, res) => {
+    try {
+        const organisasiId = req.params.id;
+        const { nama, nis, kelas, grha, jurusan, jabatan_organisasi, kategori_organisasi } = req.body;
+        
+        const [organisasi] = await db.query('SELECT * FROM organisasi WHERE id = ?', [organisasiId]);
+        if (organisasi.length === 0) {
+            return res.status(404).json({ message: 'Organisasi not found' });
+        }
+
+        const organisasiData = organisasi[0];
+        let foto = organisasiData.foto;
+
+        // Handle new photo upload
+        if (req.file) {
+            // Delete old photo if exists
+            if (foto) {
+                const oldPath = path.join('uploads/organisasi', foto);
+                if (fs.existsSync(oldPath)) {
+                    fs.unlinkSync(oldPath);
+                }
+            }
+            
+            // Rename new file
+            const ext = path.extname(req.file.originalname);
+            const newFileName = `${nis}_${jabatan_organisasi}${ext}`;
+            const oldPath = path.join('uploads/organisasi', req.file.filename);
+            const newPath = path.join('uploads/organisasi', newFileName);
+            fs.renameSync(oldPath, newPath);
+            foto = newFileName;
+        }
+
+        // Recalculate points if jabatan_organisasi changed
+        const point = calculateOrganisasiPoints(jabatan_organisasi);
+
+        await db.query(
+            'UPDATE organisasi SET nama = ?, nis = ?, kelas = ?, grha = ?, jurusan = ?, jabatan_organisasi = ?, kategori_organisasi = ?, foto = ?, point = ? WHERE id = ?',
+            [nama, nis, kelas, grha, jurusan, jabatan_organisasi, kategori_organisasi, foto, point, organisasiId]
+        );
+
+        // If status is approved and point changed, update user IPC
+        if (organisasiData.status === 'approved' && organisasiData.point !== point) {
+            const pointDiff = point - organisasiData.point;
+            await db.query('UPDATE users SET ipc_total = ipc_total + ? WHERE id = ?', [pointDiff, organisasiData.user_id]);
+            
+            await db.query(
+                'INSERT INTO ipc_history (user_id, jenis_perubahan, point_change, ipc_sebelum, ipc_sesudah, keterangan) VALUES (?, ?, ?, ?, ?, ?)',
+                [organisasiData.user_id, 'organisasi_update', pointDiff, organisasiData.ipc_sebelum || organisasiData.ipc_total, organisasiData.ipc_total + pointDiff, `Update Organisasi: ${jabatan_organisasi}`]
+            );
+        }
+
+        // Log activity
+        await db.query(
+            'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
+            [req.user.id, 'Update Organisasi', `Updated organisasi ID ${organisasiId}`]
+        );
+
+        res.json({ message: 'Organisasi updated successfully' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
 module.exports = router;

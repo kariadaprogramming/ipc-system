@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { KELAS_OPTIONS, JURUSAN_OPTIONS, applyKelasChange, jurusanFromKelas, isJurusanLocked } from '../utils/kelasJurusan';
+import EditModal from './EditModal';
+import useEditModal from '../hooks/useEditModal';
 
 function InputEvent() {
   const [formData, setFormData] = useState({
@@ -27,6 +29,7 @@ function InputEvent() {
   const [showForm, setShowForm] = useState(false);
   const [allEvent, setAllEvent] = useState([]);
   const [loadingIndex, setLoadingIndex] = useState(false);
+  const editModal = useEditModal();
 
   const grhaOptions = [
     'Airsanya', 'Daksina', 'Genya', 'Madhya', 'Nairiti', 'Pascima', 'Purwa', 'Uttara', 'Wayabhya'
@@ -243,6 +246,48 @@ function InputEvent() {
     }
   };
 
+  const handleEdit = (item) => {
+    editModal.openEditModal(item);
+  };
+
+  const handleEditFileChange = (e) => {
+    editModal.setEditFoto(e.target.files[0]);
+  };
+
+  const handleUpdate = async () => {
+    editModal.setIsLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const data = new FormData();
+      Object.keys(editModal.editFormData).forEach(key => {
+        if (key !== 'id' && key !== 'created_at' && key !== 'status' && key !== 'user_id') {
+          data.append(key, editModal.editFormData[key]);
+        }
+      });
+      if (editModal.editFoto) {
+        const fileToUpload = editModal.editFormData.nis
+          ? new File([editModal.editFoto], `${editModal.editFormData.nis}_${editModal.editFoto.name}`, { type: editModal.editFoto.type })
+          : editModal.editFoto;
+        data.append('foto', fileToUpload);
+      }
+
+      await axios.put(`/event/${editModal.editingItem.id}`, data, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      setMessage('Event berhasil diperbarui!');
+      fetchAllEvent();
+      editModal.closeEditModal();
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Gagal memperbarui event');
+    } finally {
+      editModal.setIsLoading(false);
+    }
+  };
+
   const getStatusBadge = (status) => {
     const styles = {
       pending: { background: '#ffc107', color: '#333' },
@@ -332,6 +377,7 @@ function InputEvent() {
                     <th>Pembina</th>
                     <th>Point</th>
                     <th>Status</th>
+                    <th>Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -345,6 +391,15 @@ function InputEvent() {
                       <td>{item.pembina || '-'}</td>
                       <td>{item.point}</td>
                       <td>{getStatusBadge(item.status)}</td>
+                      <td>
+                        <button 
+                          className="btn btn-info" 
+                          onClick={() => handleEdit(item)} 
+                          style={{ padding: '3px 8px', fontSize: '12px' }}
+                        >
+                          Edit
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -467,6 +522,120 @@ function InputEvent() {
         </button>
       </form>
       )}
+
+      <EditModal
+        isOpen={editModal.showEditModal}
+        title="Edit Event"
+        onClose={editModal.closeEditModal}
+        onSave={handleUpdate}
+        isLoading={editModal.isLoading}
+        photoPreview={editModal.editingItem?.foto ? `/uploads/event/${editModal.editingItem.foto}` : null}
+      >
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          <div className="form-group">
+            <label>Nama</label>
+            <input
+              type="text"
+              value={editModal.editFormData.nama || ''}
+              onChange={(e) => editModal.setEditFormData({ ...editModal.editFormData, nama: e.target.value })}
+              placeholder="Nama siswa"
+            />
+          </div>
+          <div className="form-group">
+            <label>NIS</label>
+            <input
+              type="text"
+              value={editModal.editFormData.nis || ''}
+              onChange={(e) => editModal.setEditFormData({ ...editModal.editFormData, nis: e.target.value })}
+              placeholder="NIS"
+              disabled
+            />
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          <div className="form-group">
+            <label>Kelas</label>
+            <select 
+              value={editModal.editFormData.kelas || ''} 
+              onChange={(e) => editModal.setEditFormData({ ...editModal.editFormData, kelas: e.target.value })}
+            >
+              <option value="">Pilih Kelas</option>
+              {KELAS_OPTIONS.map(kelas => (
+                <option key={kelas} value={kelas}>{kelas}</option>
+              ))}
+            </select>
+          </div>
+          <div className="form-group">
+            <label>Jurusan</label>
+            <select 
+              value={editModal.editFormData.jurusan || ''} 
+              onChange={(e) => editModal.setEditFormData({ ...editModal.editFormData, jurusan: e.target.value })}
+            >
+              {JURUSAN_OPTIONS.map(j => <option key={j} value={j}>{j}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          <div className="form-group">
+            <label>Grha</label>
+            <select 
+              value={editModal.editFormData.grha || ''} 
+              onChange={(e) => editModal.setEditFormData({ ...editModal.editFormData, grha: e.target.value })}
+            >
+              <option value="">Pilih Grha</option>
+              {grhaOptions.map(grha => (
+                <option key={grha} value={grha}>{grha}</option>
+              ))}
+            </select>
+          </div>
+          <div className="form-group">
+            <label>Pembina</label>
+            <select 
+              value={editModal.editFormData.pembina || ''} 
+              onChange={(e) => editModal.setEditFormData({ ...editModal.editFormData, pembina: e.target.value })}
+            >
+              <option value="">Pilih Pembina</option>
+              {teachers.map(teacher => (
+                <option key={teacher.id} value={teacher.nama}>{teacher.nama} ({teacher.nip})</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          <div className="form-group">
+            <label>Nama Event</label>
+            <input
+              type="text"
+              value={editModal.editFormData.nama_event || ''}
+              onChange={(e) => editModal.setEditFormData({ ...editModal.editFormData, nama_event: e.target.value })}
+              placeholder="Nama event"
+            />
+          </div>
+          <div className="form-group">
+            <label>Tingkat</label>
+            <select 
+              value={editModal.editFormData.tingkat || ''} 
+              onChange={(e) => editModal.setEditFormData({ ...editModal.editFormData, tingkat: e.target.value })}
+            >
+              {tingkatOptions.map(tingkat => (
+                <option key={tingkat.value} value={tingkat.value}>{tingkat.label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="form-group">
+          <label>Foto Bukti {editModal.editingItem?.foto && '(Pilih untuk ganti)'}</label>
+          <input
+            type="file"
+            onChange={handleEditFileChange}
+            accept="image/*"
+          />
+        </div>
+      </EditModal>
 
       {/* Submission History */}
       {submissions.length > 0 && (
