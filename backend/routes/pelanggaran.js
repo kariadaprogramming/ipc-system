@@ -7,6 +7,7 @@ const path = require('path');
 const fs = require('fs');
 const { calculatePelanggaranPoints } = require('../constants/points');
 const { resolveStudentIdByNis, applyIpcChange } = require('../utils/ipc');
+const { movePhotoToApprovedFolder } = require('../utils/fileUtils');
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -103,10 +104,19 @@ router.put('/:id/approve', auth, superAdminOnly, async (req, res) => {
         }
 
         const pelanggaranData = pelanggaran[0];
+        let newFotoPath = pelanggaranData.foto;
+        
+        // Move photo to approved folder if it exists
+        if (pelanggaranData.foto) {
+            const movedPath = movePhotoToApprovedFolder(path.join('uploads/pelanggaran', pelanggaranData.foto), 'pelanggaran');
+            if (movedPath) {
+                newFotoPath = path.join('uploads', movedPath).replace(/\\\\/g, '/');
+            }
+        }
         
         await db.query(
-            'UPDATE pelanggaran SET status = ? WHERE id = ? AND status = ?',
-            ['approved', pelanggaranId, 'pending']
+            'UPDATE pelanggaran SET status = ?, foto = ? WHERE id = ? AND status = ?',
+            ['approved', newFotoPath, pelanggaranId, 'pending']
         );
         
         await applyIpcChange(
@@ -193,11 +203,15 @@ router.put('/:id', auth, upload.single('foto'), async (req, res) => {
         // If status is approved and point changed, update user IPC
         if (pelanggaranData.status === 'approved' && pelanggaranData.point_dikurangi !== point_dikurangi) {
             const pointDiff = point_dikurangi - pelanggaranData.point_dikurangi;
-            await db.query('UPDATE users SET ipc_total = ipc_total - ? WHERE id = ?', [pointDiff, pelanggaranData.user_id]);
+            const [userBefore] = await db.query('SELECT ipc_total FROM users WHERE id = ?', [pelanggaranData.user_id]);
+            const ipcSebelum = userBefore[0].ipc_total;
+            const ipcSesudah = ipcSebelum - pointDiff;
+            
+            await db.query('UPDATE users SET ipc_total = ? WHERE id = ?', [ipcSesudah, pelanggaranData.user_id]);
             
             await db.query(
                 'INSERT INTO ipc_history (user_id, jenis_perubahan, point_change, ipc_sebelum, ipc_sesudah, keterangan) VALUES (?, ?, ?, ?, ?, ?)',
-                [pelanggaranData.user_id, 'pelanggaran_update', -pointDiff, pelanggaranData.ipc_sebelum || pelanggaranData.ipc_total, pelanggaranData.ipc_total - pointDiff, `Update Pelanggaran: ${jenis_pelanggaran}`]
+                [pelanggaranData.user_id, 'pelanggaran_update', -pointDiff, ipcSebelum, ipcSesudah, `Update Pelanggaran: ${jenis_pelanggaran}`]
             );
         }
 

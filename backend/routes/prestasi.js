@@ -5,6 +5,7 @@ const db = require('../config/database');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { movePhotoToApprovedFolder } = require('../utils/fileUtils');
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -112,9 +113,18 @@ router.put('/:id/approve', auth, async (req, res) => {
         }
 
         const prestasiData = prestasi[0];
+        let newFotoPath = prestasiData.foto;
         
-        // Update status
-        await db.query('UPDATE prestasi SET status = ? WHERE id = ?', ['approved', prestasiId]);
+        // Move photo to approved folder if it exists
+        if (prestasiData.foto) {
+            const movedPath = movePhotoToApprovedFolder(path.join('uploads/prestasi', prestasiData.foto), 'prestasi');
+            if (movedPath) {
+                newFotoPath = path.join('uploads', movedPath).replace(/\\/g, '/');
+            }
+        }
+        
+        // Update status and photo path
+        await db.query('UPDATE prestasi SET status = ?, foto = ? WHERE id = ?', ['approved', newFotoPath, prestasiId]);
         
         // Update user IPC
         const [user] = await db.query('SELECT ipc_total FROM users WHERE id = ?', [prestasiData.user_id]);

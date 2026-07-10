@@ -5,6 +5,7 @@ const db = require('../config/database');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { movePhotoToApprovedFolder } = require('../utils/fileUtils');
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -98,8 +99,18 @@ router.put('/:id/approve', auth, async (req, res) => {
         }
 
         const kepanitiaanData = kepanitiaan[0];
+        let newFotoPath = kepanitiaanData.foto;
         
-        await db.query('UPDATE kepanitiaan SET status = ? WHERE id = ?', ['approved', kepanitiaanId]);
+        // Move photo to approved folder if it exists
+        if (kepanitiaanData.foto) {
+            const movedPath = movePhotoToApprovedFolder(path.join('uploads/kepanitiaan', kepanitiaanData.foto), 'kepanitiaan');
+            if (movedPath) {
+                newFotoPath = path.join('uploads', movedPath).replace(/\\/g, '/');
+            }
+        }
+        
+        // Update status and photo path
+        await db.query('UPDATE kepanitiaan SET status = ?, foto = ? WHERE id = ?', ['approved', newFotoPath, kepanitiaanId]);
         
         const [user] = await db.query('SELECT ipc_total FROM users WHERE id = ?', [kepanitiaanData.user_id]);
         const ipcSebelum = user[0].ipc_total;
@@ -188,11 +199,15 @@ router.put('/:id', auth, upload.single('foto'), async (req, res) => {
         // If status is approved and point changed, update user IPC
         if (kepanitiaanData.status === 'approved' && kepanitiaanData.point !== point) {
             const pointDiff = point - kepanitiaanData.point;
-            await db.query('UPDATE users SET ipc_total = ipc_total + ? WHERE id = ?', [pointDiff, kepanitiaanData.user_id]);
+            const [userBefore] = await db.query('SELECT ipc_total FROM users WHERE id = ?', [kepanitiaanData.user_id]);
+            const ipcSebelum = userBefore[0].ipc_total;
+            const ipcSesudah = ipcSebelum + pointDiff;
+            
+            await db.query('UPDATE users SET ipc_total = ? WHERE id = ?', [ipcSesudah, kepanitiaanData.user_id]);
             
             await db.query(
                 'INSERT INTO ipc_history (user_id, jenis_perubahan, point_change, ipc_sebelum, ipc_sesudah, keterangan) VALUES (?, ?, ?, ?, ?, ?)',
-                [kepanitiaanData.user_id, 'kepanitiaan_update', pointDiff, kepanitiaanData.ipc_sebelum || kepanitiaanData.ipc_total, kepanitiaanData.ipc_total + pointDiff, `Update Kepanitiaan: ${jabatan_kepanitiaan}`]
+                [kepanitiaanData.user_id, 'kepanitiaan_update', pointDiff, ipcSebelum, ipcSesudah, `Update Kepanitiaan: ${jabatan_kepanitiaan}`]
             );
         }
 

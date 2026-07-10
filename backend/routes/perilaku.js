@@ -8,6 +8,7 @@ const {
     formatPerilakuKarakter
 } = require('../constants/points');
 const { resolveStudentIdByNis, applyPerilakuIpcChange } = require('../utils/ipc');
+const { movePhotoToApprovedFolder } = require('../utils/fileUtils');
 
 // Get all perilaku (for approvals)
 router.get('/all', auth, async (req, res) => {
@@ -238,11 +239,15 @@ router.put('/:id', auth, async (req, res) => {
         // If status is approved and point changed, update user IPC
         if (perilakuData.status === 'approved' && perilakuData.point !== point) {
             const pointDiff = point - perilakuData.point;
-            await db.query('UPDATE users SET ipc_total = ipc_total + ? WHERE id = ?', [pointDiff, perilakuData.user_id]);
+            const [userBefore] = await db.query('SELECT ipc_total FROM users WHERE id = ?', [perilakuData.user_id]);
+            const ipcSebelum = userBefore[0].ipc_total;
+            const ipcSesudah = ipcSebelum + pointDiff;
+            
+            await db.query('UPDATE users SET ipc_total = ? WHERE id = ?', [ipcSesudah, perilakuData.user_id]);
             
             await db.query(
                 'INSERT INTO ipc_history (user_id, jenis_perubahan, point_change, ipc_sebelum, ipc_sesudah, keterangan) VALUES (?, ?, ?, ?, ?, ?)',
-                [perilakuData.user_id, 'perilaku_update', pointDiff, perilakuData.ipc_sebelum || perilakuData.ipc_total, perilakuData.ipc_total + pointDiff, `Update Perilaku: ${karakter}`]
+                [perilakuData.user_id, 'perilaku_update', pointDiff, ipcSebelum, ipcSesudah, `Update Perilaku: ${karakter}`]
             );
         }
 

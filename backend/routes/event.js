@@ -5,6 +5,7 @@ const db = require('../config/database');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { movePhotoToApprovedFolder } = require('../utils/fileUtils');
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -97,8 +98,18 @@ router.put('/:id/approve', auth, async (req, res) => {
         }
 
         const eventData = event[0];
+        let newFotoPath = eventData.foto;
         
-        await db.query('UPDATE event SET status = ? WHERE id = ?', ['approved', eventId]);
+        // Move photo to approved folder if it exists
+        if (eventData.foto) {
+            const movedPath = movePhotoToApprovedFolder(path.join('uploads/event', eventData.foto), 'event');
+            if (movedPath) {
+                newFotoPath = path.join('uploads', movedPath).replace(/\\/g, '/');
+            }
+        }
+        
+        // Update status and photo path
+        await db.query('UPDATE event SET status = ?, foto = ? WHERE id = ?', ['approved', newFotoPath, eventId]);
         
         const [user] = await db.query('SELECT ipc_total FROM users WHERE id = ?', [eventData.user_id]);
         const ipcSebelum = user[0].ipc_total;
@@ -187,11 +198,15 @@ router.put('/:id', auth, upload.single('foto'), async (req, res) => {
         // If status is approved and point changed, update user IPC
         if (eventData.status === 'approved' && eventData.point !== point) {
             const pointDiff = point - eventData.point;
-            await db.query('UPDATE users SET ipc_total = ipc_total + ? WHERE id = ?', [pointDiff, eventData.user_id]);
+            const [userBefore] = await db.query('SELECT ipc_total FROM users WHERE id = ?', [eventData.user_id]);
+            const ipcSebelum = userBefore[0].ipc_total;
+            const ipcSesudah = ipcSebelum + pointDiff;
+            
+            await db.query('UPDATE users SET ipc_total = ? WHERE id = ?', [ipcSesudah, eventData.user_id]);
             
             await db.query(
                 'INSERT INTO ipc_history (user_id, jenis_perubahan, point_change, ipc_sebelum, ipc_sesudah, keterangan) VALUES (?, ?, ?, ?, ?, ?)',
-                [eventData.user_id, 'event_update', pointDiff, eventData.ipc_sebelum || eventData.ipc_total, eventData.ipc_total + pointDiff, `Update Event: ${nama_event}`]
+                [eventData.user_id, 'event_update', pointDiff, ipcSebelum, ipcSesudah, `Update Event: ${nama_event}`]
             );
         }
 

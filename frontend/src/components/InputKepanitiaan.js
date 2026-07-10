@@ -479,7 +479,7 @@ function InputKepanitiaan() {
         onClose={editModal.closeEditModal}
         onSave={handleUpdate}
         isLoading={editModal.isLoading}
-        photoPreview={editModal.editingItem?.foto ? `/uploads/kepanitiaan/${editModal.editingItem.foto}` : null}
+        photoPreview={editModal.editingItem?.foto ? `${API_BASE_URL.replace('/api', '')}/uploads/kepanitiaan/${editModal.editingItem.foto}` : null}
       >
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <div className="form-group">
