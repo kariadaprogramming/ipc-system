@@ -163,4 +163,69 @@ router.put('/:id/reject', auth, async (req, res) => {
     }
 });
 
+// Update prestasi (for superadmin)
+router.put('/:id', auth, upload.single('foto'), async (req, res) => {
+    try {
+        const prestasiId = req.params.id;
+        const { nama, nis, jenis, nama_lomba, jurusan, kelas, pembina, grha, juara, kategori } = req.body;
+        
+        const [prestasi] = await db.query('SELECT * FROM prestasi WHERE id = ?', [prestasiId]);
+        if (prestasi.length === 0) {
+            return res.status(404).json({ message: 'Prestasi not found' });
+        }
+
+        const prestasiData = prestasi[0];
+        let foto = prestasiData.foto;
+
+        // Handle new photo upload
+        if (req.file) {
+            // Delete old photo if exists
+            if (foto) {
+                const oldPath = path.join('uploads/prestasi', foto);
+                if (fs.existsSync(oldPath)) {
+                    fs.unlinkSync(oldPath);
+                }
+            }
+            
+            // Rename new file
+            const ext = path.extname(req.file.originalname);
+            const newFileName = `${nis}_${nama_lomba}${ext}`;
+            const oldPath = path.join('uploads/prestasi', req.file.filename);
+            const newPath = path.join('uploads/prestasi', newFileName);
+            fs.renameSync(oldPath, newPath);
+            foto = newFileName;
+        }
+
+        // Recalculate points if juara or kategori changed
+        const point = calculatePrestasiPoints(juara, kategori);
+
+        await db.query(
+            'UPDATE prestasi SET nama = ?, nis = ?, jenis = ?, nama_lomba = ?, jurusan = ?, foto = ?, kelas = ?, pembina = ?, grha = ?, juara = ?, kategori = ?, point = ? WHERE id = ?',
+            [nama, nis, jenis, nama_lomba, jurusan, foto, kelas, pembina, grha, juara, kategori, point, prestasiId]
+        );
+
+        // If status is approved and point changed, update user IPC
+        if (prestasiData.status === 'approved' && prestasiData.point !== point) {
+            const pointDiff = point - prestasiData.point;
+            await db.query('UPDATE users SET ipc_total = ipc_total + ? WHERE id = ?', [pointDiff, prestasiData.user_id]);
+            
+            await db.query(
+                'INSERT INTO ipc_history (user_id, jenis_perubahan, point_change, ipc_sebelum, ipc_sesudah, keterangan) VALUES (?, ?, ?, ?, ?, ?)',
+                [prestasiData.user_id, 'prestasi_update', pointDiff, prestasiData.ipc_sebelum || prestasiData.ipc_total, prestasiData.ipc_total + pointDiff, `Update Prestasi: ${nama_lomba}`]
+            );
+        }
+
+        // Log activity
+        await db.query(
+            'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
+            [req.user.id, 'Update Prestasi', `Updated prestasi ID ${prestasiId}`]
+        );
+
+        res.json({ message: 'Prestasi updated successfully' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
 module.exports = router;

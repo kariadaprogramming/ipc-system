@@ -29,16 +29,22 @@ function InputPrestasi() {
   const [allPrestasi, setAllPrestasi] = useState([]);
   const [loadingIndex, setLoadingIndex] = useState(false);
   const [userRole, setUserRole] = useState('');
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);
+  const [editFormData, setEditFormData] = useState({});
+  const [editFoto, setEditFoto] = useState(null);
 
   const grhaOptions = [
     'Airsanya', 'Daksina', 'Genya', 'Madhya', 'Nairiti', 'Pascima', 'Purwa', 'Uttara', 'Wayabhya'
   ];
 
   useEffect(() => {
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    setUserRole(user.role || '');
     fetchTeachers();
     fetchUserSubmissions();
     checkAccess();
-    if (userRole === 'superadmin') {
+    if (user.role === 'superadmin') {
       fetchAllPrestasi();
     }
   }, []);
@@ -55,6 +61,59 @@ function InputPrestasi() {
       console.error('Error fetching all prestasi:', error);
     } finally {
       setLoadingIndex(false);
+    }
+  };
+
+  const handleEdit = (item) => {
+    setEditingItem(item);
+    setEditFormData({
+      nama: item.nama,
+      nis: item.nis,
+      jenis: item.jenis,
+      nama_lomba: item.nama_lomba,
+      jurusan: item.jurusan,
+      kelas: item.kelas,
+      pembina: item.pembina || '',
+      grha: item.grha || '',
+      juara: item.juara,
+      kategori: item.kategori
+    });
+    setEditFoto(null);
+    setShowEditModal(true);
+  };
+
+  const handleEditFileChange = (e) => {
+    setEditFoto(e.target.files[0]);
+  };
+
+  const handleUpdate = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const data = new FormData();
+      Object.keys(editFormData).forEach(key => {
+        data.append(key, editFormData[key]);
+      });
+      if (editFoto) {
+        const fileToUpload = editFormData.nis
+          ? new File([editFoto], `${editFormData.nis}_${editFormData.nama_lomba}`, { type: editFoto.type })
+          : editFoto;
+        data.append('foto', fileToUpload);
+      }
+      await axios.put(`/prestasi/${editingItem.id}`, data, {
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      setMessage('Data berhasil diupdate!');
+      setShowEditModal(false);
+      fetchAllPrestasi();
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Gagal mengupdate data');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -297,6 +356,7 @@ function InputPrestasi() {
                     <th>Pembina</th>
                     <th>Point</th>
                     <th>Status</th>
+                    <th>Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -312,6 +372,9 @@ function InputPrestasi() {
                       <td>{item.pembina || '-'}</td>
                       <td>{item.point}</td>
                       <td>{getStatusBadge(item)}</td>
+                      <td>
+                        <button className="btn btn-info" onClick={() => handleEdit(item)} style={{ padding: '3px 8px', fontSize: '12px' }}>Edit</button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -326,7 +389,22 @@ function InputPrestasi() {
       
       {/* Input Form - Show for non-superadmin or when showForm is true */}
       {(userRole !== 'superadmin' || showForm) && (
-        <form onSubmit={handleSubmit}>
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div className="card" style={{ width: 500, maxWidth: '90%', maxHeight: '90vh', overflowY: 'auto' }}>
+            <h3>Input Prestasi Baru</h3>
+            <button className="btn btn-danger" onClick={() => setShowForm(false)} style={{ marginBottom: '10px' }}>Tutup</button>
+            <form onSubmit={handleSubmit}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <div className="form-group">
             <label>Nama <span className="required">*</span></label>
@@ -451,14 +529,113 @@ function InputPrestasi() {
           </div>
         </div>
 
-        <button
-          type="submit"
-          className="btn btn-primary"
-          disabled={loading}
-        >
-          {loading ? 'Mengirim...' : (JSON.parse(localStorage.getItem('user') || '{}').role === 'superadmin' ? 'Kirim' : 'Ajukan untuk Persetujuan')}
-        </button>
-      </form>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={loading}
+            >
+              {loading ? 'Mengirim...' : (JSON.parse(localStorage.getItem('user') || '{}').role === 'superadmin' ? 'Kirim' : 'Ajukan untuk Persetujuan')}
+            </button>
+          </form>
+        </div>
+      </div>
+      )}
+
+      {/* Edit Modal */}
+      {showEditModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div className="card" style={{ width: 500, maxWidth: '90%', maxHeight: '90vh', overflowY: 'auto' }}>
+            <h3>Edit Prestasi</h3>
+            <button className="btn btn-danger" onClick={() => setShowEditModal(false)} style={{ marginBottom: '10px' }}>Tutup</button>
+            <form onSubmit={handleUpdate}>
+              <div className="form-group">
+                <label>Nama</label>
+                <input type="text" value={editFormData.nama || ''} onChange={(e) => setEditFormData({...editFormData, nama: e.target.value})} required />
+              </div>
+              <div className="form-group">
+                <label>NIS</label>
+                <input type="text" value={editFormData.nis || ''} onChange={(e) => setEditFormData({...editFormData, nis: e.target.value})} required />
+              </div>
+              <div className="form-group">
+                <label>Jenis</label>
+                <select value={editFormData.jenis || 'akademik'} onChange={(e) => setEditFormData({...editFormData, jenis: e.target.value})}>
+                  <option value="akademik">Akademik</option>
+                  <option value="non-akademik">Non-Akademik</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Nama Lomba</label>
+                <input type="text" value={editFormData.nama_lomba || ''} onChange={(e) => setEditFormData({...editFormData, nama_lomba: e.target.value})} required />
+              </div>
+              <div className="form-group">
+                <label>Kelas</label>
+                <select value={editFormData.kelas || ''} onChange={(e) => setEditFormData({...editFormData, kelas: e.target.value})}>
+                  <option value="">Pilih Kelas</option>
+                  {KELAS_OPTIONS.map(k => <option key={k} value={k}>{k}</option>)}
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Jurusan</label>
+                <select value={editFormData.jurusan || 'TKJ'} disabled>
+                  {JURUSAN_OPTIONS.map(j => <option key={j} value={j}>{j}</option>)}
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Pembina</label>
+                <input type="text" value={editFormData.pembina || ''} onChange={(e) => setEditFormData({...editFormData, pembina: e.target.value})} />
+              </div>
+              <div className="form-group">
+                <label>Grha</label>
+                <select value={editFormData.grha || ''} onChange={(e) => setEditFormData({...editFormData, grha: e.target.value})}>
+                  <option value="">Pilih Grha</option>
+                  {grhaOptions.map(grha => <option key={grha} value={grha}>{grha}</option>)}
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Juara</label>
+                <select value={editFormData.juara || 'juara 1'} onChange={(e) => setEditFormData({...editFormData, juara: e.target.value})}>
+                  <option value="juara 1">Juara 1</option>
+                  <option value="juara 2">Juara 2</option>
+                  <option value="juara 3">Juara 3</option>
+                  <option value="harapan 1">Harapan 1</option>
+                  <option value="harapan 2">Harapan 2</option>
+                  <option value="partisipasi">Partisipasi</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Kategori</label>
+                <select value={editFormData.kategori || 'kecamatan'} onChange={(e) => setEditFormData({...editFormData, kategori: e.target.value})}>
+                  <option value="kecamatan">Kecamatan</option>
+                  <option value="kabupaten">Kabupaten</option>
+                  <option value="provinsi">Provinsi</option>
+                  <option value="nasional">Nasional</option>
+                  <option value="internasional">Internasional</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Foto Bukti</label>
+                <input type="file" onChange={handleEditFileChange} accept="image/*" />
+                {editingItem && editingItem.foto && (
+                  <div style={{ marginTop: '10px' }}>
+                    <small>Foto saat ini: {editingItem.foto}</small>
+                  </div>
+                )}
+              </div>
+              <button type="submit" className="btn btn-primary" disabled={loading}>Update</button>
+            </form>
+          </div>
+        </div>
       )}
 
       {/* Submission History - Hidden for Superadmin */}
