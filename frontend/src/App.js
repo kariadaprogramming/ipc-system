@@ -22,7 +22,6 @@ import ApprovalsV2 from './components/ApprovalsV2';
 import DriveViewer from './components/DriveViewer';
 import Notifications from './components/Notifications';
 import LaporanCetak from './components/LaporanCetak';
-import PWAInstallPrompt from './components/PWAInstallPrompt';
 import axios from 'axios';
 import API_BASE_URL from './config';
 
