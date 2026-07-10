@@ -3,6 +3,7 @@ import axios from 'axios';
 import { KELAS_OPTIONS, JURUSAN_OPTIONS, applyKelasChange, jurusanFromKelas, isJurusanLocked } from '../utils/kelasJurusan';
 import EditModal from './EditModal';
 import useEditModal from '../hooks/useEditModal';
+import API_BASE_URL from '../config';
 
 function InputKepanitiaan() {
   const [formData, setFormData] = useState({
