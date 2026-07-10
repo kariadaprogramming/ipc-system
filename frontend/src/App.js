@@ -194,7 +194,6 @@ function App() {
           </ProtectedRoute>
         } />
       </Routes>
-      <PWAInstallPrompt />
     </Router>
   );
 }
