@@ -36,6 +36,7 @@ function InputPrestasi() {
   const [editingItem, setEditingItem] = useState(null);
   const [editFormData, setEditFormData] = useState({});
   const [editFoto, setEditFoto] = useState(null);
+  const editModal = useEditModal();
 
   const grhaOptions = [
     'Airsanya', 'Daksina', 'Genya', 'Madhya', 'Nairiti', 'Pascima', 'Purwa', 'Uttara', 'Wayabhya'
@@ -68,55 +69,36 @@ function InputPrestasi() {
   };
 
   const handleEdit = (item) => {
-    setEditingItem(item);
-    setEditFormData({
-      nama: item.nama,
-      nis: item.nis,
-      jenis: item.jenis,
-      nama_lomba: item.nama_lomba,
-      jurusan: item.jurusan,
-      kelas: item.kelas,
-      pembina: item.pembina || '',
-      grha: item.grha || '',
-      juara: item.juara,
-      kategori: item.kategori
-    });
-    setEditFoto(null);
-    setShowEditModal(true);
+    editModal.openEditModal(item);
   };
 
   const handleEditFileChange = (e) => {
     setEditFoto(e.target.files[0]);
   };
 
-  const handleUpdate = async (e) => {
-    e.preventDefault();
-    setLoading(true);
+  const handleUpdate = async () => {
+    editModal.setIsLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const data = new FormData();
-      Object.keys(editFormData).forEach(key => {
-        data.append(key, editFormData[key]);
-      });
-      if (editFoto) {
-        const fileToUpload = editFormData.nis
-          ? new File([editFoto], `${editFormData.nis}_${editFormData.nama_lomba}`, { type: editFoto.type })
-          : editFoto;
-        data.append('foto', fileToUpload);
-      }
-      await axios.put(`/prestasi/${editingItem.id}`, data, {
-        headers: { 
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data'
+      const updateData = {};
+      Object.keys(editModal.editFormData).forEach(key => {
+        if (key !== 'id' && key !== 'created_at' && key !== 'status' && key !== 'user_id') {
+          updateData[key] = editModal.editFormData[key];
         }
       });
-      setMessage('Data berhasil diupdate!');
-      setShowEditModal(false);
+      
+      await axios.put(`/prestasi/${editModal.editingItem.id}`, updateData, {
+        headers: { 
+          Authorization: `Bearer ${token}`
+        }
+      });
+      setMessage('Prestasi berhasil diperbarui!');
       fetchAllPrestasi();
+      editModal.closeEditModal();
     } catch (error) {
-      setMessage(error.response?.data?.message || 'Gagal mengupdate data');
+      setMessage(error.response?.data?.message || 'Gagal memperbarui prestasi');
     } finally {
-      setLoading(false);
+      editModal.setIsLoading(false);
     }
   };
 
@@ -327,7 +309,7 @@ function InputPrestasi() {
         <h2>Input Prestasi</h2>
         {userRole === 'superadmin' && (
           <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>
-            {showForm ? 'Tutup Form' : '+ Input Prestasi Baru'}
+            + Input Prestasi Baru
           </button>
         )}
       </div>
@@ -405,8 +387,16 @@ function InputPrestasi() {
           zIndex: 1000
         }}>
           <div className="card" style={{ width: 500, maxWidth: '90%', maxHeight: '90vh', overflowY: 'auto' }}>
-            <h3>Input Prestasi Baru</h3>
-            <button className="btn btn-danger" onClick={() => setShowForm(false)} style={{ marginBottom: '10px' }}>Tutup</button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                    <h3 style={{ margin: 0 }}>Input Prestasi</h3>
+                    <button 
+                        className="btn btn-danger" 
+                        onClick={() => setShowForm(false)}
+                        style={{ padding: '4px 12px', fontSize: '12px' }}
+                    >
+                        ✕
+                    </button>
+                </div>
             <form onSubmit={handleSubmit}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <div className="form-group">
@@ -418,7 +408,7 @@ function InputPrestasi() {
               onChange={handleChange}
               placeholder="Nama siswa"
               required
-              disabled={isAutoFilled}
+              disabled={true}
               style={{ backgroundColor: isAutoFilled ? '#f0f0f0' : '' }}
             />
             {isAutoFilled && <p className="form-helper-text">Data diisi otomatis dari NIS</p>}
@@ -437,6 +427,31 @@ function InputPrestasi() {
             <p className="form-helper-text">Masukkan NIS untuk mengisi data siswa secara otomatis</p>
           </div>
         </div>
+        
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          <div className="form-group">
+            <label>Kelas</label>
+            <select name="kelas" 
+            value={formData.kelas} 
+            onChange={handleChange} required disabled={true} style={{ backgroundColor: isAutoFilled ? '#f0f0f0' : '' }}>
+              <option value="">Pilih Kelas</option>
+              {KELAS_OPTIONS.map(kelas => (
+                <option key={kelas} value={kelas}>{kelas}</option>
+              ))}
+            </select>
+            <p className="form-helper-text">Data diisi otomatis dari NIS</p>
+          </div>
+          <div className="form-group">
+            <label>Grha</label>
+            <select name="grha" value={formData.grha} onChange={handleChange} disabled={true} style={{ backgroundColor: isAutoFilled ? '#f0f0f0' : '' }}>
+              <option value="">Pilih Grha</option>
+              {grhaOptions.map(grha => (
+                <option key={grha} value={grha}>{grha}</option>
+              ))}
+            </select>
+            <p className="form-helper-text">Data diisi otomatis dari NIS</p>
+          </div>
+        </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <div className="form-group">
@@ -448,9 +463,10 @@ function InputPrestasi() {
           </div>
           <div className="form-group">
             <label>Jurusan</label>
-            <select name="jurusan" value={formData.jurusan} onChange={handleChange} disabled={isJurusanLocked(formData.kelas, isAutoFilled)} style={{ backgroundColor: isJurusanLocked(formData.kelas, isAutoFilled) ? '#f0f0f0' : '' }}>
+            <select name="jurusan" value={formData.jurusan} onChange={handleChange} disabled={true} style={{ backgroundColor: isJurusanLocked(formData.kelas, isAutoFilled) ? '#f0f0f0' : '' }}>
               {JURUSAN_OPTIONS.map(j => <option key={j} value={j}>{j}</option>)}
             </select>
+            <p className="form-helper-text">Data diisi otomatis dari NIS</p>
           </div>
         </div>
 
@@ -464,27 +480,6 @@ function InputPrestasi() {
             placeholder="Nama lomba"
             required
           />
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-          <div className="form-group">
-            <label>Kelas</label>
-            <select name="kelas" value={formData.kelas} onChange={handleChange} required disabled={isAutoFilled} style={{ backgroundColor: isAutoFilled ? '#f0f0f0' : '' }}>
-              <option value="">Pilih Kelas</option>
-              {KELAS_OPTIONS.map(kelas => (
-                <option key={kelas} value={kelas}>{kelas}</option>
-              ))}
-            </select>
-          </div>
-          <div className="form-group">
-            <label>Grha</label>
-            <select name="grha" value={formData.grha} onChange={handleChange} disabled={isAutoFilled} style={{ backgroundColor: isAutoFilled ? '#f0f0f0' : '' }}>
-              <option value="">Pilih Grha</option>
-              {grhaOptions.map(grha => (
-                <option key={grha} value={grha}>{grha}</option>
-              ))}
-            </select>
-          </div>
         </div>
 
         <div className="form-group">
@@ -544,102 +539,131 @@ function InputPrestasi() {
       </div>
       )}
 
-      {/* Edit Modal */}
-      {showEditModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000
-        }}>
-          <div className="card" style={{ width: 500, maxWidth: '90%', maxHeight: '90vh', overflowY: 'auto' }}>
-            <h3>Edit Prestasi</h3>
-            <button className="btn btn-danger" onClick={() => setShowEditModal(false)} style={{ marginBottom: '10px' }}>Tutup</button>
-            <form onSubmit={handleUpdate}>
-              <div className="form-group">
-                <label>Nama</label>
-                <input type="text" value={editFormData.nama || ''} onChange={(e) => setEditFormData({...editFormData, nama: e.target.value})} required />
-              </div>
-              <div className="form-group">
-                <label>NIS</label>
-                <input type="text" value={editFormData.nis || ''} onChange={(e) => setEditFormData({...editFormData, nis: e.target.value})} required />
-              </div>
-              <div className="form-group">
-                <label>Jenis</label>
-                <select value={editFormData.jenis || 'akademik'} onChange={(e) => setEditFormData({...editFormData, jenis: e.target.value})}>
-                  <option value="akademik">Akademik</option>
-                  <option value="non-akademik">Non-Akademik</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label>Nama Lomba</label>
-                <input type="text" value={editFormData.nama_lomba || ''} onChange={(e) => setEditFormData({...editFormData, nama_lomba: e.target.value})} required />
-              </div>
-              <div className="form-group">
-                <label>Kelas</label>
-                <select value={editFormData.kelas || ''} onChange={(e) => setEditFormData({...editFormData, kelas: e.target.value})}>
-                  <option value="">Pilih Kelas</option>
-                  {KELAS_OPTIONS.map(k => <option key={k} value={k}>{k}</option>)}
-                </select>
-              </div>
-              <div className="form-group">
-                <label>Jurusan</label>
-                <select value={editFormData.jurusan || 'TKJ'} disabled>
-                  {JURUSAN_OPTIONS.map(j => <option key={j} value={j}>{j}</option>)}
-                </select>
-              </div>
-              <div className="form-group">
-                <label>Pembina</label>
-                <input type="text" value={editFormData.pembina || ''} onChange={(e) => setEditFormData({...editFormData, pembina: e.target.value})} />
-              </div>
-              <div className="form-group">
-                <label>Grha</label>
-                <select value={editFormData.grha || ''} onChange={(e) => setEditFormData({...editFormData, grha: e.target.value})}>
-                  <option value="">Pilih Grha</option>
-                  {grhaOptions.map(grha => <option key={grha} value={grha}>{grha}</option>)}
-                </select>
-              </div>
-              <div className="form-group">
-                <label>Juara</label>
-                <select value={editFormData.juara || 'juara 1'} onChange={(e) => setEditFormData({...editFormData, juara: e.target.value})}>
-                  <option value="juara 1">Juara 1</option>
-                  <option value="juara 2">Juara 2</option>
-                  <option value="juara 3">Juara 3</option>
-                  <option value="harapan 1">Harapan 1</option>
-                  <option value="harapan 2">Harapan 2</option>
-                  <option value="partisipasi">Partisipasi</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label>Kategori</label>
-                <select value={editFormData.kategori || 'kecamatan'} onChange={(e) => setEditFormData({...editFormData, kategori: e.target.value})}>
-                  <option value="kecamatan">Kecamatan</option>
-                  <option value="kabupaten">Kabupaten</option>
-                  <option value="provinsi">Provinsi</option>
-                  <option value="nasional">Nasional</option>
-                  <option value="internasional">Internasional</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label>Foto Bukti</label>
-                <input type="file" onChange={handleEditFileChange} accept="image/*" />
-                {editingItem && editingItem.foto && (
-                  <div style={{ marginTop: '10px' }}>
-                    <small>Foto saat ini: {editingItem.foto}</small>
-                  </div>
-                )}
-              </div>
-              <button type="submit" className="btn btn-primary" disabled={loading}>Update</button>
-            </form>
-          </div>
+      <EditModal
+        isOpen={editModal.showEditModal}
+        title="Edit Prestasi"
+        onClose={editModal.closeEditModal}
+        onSave={handleUpdate}
+        isLoading={editModal.isLoading}
+        photoPreview={editModal.editingItem?.foto ? `${API_BASE_URL.replace('/api', '')}uploads/prestasi/${editModal.editingItem.foto}` : null}
+      >
+        <div className="form-group">
+          <label>Nama</label>
+          <input
+            type="text"
+            value={editModal.editFormData.nama || ''}
+            required
+            disabled={true}
+            onChange={(e) => editModal.setEditFormData({ ...editModal.editFormData, nama: e.target.value })}
+            placeholder="Nama siswa"
+          />
         </div>
-      )}
+
+        <div className="form-group">
+          <label>NIS</label>
+          <input
+            type="text"
+            value={editModal.editFormData.nis || ''}
+            onChange={(e) => editModal.setEditFormData({ ...editModal.editFormData, nis: e.target.value })}
+            placeholder="NIS"
+          />
+        </div>
+
+        <div className="form-group">
+          <label>Kelas</label>
+          <select 
+            value={editModal.editFormData.kelas || ''} 
+            required
+            disabled={true}
+            onChange={(e) => editModal.setEditFormData({ ...editModal.editFormData, kelas: e.target.value })}
+          >
+            <option value="">Pilih Kelas</option>
+            {KELAS_OPTIONS.map(kelas => (
+              <option key={kelas} value={kelas}>{kelas}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="form-group">
+          <label>Jurusan</label>
+          <select 
+            value={editModal.editFormData.jurusan || ''} 
+            disabled={true}
+            onChange={(e) => editModal.setEditFormData({ ...editModal.editFormData, jurusan: e.target.value })}
+          >
+            {JURUSAN_OPTIONS.map(j => <option key={j} value={j}>{j}</option>)}
+          </select>
+        </div>
+        
+        <div className="form-group">
+          <label>Grha</label>
+          <select 
+            value={editModal.editFormData.grha || ''} 
+            disabled={true}
+            onChange={(e) => editModal.setEditFormData({ ...editModal.editFormData, grha: e.target.value })}
+          >
+            <option value="">Pilih Grha</option>
+            {grhaOptions.map(grha => (
+              <option key={grha} value={grha}>{grha}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="form-group">
+          <label>Nama Lomba</label>
+          <input
+            type="text"
+            name="nama_lomba"
+            value={editModal.editFormData.nama_lomba || ''} 
+            onChange={(e) => editModal.setEditFormData({ ...editModal.editFormData, nama_lomba: e.target.value })}
+            placeholder="Nama lomba"
+            required
+          />
+        </div>
+
+        <div className="form-group">
+          <label>Jenis</label>
+          <select name="jenis" value={editModal.editFormData.jenis || ''} onChange={(e) => editModal.setEditFormData({ ...editModal.editFormData, jenis: e.target.value })}>
+            <option value="akademik">Akademik</option>
+            <option value="nonakademik">Non-Akademik</option>
+          </select>
+        </div>
+
+        <div className="form-group">
+          <label>Pembina</label>
+          <select name="pembina" value={editModal.editFormData.pembina} onChange={(e) => editModal.setEditFormData({ ...editModal.editFormData, pembina: e.target.value })}>
+            <option value="">Pilih Pembina</option>
+            {teachers.map(teacher => (
+              <option key={teacher.id} value={teacher.nama}>{teacher.nama} ({teacher.nip})</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="form-group">
+          <label>Juara</label>
+          <select name="juara" value={editModal.editFormData.juara} onChange={(e) => editModal.setEditFormData({ ...editModal.editFormData, juara: e.target.value })}>
+            <option value="juara 1">Juara 1</option>
+            <option value="juara 2">Juara 2</option>
+            <option value="juara 3">Juara 3</option>
+            <option value="juara harapan 1">Juara Harapan 1</option>
+            <option value="juara harapan 2">Juara Harapan 2</option>
+            <option value="juara harapan 3">Juara Harapan 3</option>
+            <option value="finalis">Finalis</option>
+            <option value="peserta">Peserta</option>
+          </select>
+        </div>
+
+        <div className="form-group">
+          <label>Kategori</label>
+          <select name="kategori" value={editModal.editFormData.kategori} onChange={(e) => editModal.setEditFormData({ ...editModal.editFormData, kategori: e.target.value })}>
+            <option value="kecamatan">Kecamatan</option>
+            <option value="kabupaten">Kabupaten</option>
+            <option value="provinsi">Provinsi</option>
+            <option value="nasional">Nasional</option>
+            <option value="internasional">Internasional</option>
+          </select>
+        </div>
+      </EditModal>
 
       {/* Submission History - Hidden for Superadmin */}
       {JSON.parse(localStorage.getItem('user') || '{}').role !== 'superadmin' && (
