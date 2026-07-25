@@ -219,7 +219,7 @@ Main Tables:
 - permissions (Access control)
 
 Fields utama:
-- users: id, nama, role, kelas, jurusan, ipc_total, ipc_awal
+- users: id, nama, role, kelas, grha, ipc_total, ipc_awal
 - prestasi: user_id, jenis, tingkat, peringkat, point, status
 - approvals: user_id, jenis, data, pembina_status, superadmin_status
 

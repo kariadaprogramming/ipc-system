@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { KELAS_OPTIONS, JURUSAN_OPTIONS, applyKelasChange, jurusanFromKelas, isJurusanLocked } from '../utils/kelasJurusan';
+import { KELAS_OPTIONS, applyKelasChange } from '../utils/kelasJurusan';
 import EditModal from './EditModal';
 import useEditModal from '../hooks/useEditModal';
 import API_BASE_URL from '../config';
@@ -11,8 +11,6 @@ function InputOrganisasi() {
     nis: '',
     kelas: '',
     grha: '',
-    jurusan: 'TKJ',
-    pembina: '',
     jabatan_organisasi: '',
     kategori_organisasi: ''
   });
@@ -179,7 +177,6 @@ function InputOrganisasi() {
           ...prev,
           nama: response.data.nama || '',
           kelas: response.data.kelas || '',
-          jurusan: jurusanFromKelas(response.data.kelas) || response.data.jurusan || '',
           grha: response.data.grha || ''
         }));
         setIsAutoFilled(true);
@@ -231,8 +228,6 @@ function InputOrganisasi() {
         nis: '',
         kelas: '',
         grha: '',
-        jurusan: 'TKJ',
-        pembina: '',
         jabatan_organisasi: '',
         kategori_organisasi: ''
       });
@@ -348,7 +343,7 @@ function InputOrganisasi() {
         <h2>Input Organisasi</h2>
         {userRole === 'superadmin' && (
           <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>
-            {showForm ? 'Tutup Form' : '+ Input Organisasi Baru'}
+            {showForm ? 'Tutup Form' : '+ Input Organisasi'}
           </button>
         )}
       </div>
@@ -360,7 +355,7 @@ function InputOrganisasi() {
       )}
       
       {/* Index Display for Superadmin */}
-      {userRole === 'superadmin' && (
+      {(userRole === 'superadmin' && !showForm) && (
         <div style={{ marginBottom: '30px' }}>
           <h3 style={{ marginBottom: '15px', fontSize: '18px' }}>📋 Index Organisasi</h3>
           {loadingIndex ? (
@@ -375,7 +370,6 @@ function InputOrganisasi() {
                     <th>NIS</th>
                     <th>Kategori</th>
                     <th>Jabatan</th>
-                    <th>Pembina</th>
                     <th>Point</th>
                     <th>Status</th>
                     <th>Aksi</th>
@@ -389,7 +383,6 @@ function InputOrganisasi() {
                       <td>{item.nis}</td>
                       <td>{item.kategori_organisasi}</td>
                       <td>{item.jabatan_organisasi}</td>
-                      <td>{item.pembina || '-'}</td>
                       <td>{item.point}</td>
                       <td>{getStatusBadge(item.status)}</td>
                       <td>
@@ -468,23 +461,6 @@ function InputOrganisasi() {
         </div>
 
         <div className="form-group">
-          <label>Jurusan</label>
-          <select name="jurusan" value={formData.jurusan} onChange={handleChange} disabled={isJurusanLocked(formData.kelas, isAutoFilled)} style={{ backgroundColor: isJurusanLocked(formData.kelas, isAutoFilled) ? '#f0f0f0' : '' }}>
-            {JURUSAN_OPTIONS.map(j => <option key={j} value={j}>{j}</option>)}
-          </select>
-        </div>
-
-        <div className="form-group">
-          <label>Pembina</label>
-          <select name="pembina" value={formData.pembina} onChange={handleChange}>
-            <option value="">Pilih Pembina</option>
-            {teachers.map(teacher => (
-              <option key={teacher.id} value={teacher.nama}>{teacher.nama} ({teacher.nip})</option>
-            ))}
-          </select>
-        </div>
-
-        <div className="form-group">
           <label>Jabatan Organisasi</label>
           <select name="jabatan_organisasi" value={formData.jabatan_organisasi} onChange={handleChange} required>
             <option value="">Pilih Jabatan</option>
@@ -520,7 +496,7 @@ function InputOrganisasi() {
         onClose={editModal.closeEditModal}
         onSave={handleUpdate}
         isLoading={editModal.isLoading}
-        photoPreview={editModal.editingItem?.foto ? `${API_BASE_URL.replace('/api', '')}uploads/organisasi/${editModal.editingItem.foto}` : null}
+        photoPreview={editModal.editingItem?.foto ? `${API_BASE_URL.replace('/api', '')}/${editModal.editingItem.foto}` : null}
       >
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <div className="form-group">
@@ -557,42 +533,19 @@ function InputOrganisasi() {
               ))}
             </select>
           </div>
-          <div className="form-group">
-            <label>Jurusan</label>
-            <select 
-              value={editModal.editFormData.jurusan || ''} 
-              onChange={(e) => editModal.setEditFormData({ ...editModal.editFormData, jurusan: e.target.value })}
-            >
-              {JURUSAN_OPTIONS.map(j => <option key={j} value={j}>{j}</option>)}
-            </select>
-          </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-          <div className="form-group">
-            <label>Grha</label>
-            <select 
-              value={editModal.editFormData.grha || ''} 
-              onChange={(e) => editModal.setEditFormData({ ...editModal.editFormData, grha: e.target.value })}
-            >
-              <option value="">Pilih Grha</option>
-              {grhaOptions.map(grha => (
-                <option key={grha} value={grha}>{grha}</option>
-              ))}
-            </select>
-          </div>
-          <div className="form-group">
-            <label>Pembina</label>
-            <select 
-              value={editModal.editFormData.pembina || ''} 
-              onChange={(e) => editModal.setEditFormData({ ...editModal.editFormData, pembina: e.target.value })}
-            >
-              <option value="">Pilih Pembina</option>
-              {teachers.map(teacher => (
-                <option key={teacher.id} value={teacher.nama}>{teacher.nama} ({teacher.nip})</option>
-              ))}
-            </select>
-          </div>
+        <div className="form-group">
+          <label>Grha</label>
+          <select 
+            value={editModal.editFormData.grha || ''} 
+            onChange={(e) => editModal.setEditFormData({ ...editModal.editFormData, grha: e.target.value })}
+          >
+            <option value="">Pilih Grha</option>
+            {grhaOptions.map(grha => (
+              <option key={grha} value={grha}>{grha}</option>
+            ))}
+          </select>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>

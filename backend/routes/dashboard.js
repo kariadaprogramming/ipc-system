@@ -12,14 +12,6 @@ router.get('/stats', auth, async (req, res) => {
         // Total teachers
         const [totalTeachers] = await db.query("SELECT COUNT(*) as count FROM users WHERE role = 'guru'");
         
-        // Total by jurusan
-        const [byJurusan] = await db.query(`
-            SELECT jurusan, COUNT(*) as count 
-            FROM users 
-            WHERE role = 'siswa' AND jurusan IS NOT NULL 
-            GROUP BY jurusan
-        `);
-        
         // Total by grha
         const [byGrha] = await db.query(`
             SELECT grha, COUNT(*) as count 
@@ -57,7 +49,6 @@ router.get('/stats', auth, async (req, res) => {
         res.json({
             total_students: totalStudents[0].count,
             total_teachers: totalTeachers[0].count,
-            by_jurusan: byJurusan,
             by_grha: byGrha,
             prestasi_akademik: prestasiAkademik[0].count,
             prestasi_nonakademik: prestasiNonAkademik[0].count,

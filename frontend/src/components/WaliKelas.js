@@ -654,7 +654,6 @@ function WaliKelas() {
                     <th style={{ width: '50px' }}>No</th>
                     <th>Nama</th>
                     <th>NIS</th>
-                    <th style={{ textAlign: 'center' }}>Jurusan</th>
                     <th style={{ textAlign: 'center' }}>IPC</th>
                     <th style={{ textAlign: 'center' }}>Aksi</th>
                   </tr>
@@ -691,7 +690,6 @@ function WaliKelas() {
                         </div>
                       </td>
                       <td>{student.nis}</td>
-                      <td style={{ textAlign: 'center' }}>{student.jurusan}</td>
                       <td style={{ textAlign: 'center' }}>
                         <span style={{ 
                           background: getIpcColor(student.ipc_total || 80),
@@ -793,10 +791,6 @@ function WaliKelas() {
               <div style={{ padding: '12px', background: 'var(--bg-tertiary)', borderRadius: 'var(--border-radius-sm)' }}>
                 <strong style={{ color: 'var(--text-secondary)', display: 'block', marginBottom: '4px', fontSize: '0.85rem' }}>NISN</strong>
                 <div style={{ fontSize: '1rem', fontWeight: '600', color: 'var(--text-primary)' }}>{selectedStudent.nisn || '-'}</div>
-              </div>
-              <div style={{ padding: '12px', background: 'var(--bg-tertiary)', borderRadius: 'var(--border-radius-sm)' }}>
-                <strong style={{ color: 'var(--text-secondary)', display: 'block', marginBottom: '4px', fontSize: '0.85rem' }}>Jurusan</strong>
-                <div style={{ fontSize: '1rem', fontWeight: '600', color: 'var(--text-primary)' }}>{selectedStudent.jurusan}</div>
               </div>
               <div style={{ padding: '12px', background: 'var(--bg-tertiary)', borderRadius: 'var(--border-radius-sm)' }}>
                 <strong style={{ color: 'var(--text-secondary)', display: 'block', marginBottom: '4px', fontSize: '0.85rem' }}>Grha</strong>

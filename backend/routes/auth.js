@@ -69,7 +69,6 @@ router.post('/login', async (req, res) => {
                 nip: user.nip,
                 role: user.role,
                 kelas: user.kelas,
-                jurusan: user.jurusan,
                 grha: user.grha,
                 wali_kelas: user.wali_kelas,
                 ipc_total: user.ipc_total

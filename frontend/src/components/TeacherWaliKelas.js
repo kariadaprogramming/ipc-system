@@ -228,7 +228,7 @@ function TeacherWaliKelas() {
                   <td style={{ padding: '12px' }}>
                     <strong>{student.nama}</strong>
                     <br />
-                    <small style={{ color: '#666' }}>{student.jurusan} | {student.grha}</small>
+                    <small style={{ color: '#666' }}>{student.grha}</small>
                   </td>
                   <td style={{ padding: '12px' }}>{student.nis}</td>
                   <td style={{ padding: '12px', textAlign: 'center' }}>
@@ -365,10 +365,6 @@ function TeacherWaliKelas() {
                   <tr>
                     <td style={{ padding: '8px', fontWeight: 'bold' }}>NISN</td>
                     <td style={{ padding: '8px' }}>{selectedStudent.nisn || '-'}</td>
-                  </tr>
-                  <tr>
-                    <td style={{ padding: '8px', fontWeight: 'bold' }}>Jurusan</td>
-                    <td style={{ padding: '8px' }}>{selectedStudent.jurusan}</td>
                   </tr>
                   <tr>
                     <td style={{ padding: '8px', fontWeight: 'bold' }}>Grha</td>

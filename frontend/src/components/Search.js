@@ -63,7 +63,6 @@ function Search() {
                 <th>Nama</th>
                 <th>NIS</th>
                 <th>Kelas</th>
-                <th>Jurusan</th>
                 <th>Grha</th>
                 <th>IPC</th>
                 <th>Prestasi Akademik</th>
@@ -77,7 +76,6 @@ function Search() {
                   <td>{student.nama}</td>
                   <td>{student.nis}</td>
                   <td>{student.kelas}</td>
-                  <td>{student.jurusan}</td>
                   <td>{student.grha}</td>
                   <td>{student.ipc_total}</td>
                   <td>{student.total_prestasi_akademik}</td>
@@ -102,7 +100,6 @@ function Search() {
           <div style={{ marginBottom: '20px' }}>
             <p><strong>NIS:</strong> {selectedStudent.student.nis}</p>
             <p><strong>Kelas:</strong> {selectedStudent.student.kelas}</p>
-            <p><strong>Jurusan:</strong> {selectedStudent.student.jurusan}</p>
             <p><strong>Grha:</strong> {selectedStudent.student.grha}</p>
             <p><strong>IPC Total:</strong> {selectedStudent.student.ipc_total}</p>
           </div>

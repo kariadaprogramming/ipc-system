@@ -48,7 +48,6 @@ router.post('/', auth, checkInputAccess('perilaku'), async (req, res) => {
             nama,
             nis,
             kelas,
-            jurusan,
             grha,
             karakter_siswa,
             tanggung_jawab,
@@ -84,9 +83,9 @@ router.post('/', auth, checkInputAccess('perilaku'), async (req, res) => {
 
         if (userRole === 'superadmin') {
             const [result] = await db.query(
-                `INSERT INTO perilaku (user_id, nama, nis, kelas, jurusan, grha, karakter_siswa, point, status)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'approved')`,
-                [userId, nama, nis, kelas, jurusan, grha, karakter, point]
+                `INSERT INTO perilaku (user_id, nama, nis, kelas, grha, karakter_siswa, point, status)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, 'approved')`,
+                [userId, nama, nis, kelas, grha, karakter, point]
             );
 
             await applyPerilakuIpcChange(
@@ -108,8 +107,8 @@ router.post('/', auth, checkInputAccess('perilaku'), async (req, res) => {
         }
 
         const [result] = await db.query(
-            'INSERT INTO perilaku (user_id, nama, nis, kelas, jurusan, grha, karakter_siswa, point) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            [userId, nama, nis, kelas, jurusan, grha, karakter, point]
+            'INSERT INTO perilaku (user_id, nama, nis, kelas, grha, karakter_siswa, point) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [userId, nama, nis, kelas, grha, karakter, point]
         );
 
         const [superadmins] = await db.query('SELECT id FROM users WHERE role = "superadmin"');
@@ -202,7 +201,7 @@ router.put('/:id/reject', auth, superAdminOnly, async (req, res) => {
 router.put('/:id', auth, async (req, res) => {
     try {
         const perilakuId = req.params.id;
-        const { nama, nis, kelas, jurusan, grha, karakter_siswa, tanggung_jawab, disiplin, kepedulian, kemandirian, spiritual, kejujuran, kepercayaan_diri } = req.body;
+        const { nama, nis, kelas, grha, karakter_siswa, tanggung_jawab, disiplin, kepedulian, kemandirian, spiritual, kejujuran, kepercayaan_diri } = req.body;
         
         const [perilaku] = await db.query('SELECT * FROM perilaku WHERE id = ?', [perilakuId]);
         if (perilaku.length === 0) {
@@ -232,8 +231,8 @@ router.put('/:id', auth, async (req, res) => {
             });
 
         await db.query(
-            'UPDATE perilaku SET nama = ?, nis = ?, kelas = ?, jurusan = ?, grha = ?, karakter_siswa = ?, point = ? WHERE id = ?',
-            [nama, nis, kelas, jurusan, grha, karakter, point, perilakuId]
+            'UPDATE perilaku SET nama = ?, nis = ?, kelas = ?, grha = ?, karakter_siswa = ?, point = ? WHERE id = ?',
+            [nama, nis, kelas, grha, karakter, point, perilakuId]
         );
 
         // If status is approved and point changed, update user IPC

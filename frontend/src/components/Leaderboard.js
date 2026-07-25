@@ -224,7 +224,6 @@ function Leaderboard() {
                       </td>
                       <td style={{ textAlign: 'center', padding: '16px' }}>
                         <strong style={{ display: 'block', fontSize: '1rem' }}>{student.kelas}</strong>
-                        <span style={{ fontSize: '0.8rem', opacity: 0.7 }}>{student.jurusan}</span>
                       </td>
                       <td style={{ textAlign: 'center', padding: '16px', fontWeight: '700', fontSize: '1.5rem' }}>
                         {student.total_prestasi}
@@ -290,7 +289,7 @@ function Leaderboard() {
             </div>
             <div style={{ padding: '10px', background: 'var(--bg-primary)', borderRadius: 'var(--border-radius-sm)' }}>
               <strong style={{ color: 'var(--primary-color)' }}>🏫 Kelas</strong>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '2px' }}>Kelas & jurusan</div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '2px' }}>Kelas</div>
             </div>
             <div style={{ padding: '10px', background: 'var(--bg-primary)', borderRadius: 'var(--border-radius-sm)' }}>
               <strong style={{ color: 'var(--primary-color)' }}>📊 Total</strong>

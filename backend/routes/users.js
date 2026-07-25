@@ -4,7 +4,6 @@ const bcrypt = require('bcryptjs');
 const { auth, superAdminOnly, teacherOrSuperAdmin } = require('../middleware/auth');
 const db = require('../config/database');
 const { getStudentRecords } = require('../utils/studentRecords');
-const { resolveJurusan } = require('../utils/kelasJurusan');
 
 async function applyIpcAwalUpdate(userId, newIpcAwal, adminId) {
     const parsedAwal = parseInt(newIpcAwal, 10);
@@ -65,7 +64,7 @@ router.get('/nis/:nis', auth, async (req, res) => {
     try {
         console.log('Fetching student by NIS:', req.params.nis);
         const [users] = await db.query(
-            'SELECT id, nama, nis, nisn, kelas, jurusan, grha FROM users WHERE nis = ? AND role = ?',
+            'SELECT id, nama, nis, nisn, kelas, grha FROM users WHERE nis = ? AND role = ?',
             [req.params.nis, 'siswa']
         );
         
@@ -87,11 +86,11 @@ router.get('/', auth, teacherOrSuperAdmin, async (req, res) => {
     try {
         // If guru, only return students
         if (req.user.role === 'guru') {
-            const [users] = await db.query('SELECT id, nama, nis, nisn, nip, role, kelas, jurusan, grha, wali_kelas, ipc_total, ipc_awal, created_at FROM users WHERE role = ?', ['siswa']);
+            const [users] = await db.query('SELECT id, nama, nis, nisn, nip, role, kelas, grha, wali_kelas, ipc_total, ipc_awal, created_at FROM users WHERE role = ?', ['siswa']);
             return res.json(users);
         }
         // If superadmin, return all users
-        const [users] = await db.query('SELECT id, nama, nis, nisn, nip, role, kelas, jurusan, grha, wali_kelas, ipc_total, ipc_awal, created_at FROM users');
+        const [users] = await db.query('SELECT id, nama, nis, nisn, nip, role, kelas, grha, wali_kelas, ipc_total, ipc_awal, created_at FROM users');
         res.json(users);
     } catch (error) {
         console.error(error);
@@ -208,7 +207,7 @@ router.get('/:id/ipc-history', auth, teacherOrSuperAdmin, async (req, res) => {
 router.get('/:id', auth, async (req, res) => {
     try {
         const [users] = await db.query(
-            'SELECT id, nama, nis, nisn, nip, role, kelas, jurusan, grha, wali_kelas, ipc_total, alamat, no_hp, detail, created_at FROM users WHERE id = ?',
+            'SELECT id, nama, nis, nisn, nip, role, kelas, grha, wali_kelas, ipc_total, alamat, no_hp, detail, created_at FROM users WHERE id = ?',
             [req.params.id]
         );
         
@@ -226,8 +225,7 @@ router.get('/:id', auth, async (req, res) => {
 // Create student account (Superadmin creates directly, Guru needs approval)
 router.post('/create-student', auth, teacherOrSuperAdmin, async (req, res) => {
     try {
-        const { nama, nis, nisn, kelas, jurusan, password, wali_kelas, grha } = req.body;
-        const resolvedJurusan = resolveJurusan(kelas, jurusan);
+        const { nama, nis, nisn, kelas, password, wali_kelas, grha } = req.body;
 
         // Check for duplicate in users table
         const [existing] = await db.query(
@@ -255,8 +253,8 @@ router.post('/create-student', auth, teacherOrSuperAdmin, async (req, res) => {
         if (req.user.role === 'superadmin') {
             const ipc_awal = 80;
             const [result] = await db.query(
-                'INSERT INTO users (nama, nis, nisn, password, role, kelas, jurusan, wali_kelas, grha, ipc_total, ipc_awal) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                [nama, nis, nisn, hashedPassword, 'siswa', kelas, resolvedJurusan, wali_kelas, grha, ipc_awal, ipc_awal]
+                'INSERT INTO users (nama, nis, nisn, password, role, kelas, wali_kelas, grha, ipc_total, ipc_awal) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [nama, nis, nisn, hashedPassword, 'siswa', kelas, wali_kelas, grha, ipc_awal, ipc_awal]
             );
 
             // Create default permissions
@@ -282,8 +280,8 @@ router.post('/create-student', auth, teacherOrSuperAdmin, async (req, res) => {
 
         // If Guru, create approval request
         const [result] = await db.query(
-            'INSERT INTO student_creation_approvals (nama, nis, nisn, kelas, jurusan, grha, password, requested_by, superadmin_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, "pending")',
-            [nama, nis, nisn, kelas, resolvedJurusan, grha, hashedPassword, req.user.id]
+            'INSERT INTO student_creation_approvals (nama, nis, nisn, kelas, grha, password, requested_by, superadmin_status) VALUES (?, ?, ?, ?, ?, ?, ?, "pending")',
+            [nama, nis, nisn, kelas, grha, hashedPassword, req.user.id]
         );
 
         // Notify superadmin
@@ -525,8 +523,7 @@ router.post('/:id/biodata-request', auth, async (req, res) => {
     try {
         const userId = parseInt(req.params.id);
         const requestedBy = req.user.id;
-        const { nama, nis, nisn, kelas, jurusan, grha } = req.body;
-        const resolvedJurusan = resolveJurusan(kelas, jurusan);
+        const { nama, nis, nisn, kelas, grha } = req.body;
 
         // Only guru can request biodata updates
         if (req.user.role !== 'guru') {
@@ -535,7 +532,7 @@ router.post('/:id/biodata-request', auth, async (req, res) => {
         
         // Get current student data
         const [student] = await db.query(
-            'SELECT nama, nis, nisn, kelas, jurusan, grha FROM users WHERE id = ? AND role = ?',
+            'SELECT nama, nis, nisn, kelas, grha FROM users WHERE id = ? AND role = ?',
             [userId, 'siswa']
         );
         
@@ -548,12 +545,12 @@ router.post('/:id/biodata-request', auth, async (req, res) => {
         // Create approval request
         const [result] = await db.query(
             `INSERT INTO biodata_update_approvals 
-            (user_id, nama_baru, nis_baru, nisn_baru, kelas_baru, jurusan_baru, grha_baru,
-             nama_lama, nis_lama, nisn_lama, kelas_lama, jurusan_lama, grha_lama, requested_by,
+            (user_id, nama_baru, nis_baru, nisn_baru, kelas_baru, grha_baru,
+             nama_lama, nis_lama, nisn_lama, kelas_lama, grha_lama, requested_by,
              pembina_status, superadmin_status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'pending')`,
-            [userId, nama, nis, nisn, kelas, resolvedJurusan, grha,
-             current.nama, current.nis, current.nisn, current.kelas, current.jurusan, current.grha,
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'pending')`,
+            [userId, nama, nis, nisn, kelas, grha,
+             current.nama, current.nis, current.nisn, current.kelas, current.grha,
              requestedBy]
         );
         
@@ -595,8 +592,8 @@ router.put('/biodata-approvals/:id', auth, superAdminOnly, async (req, res) => {
         if (status === 'approved') {
             // Update student data with new biodata
             await db.query(
-                'UPDATE users SET nama = ?, nis = ?, nisn = ?, kelas = ?, jurusan = ?, grha = ? WHERE id = ?',
-                [data.nama_baru, data.nis_baru, data.nisn_baru, data.kelas_baru, data.jurusan_baru, data.grha_baru, data.user_id]
+                'UPDATE users SET nama = ?, nis = ?, nisn = ?, kelas = ?, grha = ? WHERE id = ?',
+                [data.nama_baru, data.nis_baru, data.nisn_baru, data.kelas_baru, data.grha_baru, data.user_id]
             );
             
             // Update approval status
@@ -639,8 +636,7 @@ router.put('/biodata-approvals/:id', auth, superAdminOnly, async (req, res) => {
 router.put('/:id/biodata', auth, superAdminOnly, async (req, res) => {
     try {
         const userId = parseInt(req.params.id);
-        const { nama, nis, nisn, kelas, jurusan, grha, nip, detail, alamat, no_hp } = req.body;
-        const resolvedJurusan = resolveJurusan(kelas, jurusan);
+        const { nama, nis, nisn, kelas, grha, nip, detail, alamat, no_hp } = req.body;
 
         // Get user current data
         const [user] = await db.query('SELECT role FROM users WHERE id = ?', [userId]);
@@ -653,8 +649,8 @@ router.put('/:id/biodata', auth, superAdminOnly, async (req, res) => {
         if (role === 'siswa') {
             // Update siswa biodata
             await db.query(
-                'UPDATE users SET nama = ?, nis = ?, nisn = ?, kelas = ?, jurusan = ?, grha = ? WHERE id = ?',
-                [nama, nis, nisn, kelas, resolvedJurusan, grha, userId]
+                'UPDATE users SET nama = ?, nis = ?, nisn = ?, kelas = ?, grha = ? WHERE id = ?',
+                [nama, nis, nisn, kelas, grha, userId]
             );
         } else if (role === 'guru') {
             // Update guru biodata
@@ -699,8 +695,8 @@ router.put('/student-creation-approvals/:id', auth, superAdminOnly, async (req, 
             // Create student account
             const ipc_awal = 80;
             const [result] = await db.query(
-                'INSERT INTO users (nama, nis, nisn, password, role, kelas, jurusan, grha, ipc_total, ipc_awal) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                [data.nama, data.nis, data.nisn, data.password, 'siswa', data.kelas, data.jurusan, data.grha, ipc_awal, ipc_awal]
+                'INSERT INTO users (nama, nis, nisn, password, role, kelas, grha, ipc_total, ipc_awal) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [data.nama, data.nis, data.nisn, data.password, 'siswa', data.kelas, data.grha, ipc_awal, ipc_awal]
             );
             
             // Create default permissions

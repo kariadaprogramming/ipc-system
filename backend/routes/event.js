@@ -53,7 +53,7 @@ router.get('/user/:userId', auth, async (req, res) => {
 // Create event
 router.post('/', auth, upload.single('foto'), async (req, res) => {
     try {
-        const { nama, nis, kelas, grha, jurusan, nama_event, tingkat } = req.body;
+        const { nama, nis, kelas, grha, nama_event, tingkat } = req.body;
         let foto = req.file ? req.file.filename : null;
 
         // Rename file to NIS_Nama Event format
@@ -71,8 +71,8 @@ router.post('/', auth, upload.single('foto'), async (req, res) => {
         const point = calculateEventPoints(tingkat);
 
         const [result] = await db.query(
-            'INSERT INTO event (user_id, nama, nis, kelas, grha, jurusan, nama_event, tingkat, foto, point) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [req.user.id, nama, nis, kelas, grha, jurusan, nama_event, tingkat, foto, point]
+            'INSERT INTO event (user_id, nama, nis, kelas, grha, nama_event, tingkat, foto, point) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [req.user.id, nama, nis, kelas, grha, nama_event, tingkat, foto, point]
         );
 
         await db.query(
@@ -158,7 +158,7 @@ router.put('/:id/reject', auth, async (req, res) => {
 router.put('/:id', auth, upload.single('foto'), async (req, res) => {
     try {
         const eventId = req.params.id;
-        const { nama, nis, kelas, grha, jurusan, nama_event, tingkat } = req.body;
+        const { nama, nis, kelas, grha, nama_event, tingkat } = req.body;
         
         const [event] = await db.query('SELECT * FROM event WHERE id = ?', [eventId]);
         if (event.length === 0) {
@@ -191,8 +191,8 @@ router.put('/:id', auth, upload.single('foto'), async (req, res) => {
         const point = calculateEventPoints(tingkat);
 
         await db.query(
-            'UPDATE event SET nama = ?, nis = ?, kelas = ?, grha = ?, jurusan = ?, nama_event = ?, tingkat = ?, foto = ?, point = ? WHERE id = ?',
-            [nama, nis, kelas, grha, jurusan, nama_event, tingkat, foto, point, eventId]
+            'UPDATE event SET nama = ?, nis = ?, kelas = ?, grha = ?, nama_event = ?, tingkat = ?, foto = ?, point = ? WHERE id = ?',
+            [nama, nis, kelas, grha, nama_event, tingkat, foto, point, eventId]
         );
 
         // If status is approved and point changed, update user IPC

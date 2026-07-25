@@ -54,7 +54,7 @@ router.get('/user/:userId', auth, async (req, res) => {
 // Create pelanggaran
 router.post('/', auth, checkInputAccess('pelanggaran'), upload.single('foto'), async (req, res) => {
     try {
-        const { nama, nis, kelas, jurusan, grha, keterangan, jenis_pelanggaran } = req.body;
+        const { nama, nis, kelas, grha, keterangan, jenis_pelanggaran } = req.body;
         let foto = req.file ? req.file.filename : null;
 
         // Rename file to NIS_Keterangan_UniqueId format
@@ -74,8 +74,8 @@ router.post('/', auth, checkInputAccess('pelanggaran'), upload.single('foto'), a
         const userId = await resolveStudentIdByNis(nis, req.user.id);
 
         const [result] = await db.query(
-            'INSERT INTO pelanggaran (user_id, nama, nis, kelas, jurusan, grha, keterangan, foto, jenis_pelanggaran, point_dikurangi) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [userId, nama, nis, kelas, jurusan, grha, keterangan, foto, jenis_pelanggaran, point_dikurangi]
+            'INSERT INTO pelanggaran (user_id, nama, nis, kelas, grha, keterangan, foto, jenis_pelanggaran, point_dikurangi) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [userId, nama, nis, kelas, grha, keterangan, foto, jenis_pelanggaran, point_dikurangi]
         );
 
         await db.query(
@@ -162,7 +162,7 @@ router.put('/:id/reject', auth, superAdminOnly, async (req, res) => {
 router.put('/:id', auth, upload.single('foto'), async (req, res) => {
     try {
         const pelanggaranId = req.params.id;
-        const { nama, nis, kelas, jurusan, grha, keterangan, jenis_pelanggaran } = req.body;
+        const { nama, nis, kelas, grha, keterangan, jenis_pelanggaran } = req.body;
         
         const [pelanggaran] = await db.query('SELECT * FROM pelanggaran WHERE id = ?', [pelanggaranId]);
         if (pelanggaran.length === 0) {
@@ -196,8 +196,8 @@ router.put('/:id', auth, upload.single('foto'), async (req, res) => {
         const point_dikurangi = calculatePelanggaranPoints(jenis_pelanggaran);
 
         await db.query(
-            'UPDATE pelanggaran SET nama = ?, nis = ?, kelas = ?, jurusan = ?, grha = ?, keterangan = ?, foto = ?, jenis_pelanggaran = ?, point_dikurangi = ? WHERE id = ?',
-            [nama, nis, kelas, jurusan, grha, keterangan, foto, jenis_pelanggaran, point_dikurangi, pelanggaranId]
+            'UPDATE pelanggaran SET nama = ?, nis = ?, kelas = ?, grha = ?, keterangan = ?, foto = ?, jenis_pelanggaran = ?, point_dikurangi = ? WHERE id = ?',
+            [nama, nis, kelas, grha, keterangan, foto, jenis_pelanggaran, point_dikurangi, pelanggaranId]
         );
 
         // If status is approved and point changed, update user IPC

@@ -11,7 +11,6 @@ function IzinAkun() {
   const [filters, setFilters] = useState({
     role: '',
     kelas: '',
-    jurusan: '',
     grha: ''
   });
 
@@ -41,7 +40,7 @@ function IzinAkun() {
   };
 
   const resetFilters = () => {
-    setFilters({ role: '', kelas: '', jurusan: '', grha: '' });
+    setFilters({ role: '', kelas: '', grha: '' });
     setSearchQuery('');
   };
 
@@ -67,9 +66,6 @@ function IzinAkun() {
     }
     if (filters.kelas) {
       filtered = filtered.filter(user => user.kelas === filters.kelas);
-    }
-    if (filters.jurusan) {
-      filtered = filtered.filter(user => user.jurusan === filters.jurusan);
     }
     if (filters.grha) {
       filtered = filtered.filter(user => user.grha === filters.grha);
@@ -357,19 +353,6 @@ function IzinAkun() {
                 >
                   <option value="">Semua Kelas</option>
                   {kelasOptions.map(k => <option key={k} value={k}>{k}</option>)}
-                </select>
-              </div>
-              <div style={{ flex: '1', minWidth: '150px' }}>
-                <label>Jurusan</label>
-                <select
-                  value={filters.jurusan}
-                  onChange={(e) => handleFilterChange('jurusan', e.target.value)}
-                  className="form-control"
-                >
-                  <option value="">Semua Jurusan</option>
-                  <option value="TKJ">TKJ</option>
-                  <option value="TO">TO</option>
-                  <option value="DPIB">DPIB</option>
                 </select>
               </div>
               <div style={{ flex: '1', minWidth: '150px' }}>

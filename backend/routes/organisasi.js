@@ -53,7 +53,7 @@ router.get('/user/:userId', auth, async (req, res) => {
 // Create organisasi
 router.post('/', auth, upload.single('foto'), async (req, res) => {
     try {
-        const { nama, nis, kelas, grha, jurusan, jabatan_organisasi, kategori_organisasi } = req.body;
+        const { nama, nis, kelas, grha, jabatan_organisasi, kategori_organisasi } = req.body;
         let foto = req.file ? req.file.filename : null;
 
         // Rename file to NIS_Jabatan Organisasi format
@@ -71,8 +71,8 @@ router.post('/', auth, upload.single('foto'), async (req, res) => {
         const point = calculateOrganisasiPoints(jabatan_organisasi);
 
         const [result] = await db.query(
-            'INSERT INTO organisasi (user_id, nama, nis, kelas, grha, jurusan, jabatan_organisasi, foto, kategori_organisasi, point) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [req.user.id, nama, nis, kelas, grha, jurusan, jabatan_organisasi, foto, kategori_organisasi, point]
+            'INSERT INTO organisasi (user_id, nama, nis, kelas, grha, jabatan_organisasi, foto, kategori_organisasi, point) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [req.user.id, nama, nis, kelas, grha, jabatan_organisasi, foto, kategori_organisasi, point]
         );
 
         // Log activity
@@ -159,7 +159,7 @@ router.put('/:id/reject', auth, async (req, res) => {
 router.put('/:id', auth, upload.single('foto'), async (req, res) => {
     try {
         const organisasiId = req.params.id;
-        const { nama, nis, kelas, grha, jurusan, jabatan_organisasi, kategori_organisasi } = req.body;
+        const { nama, nis, kelas, grha, jabatan_organisasi, kategori_organisasi } = req.body;
         
         const [organisasi] = await db.query('SELECT * FROM organisasi WHERE id = ?', [organisasiId]);
         if (organisasi.length === 0) {
@@ -192,8 +192,8 @@ router.put('/:id', auth, upload.single('foto'), async (req, res) => {
         const point = calculateOrganisasiPoints(jabatan_organisasi);
 
         await db.query(
-            'UPDATE organisasi SET nama = ?, nis = ?, kelas = ?, grha = ?, jurusan = ?, jabatan_organisasi = ?, kategori_organisasi = ?, foto = ?, point = ? WHERE id = ?',
-            [nama, nis, kelas, grha, jurusan, jabatan_organisasi, kategori_organisasi, foto, point, organisasiId]
+            'UPDATE organisasi SET nama = ?, nis = ?, kelas = ?, grha = ?, jabatan_organisasi = ?, kategori_organisasi = ?, foto = ?, point = ? WHERE id = ?',
+            [nama, nis, kelas, grha, jabatan_organisasi, kategori_organisasi, foto, point, organisasiId]
         );
 
         // If status is approved and point changed, update user IPC

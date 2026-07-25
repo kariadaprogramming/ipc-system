@@ -67,7 +67,7 @@ router.get('/user/:userId', auth, async (req, res) => {
 // Create prestasi
 router.post('/', auth, upload.single('foto'), async (req, res) => {
     try {
-        const { nama, nis, jenis, nama_lomba, jurusan, kelas, pembina, grha, juara, kategori } = req.body;
+        const { nama, nis, jenis, nama_lomba, kelas, pembina, grha, juara, kategori } = req.body;
         let foto = req.file ? req.file.filename : null;
 
         // Rename file to NIS_Nama Lomba format
@@ -85,8 +85,8 @@ router.post('/', auth, upload.single('foto'), async (req, res) => {
         const point = calculatePrestasiPoints(juara, kategori);
 
         const [result] = await db.query(
-            'INSERT INTO prestasi (user_id, nama, nis, jenis, nama_lomba, jurusan, foto, kelas, pembina, grha, juara, kategori, point) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [req.user.id, nama, nis, jenis, nama_lomba, jurusan, foto, kelas, pembina, grha, juara, kategori, point]
+            'INSERT INTO prestasi (user_id, nama, nis, jenis, nama_lomba, foto, kelas, pembina, grha, juara, kategori, point) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [req.user.id, nama, nis, jenis, nama_lomba, foto, kelas, pembina, grha, juara, kategori, point]
         );
 
         // Log activity
@@ -177,7 +177,7 @@ router.put('/:id/reject', auth, async (req, res) => {
 router.put('/:id', auth, upload.single('foto'), async (req, res) => {
     try {
         const prestasiId = req.params.id;
-        const { nama, nis, jenis, nama_lomba, jurusan, kelas, pembina, grha, juara, kategori } = req.body;
+        const { nama, nis, jenis, nama_lomba, kelas, pembina, grha, juara, kategori } = req.body;
         
         const [prestasi] = await db.query('SELECT * FROM prestasi WHERE id = ?', [prestasiId]);
         if (prestasi.length === 0) {
@@ -210,8 +210,8 @@ router.put('/:id', auth, upload.single('foto'), async (req, res) => {
         const point = calculatePrestasiPoints(juara, kategori);
 
         await db.query(
-            'UPDATE prestasi SET nama = ?, nis = ?, jenis = ?, nama_lomba = ?, jurusan = ?, foto = ?, kelas = ?, pembina = ?, grha = ?, juara = ?, kategori = ?, point = ? WHERE id = ?',
-            [nama, nis, jenis, nama_lomba, jurusan, foto, kelas, pembina, grha, juara, kategori, point, prestasiId]
+            'UPDATE prestasi SET nama = ?, nis = ?, jenis = ?, nama_lomba = ?, foto = ?, kelas = ?, pembina = ?, grha = ?, juara = ?, kategori = ?, point = ? WHERE id = ?',
+            [nama, nis, jenis, nama_lomba, foto, kelas, pembina, grha, juara, kategori, point, prestasiId]
         );
 
         // If status is approved and point changed, update user IPC

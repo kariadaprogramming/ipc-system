@@ -182,7 +182,13 @@ function ApprovalsV2() {
         return path;
       }
       let cleanPath = path;
-      if (path.includes('\\') || path.includes(':')) {
+      // Handle organized paths (uploads/approved/type/filename)
+      if (path.includes('approved')) {
+        cleanPath = path.replace(/\\/g, '/');
+        if (!cleanPath.startsWith('/')) {
+          cleanPath = `/${cleanPath}`;
+        }
+      } else if (path.includes('\\') || path.includes(':')) {
         cleanPath = path.split('\\').pop();
         cleanPath = `/uploads/${uploadFolder}/${cleanPath}`;
       } else if (!path.startsWith('/')) {
@@ -255,7 +261,6 @@ function ApprovalsV2() {
                     <small>
                       {item.nama_baru !== item.nama_lama && <div>Nama: {item.nama_lama} → {item.nama_baru}</div>}
                       {item.kelas_baru !== item.kelas_lama && <div>Kelas: {item.kelas_lama} → {item.kelas_baru}</div>}
-                      {item.jurusan_baru !== item.jurusan_lama && <div>Jurusan: {item.jurusan_lama} → {item.jurusan_baru}</div>}
                       {item.grha_baru !== item.grha_lama && <div>Grha: {item.grha_lama} → {item.grha_baru}</div>}
                     </small>
                   </td>

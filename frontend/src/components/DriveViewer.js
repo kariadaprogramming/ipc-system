@@ -14,7 +14,6 @@ function DriveViewer() {
     minSize: '',
     maxSize: '',
     kelas: '',
-    jurusan: '',
     grha: ''
   });
   const [studentsData, setStudentsData] = useState({});
@@ -115,7 +114,7 @@ function DriveViewer() {
   };
 
   const resetFilters = () => {
-    setFilters({ fileType: '', searchQuery: '', minSize: '', maxSize: '', kelas: '', jurusan: '', grha: '' });
+    setFilters({ fileType: '', searchQuery: '', minSize: '', maxSize: '', kelas: '', grha: '' });
   };
 
   const extractNISFromFilename = (filename) => {
@@ -172,13 +171,10 @@ function DriveViewer() {
       if (filters.kelas && student.kelas !== filters.kelas) {
         return false;
       }
-      if (filters.jurusan && student.jurusan !== filters.jurusan) {
-        return false;
-      }
       if (filters.grha && student.grha !== filters.grha) {
         return false;
       }
-    } else if (filters.kelas || filters.jurusan || filters.grha) {
+    } else if (filters.kelas || filters.grha) {
       // If student filters are active but we can't find student data, exclude this file
       return false;
     }
@@ -263,19 +259,6 @@ function DriveViewer() {
                 >
                   <option value="">Semua Kelas</option>
                   {kelasOptions.map(k => <option key={k} value={k}>{k}</option>)}
-                </select>
-              </div>
-              <div style={{ flex: '1', minWidth: '150px' }}>
-                <label>Jurusan</label>
-                <select
-                  value={filters.jurusan}
-                  onChange={(e) => handleFilterChange('jurusan', e.target.value)}
-                  className="form-control"
-                >
-                  <option value="">Semua Jurusan</option>
-                  <option value="TKJ">TKJ</option>
-                  <option value="TO">TO</option>
-                  <option value="DPIB">DPIB</option>
                 </select>
               </div>
               <div style={{ flex: '1', minWidth: '150px' }}>

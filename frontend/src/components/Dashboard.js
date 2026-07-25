@@ -86,26 +86,6 @@ function Dashboard() {
           {stats && (
             <>
               <div className="card">
-                <h3>Siswa per Jurusan</h3>
-                <table className="table">
-                  <thead>
-                    <tr>
-                      <th>Jurusan</th>
-                      <th>Jumlah</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {stats.by_jurusan && stats.by_jurusan.map((item, index) => (
-                      <tr key={index}>
-                        <td>{item.jurusan}</td>
-                        <td>{item.count}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="card">
                 <h3>Siswa per Grha</h3>
                 <table className="table">
                   <thead>

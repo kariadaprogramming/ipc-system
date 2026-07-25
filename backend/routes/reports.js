@@ -14,7 +14,6 @@ router.get('/students', auth, async (req, res) => {
                 nis,
                 nisn,
                 kelas,
-                jurusan,
                 ipc_total,
                 ipc_awal
             FROM users 
@@ -41,7 +40,6 @@ router.get('/students/class/:kelas', auth, async (req, res) => {
                 nis,
                 nisn,
                 kelas,
-                jurusan,
                 ipc_total,
                 ipc_awal
             FROM users 
@@ -63,14 +61,13 @@ router.get('/statistics', auth, async (req, res) => {
         const query = `
             SELECT 
                 kelas,
-                jurusan,
                 COUNT(*) as total_siswa,
                 AVG(ipc_total) as rata_rata_ipc,
                 MAX(ipc_total) as ipc_tertinggi,
                 MIN(ipc_total) as ipc_terendah
             FROM users 
             WHERE role = 'siswa' AND kelas IS NOT NULL
-            GROUP BY kelas, jurusan
+            GROUP BY kelas
             ORDER BY kelas
         `;
         

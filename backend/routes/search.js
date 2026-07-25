@@ -13,7 +13,7 @@ router.get('/students', auth, async (req, res) => {
         }
 
         const [students] = await db.query(`
-            SELECT id, nama, nis, nisn, kelas, jurusan, grha, ipc_total 
+            SELECT id, nama, nis, nisn, kelas, grha, ipc_total 
             FROM users 
             WHERE role = 'siswa' 
             AND (nama LIKE ? OR nis LIKE ? OR nisn LIKE ?)
@@ -53,7 +53,7 @@ router.get('/student/:userId', auth, async (req, res) => {
         const userId = req.params.userId;
 
         const [student] = await db.query(
-            'SELECT id, nama, nis, nisn, kelas, jurusan, grha, ipc_total FROM users WHERE id = ? AND role = ?',
+            'SELECT id, nama, nis, nisn, kelas, grha, ipc_total FROM users WHERE id = ? AND role = ?',
             [userId, 'siswa']
         );
 
@@ -103,7 +103,6 @@ router.get('/leaderboard/akademik', auth, async (req, res) => {
                 u.nama,
                 u.nis,
                 u.kelas,
-                u.jurusan,
                 u.grha,
                 u.foto,
                 COUNT(p.id) as total_prestasi,
@@ -113,7 +112,7 @@ router.get('/leaderboard/akademik', auth, async (req, res) => {
                 AND p.jenis = 'akademik' 
                 AND p.status = 'approved'
             WHERE u.role = 'siswa'
-            GROUP BY u.id, u.nama, u.nis, u.kelas, u.jurusan, u.grha, u.foto
+            GROUP BY u.id, u.nama, u.nis, u.kelas, u.grha, u.foto
             HAVING total_prestasi > 0
             ORDER BY total_prestasi DESC, total_point DESC, u.nama ASC
             LIMIT 20
@@ -170,7 +169,6 @@ router.get('/leaderboard/nonakademik', auth, async (req, res) => {
                 u.nama,
                 u.nis,
                 u.kelas,
-                u.jurusan,
                 u.grha,
                 u.foto,
                 COUNT(p.id) as total_prestasi,
@@ -180,7 +178,7 @@ router.get('/leaderboard/nonakademik', auth, async (req, res) => {
                 AND p.jenis = 'nonakademik' 
                 AND p.status = 'approved'
             WHERE u.role = 'siswa'
-            GROUP BY u.id, u.nama, u.nis, u.kelas, u.jurusan, u.grha, u.foto
+            GROUP BY u.id, u.nama, u.nis, u.kelas, u.grha, u.foto
             HAVING total_prestasi > 0
             ORDER BY total_prestasi DESC, total_point DESC, u.nama ASC
             LIMIT 20

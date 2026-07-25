@@ -2,14 +2,13 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import StudentDetail from './StudentDetail';
-import { KELAS_OPTIONS, JURUSAN_OPTIONS, applyKelasChange, jurusanFromKelas } from '../utils/kelasJurusan';
+import { KELAS_OPTIONS, applyKelasChange } from '../utils/kelasJurusan';
 import { GRHA_OPTIONS, getRowField, normalizeGrha } from '../utils/excelImport';
 
 function KelolaAkun() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [formType, setFormType] = useState('student');
   const [formData, setFormData] = useState({});
   const [message, setMessage] = useState('');
   const [showEditForm, setShowEditForm] = useState(false);
@@ -18,7 +17,6 @@ function KelolaAkun() {
   const [filters, setFilters] = useState({
     role: '',
     kelas: '',
-    jurusan: '',
     grha: ''
   });
   const [excelFile, setExcelFile] = useState(null);
@@ -43,7 +41,6 @@ function KelolaAkun() {
   const filteredUsers = users.filter(user => {
     if (filters.role && user.role !== filters.role) return false;
     if (filters.kelas && user.kelas !== filters.kelas) return false;
-    if (filters.jurusan && user.jurusan !== filters.jurusan) return false;
     if (filters.grha && user.grha !== filters.grha) return false;
     return true;
   });
@@ -53,7 +50,7 @@ function KelolaAkun() {
   };
 
   const resetFilters = () => {
-    setFilters({ role: '', kelas: '', jurusan: '', grha: '' });
+    setFilters({ role: '', kelas: '', grha: '' });
   };
 
   useEffect(() => {
@@ -269,7 +266,6 @@ function KelolaAkun() {
         nis: user.nis,
         nisn: user.nisn,
         kelas: user.kelas,
-        jurusan: jurusanFromKelas(user.kelas) || user.jurusan,
         grha: user.grha
       });
     } else if (user.role === 'guru') {
@@ -344,7 +340,6 @@ function KelolaAkun() {
               nis: getRowField(row, 'nis', 'NIS'),
               nisn: getRowField(row, 'nisn', 'NISN'),
               kelas,
-              jurusan: jurusanFromKelas(kelas) || getRowField(row, 'jurusan', 'Jurusan') || 'TKJ',
               grha: normalizeGrha(getRowField(row, 'grha', 'Grha', 'Gra', 'GRHA')),
               password: getRowField(row, 'password', 'Password') || '123456'
             };
@@ -391,7 +386,7 @@ function KelolaAkun() {
   const downloadTemplate = (type) => {
     const templateData = type === 'siswa'
       ? [
-          { Nama: '', NIS: '', NISN: '', Kelas: 'X TKJ 1', Jurusan: 'TKJ', Grha: '', Password: '123456' }
+          { Nama: '', NIS: '', NISN: '', Kelas: 'X TKJ 1', Grha: '', Password: '123456' }
         ]
       : [
           { Nama: '', NIP: '', Detail: '', NoHP: '', Password: '123456' }
@@ -487,19 +482,6 @@ function KelolaAkun() {
             </select>
           </div>
           <div style={{ flex: '1', minWidth: '150px' }}>
-            <label>Jurusan</label>
-            <select
-              value={filters.jurusan}
-              onChange={(e) => handleFilterChange('jurusan', e.target.value)}
-              className="form-control"
-            >
-              <option value="">Semua Jurusan</option>
-              <option value="TKJ">TKJ</option>
-              <option value="TO">TO</option>
-              <option value="DPIB">DPIB</option>
-            </select>
-          </div>
-          <div style={{ flex: '1', minWidth: '150px' }}>
             <label>Grha</label>
             <select
               value={filters.grha}
@@ -554,7 +536,6 @@ function KelolaAkun() {
               {userRole !== 'guru' && <th>NISN</th>}
               <th>Role</th>
               <th>Kelas</th>
-              <th>Jurusan</th>
               <th>IPC Awal</th>
               <th>IPC Total</th>
               <th>Aksi</th>
@@ -580,7 +561,6 @@ function KelolaAkun() {
                 {userRole !== 'guru' && <td>{user.nisn || '-'}</td>}
                 <td><span className={`badge badge-${user.role === 'superadmin' ? 'danger' : user.role === 'guru' ? 'warning' : 'info'}`}>{user.role}</span></td>
                 <td>{user.kelas || '-'}</td>
-                <td>{user.jurusan || '-'}</td>
                 <td>{user.ipc_awal ?? '-'}</td>
                 <td>{user.ipc_total ?? 0}</td>
                 <td>
@@ -703,12 +683,6 @@ function KelolaAkun() {
                   </select>
                 </div>
                 <div className="form-group">
-                  <label>Jurusan</label>
-                  <select value={formData.jurusan || 'TKJ'} disabled style={{ backgroundColor: '#f0f0f0' }}>
-                    {JURUSAN_OPTIONS.map(j => <option key={j} value={j}>{j}</option>)}
-                  </select>
-                </div>
-                <div className="form-group">
                   <label>Grha</label>
                   <select value={formData.grha || ''} onChange={(e) => setFormData({...formData, grha: e.target.value})}>
                     <option value="">Pilih Grha</option>
@@ -788,7 +762,7 @@ function KelolaAkun() {
                   <strong>Format Siswa:</strong>
                 ) : (
                   <strong>Format Guru:</strong>
-                )} {importModalType === 'siswa' ? 'nama, nis, nisn, kelas, jurusan, grha, password' : 'nama, nip, jabatan, no_hp, password'}
+                )} {importModalType === 'siswa' ? 'nama, nis, nisn, kelas, grha, password' : 'nama, nip, jabatan, no_hp, password'}
               </div>
               <button
                 className="btn btn-primary"
@@ -858,12 +832,6 @@ function KelolaAkun() {
                     <select value={formData.kelas || ''} onChange={(e) => setFormData(prev => applyKelasChange(prev, e.target.value))} required>
                       <option value="">Pilih Kelas</option>
                       {KELAS_OPTIONS.map(k => <option key={k} value={k}>{k}</option>)}
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label>Jurusan</label>
-                    <select value={formData.jurusan || 'TKJ'} disabled style={{ backgroundColor: '#f0f0f0' }}>
-                      {JURUSAN_OPTIONS.map(j => <option key={j} value={j}>{j}</option>)}
                     </select>
                   </div>
                   <div className="form-group">

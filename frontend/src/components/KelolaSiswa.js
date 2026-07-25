@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import StudentDetail from './StudentDetail';
-import { KELAS_OPTIONS, JURUSAN_OPTIONS, applyKelasChange, jurusanFromKelas } from '../utils/kelasJurusan';
+import { KELAS_OPTIONS, applyKelasChange } from '../utils/kelasJurusan';
 
 function KelolaSiswa() {
   const [students, setStudents] = useState([]);
@@ -14,7 +14,6 @@ function KelolaSiswa() {
     nis: '',
     nisn: '',
     kelas: 'X TKJ 1',
-    jurusan: 'TKJ',
     grha: 'Airsanya',
     password: ''
   });
@@ -65,7 +64,6 @@ function KelolaSiswa() {
         nis: '',
         nisn: '',
         kelas: 'X TKJ 1',
-        jurusan: 'TKJ',
         grha: 'Airsanya',
         password: ''
       });
@@ -91,7 +89,6 @@ function KelolaSiswa() {
       nis: student.nis,
       nisn: student.nisn,
       kelas: student.kelas,
-      jurusan: jurusanFromKelas(student.kelas) || student.jurusan,
       grha: student.grha,
       password: ''
     });
@@ -140,7 +137,6 @@ function KelolaSiswa() {
           nis: '',
           nisn: '',
           kelas: 'X TKJ 1',
-          jurusan: 'TKJ',
           grha: 'Airsanya',
           password: ''
         }); }}>
@@ -169,12 +165,6 @@ function KelolaSiswa() {
               <label>Kelas</label>
               <select name="kelas" value={formData.kelas} onChange={handleChange}>
                 {KELAS_OPTIONS.map(k => <option key={k} value={k}>{k}</option>)}
-              </select>
-            </div>
-            <div className="form-group">
-              <label>Jurusan</label>
-              <select name="jurusan" value={formData.jurusan} onChange={handleChange} disabled style={{ backgroundColor: '#f0f0f0' }}>
-                {JURUSAN_OPTIONS.map(j => <option key={j} value={j}>{j}</option>)}
               </select>
             </div>
             <div className="form-group">
@@ -220,12 +210,6 @@ function KelolaSiswa() {
               </select>
             </div>
             <div className="form-group">
-              <label>Jurusan</label>
-              <select name="jurusan" value={formData.jurusan} onChange={handleChange} disabled style={{ backgroundColor: '#f0f0f0' }}>
-                {JURUSAN_OPTIONS.map(j => <option key={j} value={j}>{j}</option>)}
-              </select>
-            </div>
-            <div className="form-group">
               <label>Grha</label>
               <select name="grha" value={formData.grha} onChange={handleChange}>
                 <option value="">Pilih Grha</option>
@@ -248,7 +232,6 @@ function KelolaSiswa() {
               <th>NIS</th>
               <th>NISN</th>
               <th>Kelas</th>
-              <th>Jurusan</th>
               <th>Grha</th>
               <th>IPC</th>
               <th>Aksi</th>
@@ -261,7 +244,6 @@ function KelolaSiswa() {
                 <td>{student.nis || '-'}</td>
                 <td>{student.nisn || '-'}</td>
                 <td>{student.kelas || '-'}</td>
-                <td>{student.jurusan || '-'}</td>
                 <td>{student.grha || '-'}</td>
                 <td>{student.ipc_total || 0}</td>
                 <td>

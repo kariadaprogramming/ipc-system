@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { KELAS_OPTIONS, JURUSAN_OPTIONS, applyKelasChange, jurusanFromKelas, isJurusanLocked } from '../utils/kelasJurusan';
+import { KELAS_OPTIONS, applyKelasChange } from '../utils/kelasJurusan';
 import EditModal from './EditModal';
 import useEditModal from '../hooks/useEditModal';
 import API_BASE_URL from '../config';
@@ -11,7 +11,6 @@ function InputPrestasi() {
     nis: '',
     jenis: 'akademik',
     nama_lomba: '',
-    jurusan: 'TKJ',
     kelas: '',
     pembina: '',
     grha: '',
@@ -32,10 +31,6 @@ function InputPrestasi() {
   const [allPrestasi, setAllPrestasi] = useState([]);
   const [loadingIndex, setLoadingIndex] = useState(false);
   const [userRole, setUserRole] = useState('');
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editingItem, setEditingItem] = useState(null);
-  const [editFormData, setEditFormData] = useState({});
-  const [editFoto, setEditFoto] = useState(null);
   const editModal = useEditModal();
 
   const grhaOptions = [
@@ -70,10 +65,6 @@ function InputPrestasi() {
 
   const handleEdit = (item) => {
     editModal.openEditModal(item);
-  };
-
-  const handleEditFileChange = (e) => {
-    setEditFoto(e.target.files[0]);
   };
 
   const handleUpdate = async () => {
@@ -210,11 +201,10 @@ function InputPrestasi() {
           ...prev,
           nama: response.data.nama || '',
           kelas: response.data.kelas || '',
-          jurusan: jurusanFromKelas(response.data.kelas) || response.data.jurusan || '',
           grha: response.data.grha || ''
         }));
         setIsAutoFilled(true);
-        console.log('Form data updated:', { nama: response.data.nama, kelas: response.data.kelas, jurusan: response.data.jurusan, grha: response.data.grha });
+        console.log('Form data updated:', { nama: response.data.nama, kelas: response.data.kelas, grha: response.data.grha });
       }
     } catch (error) {
       // Student not found or error, don't show error to user and don't auto-fill
@@ -266,7 +256,6 @@ function InputPrestasi() {
         nis: '',
         jenis: 'akademik',
         nama_lomba: '',
-        jurusan: 'TKJ',
         kelas: '',
         pembina: '',
         grha: '',
@@ -309,7 +298,7 @@ function InputPrestasi() {
         <h2>Input Prestasi</h2>
         {userRole === 'superadmin' && (
           <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>
-            + Input Prestasi Baru
+            + Input Prestasi
           </button>
         )}
       </div>
@@ -321,7 +310,7 @@ function InputPrestasi() {
       )}
       
       {/* Index Display for Superadmin */}
-      {userRole === 'superadmin' && (
+      {(userRole === 'superadmin' && !showForm) && (
         <div style={{ marginBottom: '30px' }}>
           <h3 style={{ marginBottom: '15px', fontSize: '18px' }}>📋 Index Prestasi</h3>
           {loadingIndex ? (
@@ -374,30 +363,7 @@ function InputPrestasi() {
       
       {/* Input Form - Show for non-superadmin or when showForm is true */}
       {(userRole !== 'superadmin' || showForm) && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000
-        }}>
-          <div className="card" style={{ width: 500, maxWidth: '90%', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                    <h3 style={{ margin: 0 }}>Input Prestasi</h3>
-                    <button 
-                        className="btn btn-danger" 
-                        onClick={() => setShowForm(false)}
-                        style={{ padding: '4px 12px', fontSize: '12px' }}
-                    >
-                        ✕
-                    </button>
-                </div>
-            <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <div className="form-group">
             <label>Nama <span className="required">*</span></label>
@@ -461,13 +427,6 @@ function InputPrestasi() {
               <option value="nonakademik">Non-Akademik</option>
             </select>
           </div>
-          <div className="form-group">
-            <label>Jurusan</label>
-            <select name="jurusan" value={formData.jurusan} onChange={handleChange} disabled={true} style={{ backgroundColor: isJurusanLocked(formData.kelas, isAutoFilled) ? '#f0f0f0' : '' }}>
-              {JURUSAN_OPTIONS.map(j => <option key={j} value={j}>{j}</option>)}
-            </select>
-            <p className="form-helper-text">Data diisi otomatis dari NIS</p>
-          </div>
         </div>
 
         <div className="form-group">
@@ -527,16 +486,14 @@ function InputPrestasi() {
           </div>
         </div>
 
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={loading}
-            >
-              {loading ? 'Mengirim...' : (JSON.parse(localStorage.getItem('user') || '{}').role === 'superadmin' ? 'Kirim' : 'Ajukan untuk Persetujuan')}
-            </button>
-          </form>
-        </div>
-      </div>
+        <button
+          type="submit"
+          className="btn btn-primary"
+          disabled={loading}
+        >
+          {loading ? 'Mengirim...' : (JSON.parse(localStorage.getItem('user') || '{}').role === 'superadmin' ? 'Kirim' : 'Ajukan untuk Persetujuan')}
+        </button>
+      </form>
       )}
 
       <EditModal
@@ -545,7 +502,7 @@ function InputPrestasi() {
         onClose={editModal.closeEditModal}
         onSave={handleUpdate}
         isLoading={editModal.isLoading}
-        photoPreview={editModal.editingItem?.foto ? `${API_BASE_URL.replace('/api', '')}uploads/prestasi/${editModal.editingItem.foto}` : null}
+        photoPreview={editModal.editingItem?.foto ? `${API_BASE_URL.replace('/api', '')}/${editModal.editingItem.foto}` : null}
       >
         <div className="form-group">
           <label>Nama</label>
@@ -584,17 +541,6 @@ function InputPrestasi() {
           </select>
         </div>
 
-        <div className="form-group">
-          <label>Jurusan</label>
-          <select 
-            value={editModal.editFormData.jurusan || ''} 
-            disabled={true}
-            onChange={(e) => editModal.setEditFormData({ ...editModal.editFormData, jurusan: e.target.value })}
-          >
-            {JURUSAN_OPTIONS.map(j => <option key={j} value={j}>{j}</option>)}
-          </select>
-        </div>
-        
         <div className="form-group">
           <label>Grha</label>
           <select 

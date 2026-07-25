@@ -131,7 +131,7 @@ function Login() {
                   name="username"
                   value={formData.username}
                   onChange={handleChange}
-                  placeholder="Masukkan NIS atau NISN"
+                  placeholder="Masukkan User"
                   required
                   autoComplete="username"
                 />
@@ -160,7 +160,7 @@ function Login() {
                   name="username"
                   value={formData.username}
                   onChange={handleChange}
-                  placeholder="Masukkan NIP"
+                  placeholder="Masukkan User"
                   required
                   autoComplete="username"
                 />
@@ -189,7 +189,7 @@ function Login() {
                   name="username"
                   value={formData.username}
                   onChange={handleChange}
-                  placeholder="Masukkan NIS"
+                  placeholder="Masukkan User"
                   required
                   autoComplete="username"
                 />

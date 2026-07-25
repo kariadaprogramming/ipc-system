@@ -241,7 +241,6 @@ function LaporanCetak({ user }) {
               <th style={{ padding: '12px', textAlign: 'left', border: '1px solid #ddd' }}>Nama</th>
               <th style={{ padding: '12px', textAlign: 'left', border: '1px solid #ddd' }}>NIS</th>
               <th style={{ padding: '12px', textAlign: 'left', border: '1px solid #ddd' }}>Kelas</th>
-              <th style={{ padding: '12px', textAlign: 'left', border: '1px solid #ddd' }}>Jurusan</th>
               <th style={{ padding: '12px', textAlign: 'left', border: '1px solid #ddd' }}>Total IPC</th>
             </tr>
           </thead>
@@ -251,7 +250,6 @@ function LaporanCetak({ user }) {
                 <td style={{ padding: '10px', border: '1px solid #ddd' }}>{student.nama}</td>
                 <td style={{ padding: '10px', border: '1px solid #ddd' }}>{student.nis}</td>
                 <td style={{ padding: '10px', border: '1px solid #ddd' }}>{student.kelas}</td>
-                <td style={{ padding: '10px', border: '1px solid #ddd' }}>{student.jurusan || '-'}</td>
                 <td style={{ padding: '10px', border: '1px solid #ddd', fontWeight: 'bold' }}>{student.ipc_total}</td>
               </tr>
             ))}

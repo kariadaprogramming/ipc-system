@@ -53,7 +53,7 @@ router.get('/user/:userId', auth, async (req, res) => {
 // Create kepanitiaan
 router.post('/', auth, upload.single('foto'), async (req, res) => {
     try {
-        const { nama, nis, kelas, grha, jurusan, jabatan_kepanitiaan, kategori_kepanitiaan } = req.body;
+        const { nama, nis, kelas, grha, jabatan_kepanitiaan, kategori_kepanitiaan } = req.body;
         let foto = req.file ? req.file.filename : null;
 
         // Rename file to NIS_Jabatan Kepanitiaan format
@@ -71,8 +71,8 @@ router.post('/', auth, upload.single('foto'), async (req, res) => {
         const point = calculateKepanitiaanPoints(jabatan_kepanitiaan);
 
         const [result] = await db.query(
-            'INSERT INTO kepanitiaan (user_id, nama, nis, kelas, grha, jurusan, jabatan_kepanitiaan, foto, kategori_kepanitiaan, point) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [req.user.id, nama, nis, kelas, grha, jurusan, jabatan_kepanitiaan, foto, kategori_kepanitiaan, point]
+            'INSERT INTO kepanitiaan (user_id, nama, nis, kelas, grha, jabatan_kepanitiaan, foto, kategori_kepanitiaan, point) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [req.user.id, nama, nis, kelas, grha, jabatan_kepanitiaan, foto, kategori_kepanitiaan, point]
         );
 
         // Log activity
@@ -159,7 +159,7 @@ router.put('/:id/reject', auth, async (req, res) => {
 router.put('/:id', auth, upload.single('foto'), async (req, res) => {
     try {
         const kepanitiaanId = req.params.id;
-        const { nama, nis, kelas, grha, jurusan, jabatan_kepanitiaan, kategori_kepanitiaan } = req.body;
+        const { nama, nis, kelas, grha, jabatan_kepanitiaan, kategori_kepanitiaan } = req.body;
         
         const [kepanitiaan] = await db.query('SELECT * FROM kepanitiaan WHERE id = ?', [kepanitiaanId]);
         if (kepanitiaan.length === 0) {
@@ -192,8 +192,8 @@ router.put('/:id', auth, upload.single('foto'), async (req, res) => {
         const point = calculateKepanitiaanPoints(jabatan_kepanitiaan);
 
         await db.query(
-            'UPDATE kepanitiaan SET nama = ?, nis = ?, kelas = ?, grha = ?, jurusan = ?, jabatan_kepanitiaan = ?, kategori_kepanitiaan = ?, foto = ?, point = ? WHERE id = ?',
-            [nama, nis, kelas, grha, jurusan, jabatan_kepanitiaan, kategori_kepanitiaan, foto, point, kepanitiaanId]
+            'UPDATE kepanitiaan SET nama = ?, nis = ?, kelas = ?, grha = ?, jabatan_kepanitiaan = ?, kategori_kepanitiaan = ?, foto = ?, point = ? WHERE id = ?',
+            [nama, nis, kelas, grha, jabatan_kepanitiaan, kategori_kepanitiaan, foto, point, kepanitiaanId]
         );
 
         // If status is approved and point changed, update user IPC

@@ -1,5 +1,3 @@
-export const JURUSAN_OPTIONS = ['TKJ', 'TO', 'DPIB'];
-
 export const KELAS_OPTIONS = [
   'X TKJ 1', 'X TKJ 2', 'X TO 1', 'X TO 2',
   'X DPIB 1', 'X DPIB 2',
@@ -9,22 +7,9 @@ export const KELAS_OPTIONS = [
   'XII DPIB 1', 'XII DPIB 2'
 ];
 
-export function jurusanFromKelas(kelas) {
-  if (!kelas) return '';
-  const parts = kelas.trim().split(/\s+/);
-  const jurusan = parts[1];
-  return JURUSAN_OPTIONS.includes(jurusan) ? jurusan : '';
-}
-
 export function applyKelasChange(prev, kelas) {
-  const derivedJurusan = jurusanFromKelas(kelas);
   return {
     ...prev,
-    kelas,
-    ...(derivedJurusan ? { jurusan: derivedJurusan } : {})
+    kelas
   };
-}
-
-export function isJurusanLocked(kelas, isAutoFilled = false) {
-  return isAutoFilled || !!kelas;
 }

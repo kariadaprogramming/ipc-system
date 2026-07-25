@@ -223,7 +223,6 @@ function Profile() {
             <p><strong>NIS:</strong> {profile?.nis || '-'}</p>
             <p><strong>NISN:</strong> {profile?.nisn || '-'}</p>
             <p><strong>Kelas:</strong> {profile?.kelas || '-'}</p>
-            <p><strong>Jurusan:</strong> {profile?.jurusan || '-'}</p>
             <p><strong>Grha:</strong> {profile?.grha || '-'}</p>
             <p><strong>Wali Kelas:</strong> {profile?.wali_kelas || '-'}</p>
           </>

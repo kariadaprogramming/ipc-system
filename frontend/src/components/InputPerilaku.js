@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { KELAS_OPTIONS, JURUSAN_OPTIONS, applyKelasChange, jurusanFromKelas, isJurusanLocked } from '../utils/kelasJurusan';
+import { KELAS_OPTIONS, applyKelasChange } from '../utils/kelasJurusan';
 import EditModal from './EditModal';
 import useEditModal from '../hooks/useEditModal';
 
@@ -9,7 +9,6 @@ function InputPerilaku() {
     nama: '',
     nis: '',
     kelas: '',
-    jurusan: 'TKJ',
     grha: '',
     tanggung_jawab: '',
     disiplin: '',
@@ -116,7 +115,6 @@ function InputPerilaku() {
           ...prev,
           nama: response.data.nama || '',
           kelas: response.data.kelas || '',
-          jurusan: jurusanFromKelas(response.data.kelas) || response.data.jurusan || '',
           grha: response.data.grha || ''
         }));
         setIsAutoFilled(true);
@@ -148,7 +146,6 @@ function InputPerilaku() {
         nama: '',
         nis: '',
         kelas: '',
-        jurusan: 'TKJ',
         grha: '',
         tanggung_jawab: '',
         disiplin: '',
@@ -218,7 +215,7 @@ function InputPerilaku() {
         <h2>Input Perilaku</h2>
         {userRole === 'superadmin' && (
           <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>
-            {showForm ? 'Tutup Form' : '+ Input Perilaku Baru'}
+            {showForm ? 'Tutup Form' : '+ Input Perilaku'}
           </button>
         )}
       </div>
@@ -230,7 +227,7 @@ function InputPerilaku() {
       )}
       
       {/* Index Display for Superadmin */}
-      {userRole === 'superadmin' && (
+      {(userRole === 'superadmin' && !showForm) && (
         <div style={{ marginBottom: '30px' }}>
           <h3 style={{ marginBottom: '15px', fontSize: '18px' }}>📋 Index Perilaku</h3>
           {loadingIndex ? (
@@ -339,13 +336,6 @@ function InputPerilaku() {
               ))}
             </select>
           </div>
-        </div>
-
-        <div className="form-group">
-          <label>Jurusan</label>
-          <select name="jurusan" value={formData.jurusan} onChange={handleChange} disabled={isJurusanLocked(formData.kelas, isAutoFilled)} style={{ backgroundColor: isJurusanLocked(formData.kelas, isAutoFilled) ? '#f0f0f0' : '' }}>
-            {JURUSAN_OPTIONS.map(j => <option key={j} value={j}>{j}</option>)}
-          </select>
         </div>
 
         <div style={{ marginBottom: '20px' }}>
@@ -467,15 +457,6 @@ function InputPerilaku() {
               {KELAS_OPTIONS.map(kelas => (
                 <option key={kelas} value={kelas}>{kelas}</option>
               ))}
-            </select>
-          </div>
-          <div className="form-group">
-            <label>Jurusan</label>
-            <select 
-              value={editModal.editFormData.jurusan || ''} 
-              onChange={(e) => editModal.setEditFormData({ ...editModal.editFormData, jurusan: e.target.value })}
-            >
-              {JURUSAN_OPTIONS.map(j => <option key={j} value={j}>{j}</option>)}
             </select>
           </div>
         </div>

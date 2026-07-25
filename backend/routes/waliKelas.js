@@ -60,7 +60,7 @@ router.get('/class-statistics', auth, superAdminOnly, async (req, res) => {
             classes.map(async (cls) => {
                 // Get students in this class
                 const [students] = await db.query(`
-                    SELECT id, nama, nis, nisn, jurusan, grha, ipc_total, foto
+                    SELECT id, nama, nis, nisn, grha, ipc_total, foto
                     FROM users 
                     WHERE role = 'siswa' AND kelas = ?
                     ORDER BY nama ASC
@@ -178,7 +178,7 @@ router.get('/my-class', auth, teacherOnly, async (req, res) => {
         // Get students in this class with full details
         const [students] = await db.query(`
             SELECT 
-                u.id, u.nama, u.nis, u.nisn, u.jurusan, u.grha, u.ipc_total, u.ipc_awal,
+                u.id, u.nama, u.nis, u.nisn, u.grha, u.ipc_total, u.ipc_awal,
                 u.alamat, u.no_hp, u.wali_kelas, u.foto, u.created_at
             FROM users u
             WHERE u.role = 'siswa' AND u.kelas = ?

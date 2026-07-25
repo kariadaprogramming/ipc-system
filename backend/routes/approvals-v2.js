@@ -10,7 +10,8 @@ const {
     calculateEventPoints,
     calculateOrganisasiPoints,
     calculateKepanitiaanPoints,
-    normalizePrestasiJenis
+    normalizePrestasiJenis,
+    calculatePelanggaranPoints
 } = require('../constants/points');
 const { resolveStudentIdByNis, applyIpcChange, applyPerilakuIpcChange } = require('../utils/ipc');
 const {
@@ -19,12 +20,26 @@ const {
     approveSubmission,
     rejectSubmission
 } = require('../utils/approvalSchema');
+const { movePhotoToApprovedFolder } = require('../utils/fileUtils');
 // Local file storage only - Google Drive removed
 
-// Configure multer for file uploads
+// Configure multer for file uploads - use type-specific folders
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        const uploadDir = 'uploads/approvals';
+        // Determine upload folder based on route
+        let uploadDir = 'uploads/approvals';
+        if (req.originalUrl.includes('/prestasi/')) {
+            uploadDir = 'uploads/prestasi';
+        } else if (req.originalUrl.includes('/event/')) {
+            uploadDir = 'uploads/event';
+        } else if (req.originalUrl.includes('/organisasi/')) {
+            uploadDir = 'uploads/organisasi';
+        } else if (req.originalUrl.includes('/kepanitiaan/')) {
+            uploadDir = 'uploads/kepanitiaan';
+        } else if (req.originalUrl.includes('/pelanggaran/')) {
+            uploadDir = 'uploads/pelanggaran';
+        }
+        
         if (!fs.existsSync(uploadDir)) {
             fs.mkdirSync(uploadDir, { recursive: true });
         }
@@ -38,10 +53,26 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage });
 
-// Helper function to save file locally
+// Helper function to save file locally - extracts the relative path from full file path
 const saveFileLocally = (filePath) => {
-    const relativePath = path.join('/uploads/approvals', path.basename(filePath));
-    return relativePath.replace(/\\/g, '/');
+    // The file is already saved in the type-specific folder by multer
+    // Extract the relative path from the absolute path
+    // filePath is absolute like: c:\Users\...\backend\uploads\prestasi\filename.jpg
+    // We want: uploads/prestasi/filename.jpg
+    
+    // Normalize path separators
+    const normalizedPath = filePath.replace(/\\/g, '/');
+    
+    // Find 'uploads' in the path
+    const uploadsIndex = normalizedPath.indexOf('uploads');
+    if (uploadsIndex !== -1) {
+        return normalizedPath.substring(uploadsIndex);
+    }
+    
+    // If uploads not found, use the filename and default to approvals folder
+    console.warn('Uploads not found in path, using fallback:', filePath);
+    const filename = path.basename(filePath);
+    return `uploads/approvals/${filename}`;
 };
 
 // ==================== SUBMIT FOR APPROVAL ====================
@@ -50,7 +81,7 @@ const saveFileLocally = (filePath) => {
 router.post('/prestasi/submit', auth, checkInputAccess('prestasi'), upload.single('foto'), async (req, res) => {
     try {
         const userRole = req.user.role;
-        const { nama, nis, jenis, nama_lomba, jurusan, kelas, pembina, grha, juara, kategori } = req.body;
+        const { nama, nis, jenis, nama_lomba, kelas, pembina, grha, juara, kategori } = req.body;
         const userId = await resolveStudentIdByNis(nis, req.user.id);
         let fotoPath = req.file ? saveFileLocally(req.file.path) : null;
         console.log('Prestasi - Using local path:', fotoPath);
@@ -60,11 +91,20 @@ router.post('/prestasi/submit', auth, checkInputAccess('prestasi'), upload.singl
             console.log('Prestasi - Superadmin direct submission');
             const point = calculatePrestasiPoints(juara, kategori);
             
+            // Move photo to organized folder if exists
+            let finalFotoPath = fotoPath;
+            if (fotoPath) {
+                const movedPath = movePhotoToApprovedFolder(fotoPath, 'prestasi');
+                if (movedPath) {
+                    finalFotoPath = path.join('uploads', movedPath).replace(/\\/g, '/');
+                }
+            }
+            
             const [result] = await db.query(
                 `INSERT INTO prestasi 
-                (user_id, nama, nis, jenis, nama_lomba, jurusan, kelas, pembina, grha, juara, kategori, foto, point, status) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'approved')`,
-                [userId, nama, nis, jenis, nama_lomba, jurusan, kelas, pembina, grha, juara, kategori, fotoPath, point]
+                (user_id, nama, nis, jenis, nama_lomba, kelas, pembina, grha, juara, kategori, foto, point, status) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'approved')`,
+                [userId, nama, nis, jenis, nama_lomba, kelas, pembina, grha, juara, kategori, finalFotoPath, point]
             );
             
             await applyIpcChange(userId, 'prestasi', point, `Prestasi: ${nama_lomba} - ${juara} ${kategori}`);
@@ -80,9 +120,9 @@ router.post('/prestasi/submit', auth, checkInputAccess('prestasi'), upload.singl
         // SISWA/GURU: Submit for approval (superadmin only)
         const [result] = await db.query(
             `INSERT INTO prestasi_approvals
-            (user_id, nama, nis, jenis, nama_lomba, jurusan, kelas, pembina, grha, juara, kategori, foto_path)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [userId, nama, nis, jenis, nama_lomba, jurusan, kelas, pembina, grha, juara, kategori, fotoPath]
+            (user_id, nama, nis, jenis, nama_lomba, kelas, pembina, grha, juara, kategori, foto_path)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [userId, nama, nis, jenis, nama_lomba, kelas, pembina, grha, juara, kategori, fotoPath]
         );
 
         // Create notification for superadmin only
@@ -107,11 +147,52 @@ router.post('/prestasi/submit', auth, checkInputAccess('prestasi'), upload.singl
     }
 });
 
-// Submit Event for Approval (or Direct Submit for Superadmin)
+// Submit Pelanggaran for Approval (or Direct Submit for Superadmin)
+router.post('/pelanggaran/submit', auth, checkInputAccess('pelanggaran'), upload.single('foto'), async (req, res) => {
+    try {
+        const userRole = req.user.role;
+        const { nama, nis, kelas, grha, keterangan, jenis_pelanggaran } = req.body;
+        const userId = await resolveStudentIdByNis(nis, req.user.id);
+        let foto_path = req.file ? saveFileLocally(req.file.path) : null;
+        console.log('Pelanggaran - Using local path:', foto_path);
+        console.log('Pelanggaran - Superadmin direct submission');
+        const point = calculatePelanggaranPoints(jenis_pelanggaran);
+        
+        // Move photo to organized folder if exists
+        let finalFotoPath = foto_path;
+        if (foto_path) {
+            const movedPath = movePhotoToApprovedFolder(foto_path, 'pelanggaran');
+            if (movedPath) {
+                finalFotoPath = path.join('uploads', movedPath).replace(/\\/g, '/');
+            }
+        }
+        
+        const [result] = await db.query(
+            `INSERT INTO pelanggaran 
+            (user_id, nama, nis, kelas, grha, keterangan, foto, jenis_pelanggaran, point_dikurangi, status) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'approved')`,
+            [userId, nama, nis, kelas, grha, keterangan, finalFotoPath, jenis_pelanggaran, point]
+        );
+        
+        await applyIpcChange(userId, 'pelanggaran', point, `Pelanggaran: ${jenis_pelanggaran}`);
+        
+        console.log('Pelanggaran - Directly added by superadmin:', result.insertId);
+        
+        return res.status(201).json({ 
+            message: 'Pelanggaran berhasil ditambahkan', 
+            id: result.insertId 
+        });
+        
+    } catch (error) {
+        console.error(error);
+        res.status(error.statusCode || 500).json({ message: error.message || 'Server error' });
+    }
+});
+
 router.post('/event/submit', auth, checkInputAccess('event'), upload.single('foto'), async (req, res) => {
     try {
         const userRole = req.user.role;
-        const { nama, nis, kelas, grha, jurusan, pembina, nama_event, tingkat } = req.body;
+        const { nama, nis, kelas, grha, pembina, nama_event, tingkat } = req.body;
         const userId = await resolveStudentIdByNis(nis, req.user.id);
         let foto_path = req.file ? saveFileLocally(req.file.path) : null;
         console.log('Event - Using local path:', foto_path);
@@ -121,11 +202,20 @@ router.post('/event/submit', auth, checkInputAccess('event'), upload.single('fot
             console.log('Event - Superadmin direct submission');
             const point = calculateEventPoints(tingkat);
             
+            // Move photo to organized folder if exists
+            let finalFotoPath = foto_path;
+            if (foto_path) {
+                const movedPath = movePhotoToApprovedFolder(foto_path, 'event');
+                if (movedPath) {
+                    finalFotoPath = path.join('uploads', movedPath).replace(/\\/g, '/');
+                }
+            }
+            
             const [result] = await db.query(
                 `INSERT INTO event 
-                (user_id, nama, nis, kelas, grha, jurusan, nama_event, tingkat, foto, point, status) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'approved')`,
-                [userId, nama, nis, kelas, grha, jurusan, nama_event, tingkat, foto_path, point]
+                (user_id, nama, nis, kelas, grha, nama_event, tingkat, foto, point, status) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'approved')`,
+                [userId, nama, nis, kelas, grha, nama_event, tingkat, finalFotoPath, point]
             );
             
             await applyIpcChange(userId, 'event', point, `Event: ${nama_event} - ${tingkat}`);
@@ -141,9 +231,9 @@ router.post('/event/submit', auth, checkInputAccess('event'), upload.single('fot
         // SISWA/GURU: Submit for approval (superadmin only)
         const [result] = await db.query(
             `INSERT INTO event_approvals
-            (user_id, nama, nis, kelas, grha, jurusan, pembina, nama_event, tingkat, foto_path)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [userId, nama, nis, kelas, grha, jurusan, pembina, nama_event, tingkat, foto_path]
+            (user_id, nama, nis, kelas, grha, pembina, nama_event, tingkat, foto_path)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [userId, nama, nis, kelas, grha, pembina, nama_event, tingkat, foto_path]
         );
 
         // Create notification for superadmin only
@@ -172,7 +262,7 @@ router.post('/event/submit', auth, checkInputAccess('event'), upload.single('fot
 router.post('/organisasi/submit', auth, checkInputAccess('organisasi'), upload.single('foto'), async (req, res) => {
     try {
         const userRole = req.user.role;
-        const { nama, nis, kelas, grha, jurusan, pembina, jabatan_organisasi, kategori_organisasi } = req.body;
+        const { nama, nis, kelas, grha, pembina, jabatan_organisasi, kategori_organisasi } = req.body;
         const userId = await resolveStudentIdByNis(nis, req.user.id);
         let foto_path = req.file ? saveFileLocally(req.file.path) : null;
         console.log('Organisasi - Using local path:', foto_path);
@@ -182,11 +272,20 @@ router.post('/organisasi/submit', auth, checkInputAccess('organisasi'), upload.s
             console.log('Organisasi - Superadmin direct submission');
             const point = calculateOrganisasiPoints(jabatan_organisasi);
             
+            // Move photo to organized folder if exists
+            let finalFotoPath = foto_path;
+            if (foto_path) {
+                const movedPath = movePhotoToApprovedFolder(foto_path, 'organisasi');
+                if (movedPath) {
+                    finalFotoPath = path.join('uploads', movedPath).replace(/\\/g, '/');
+                }
+            }
+            
             const [result] = await db.query(
                 `INSERT INTO organisasi 
-                (user_id, nama, nis, kelas, grha, jurusan, jabatan_organisasi, foto, kategori_organisasi, point, status) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'approved')`,
-                [userId, nama, nis, kelas, grha, jurusan, jabatan_organisasi, foto_path, kategori_organisasi, point]
+                (user_id, nama, nis, kelas, grha, jabatan_organisasi, foto, kategori_organisasi, point, status) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'approved')`,
+                [userId, nama, nis, kelas, grha, jabatan_organisasi, finalFotoPath, kategori_organisasi, point]
             );
             
             await applyIpcChange(
@@ -207,9 +306,9 @@ router.post('/organisasi/submit', auth, checkInputAccess('organisasi'), upload.s
         // SISWA/GURU: Submit for approval (superadmin only)
         const [result] = await db.query(
             `INSERT INTO organisasi_approvals
-            (user_id, nama, nis, kelas, grha, jurusan, pembina, jabatan_organisasi, kategori_organisasi, foto_path)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [userId, nama, nis, kelas, grha, jurusan, pembina, jabatan_organisasi, kategori_organisasi, foto_path]
+            (user_id, nama, nis, kelas, grha, pembina, jabatan_organisasi, kategori_organisasi, foto_path)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [userId, nama, nis, kelas, grha, pembina, jabatan_organisasi, kategori_organisasi, foto_path]
         );
 
         // Create notification for superadmin only
@@ -238,7 +337,7 @@ router.post('/organisasi/submit', auth, checkInputAccess('organisasi'), upload.s
 router.post('/kepanitiaan/submit', auth, checkInputAccess('kepanitiaan'), upload.single('foto'), async (req, res) => {
     try {
         const userRole = req.user.role;
-        const { nama, nis, kelas, grha, jurusan, pembina, jabatan_kepanitiaan, kategori_kepanitiaan } = req.body;
+        const { nama, nis, kelas, grha, pembina, jabatan_kepanitiaan, kategori_kepanitiaan } = req.body;
         const userId = await resolveStudentIdByNis(nis, req.user.id);
         let foto_path = req.file ? saveFileLocally(req.file.path) : null;
         console.log('Kepanitiaan - Using local path:', foto_path);
@@ -248,11 +347,20 @@ router.post('/kepanitiaan/submit', auth, checkInputAccess('kepanitiaan'), upload
             console.log('Kepanitiaan - Superadmin direct submission');
             const point = calculateKepanitiaanPoints(jabatan_kepanitiaan);
             
+            // Move photo to organized folder if exists
+            let finalFotoPath = foto_path;
+            if (foto_path) {
+                const movedPath = movePhotoToApprovedFolder(foto_path, 'kepanitiaan');
+                if (movedPath) {
+                    finalFotoPath = path.join('uploads', movedPath).replace(/\\/g, '/');
+                }
+            }
+            
             const [result] = await db.query(
                 `INSERT INTO kepanitiaan 
-                (user_id, nama, nis, kelas, grha, jurusan, jabatan_kepanitiaan, foto, kategori_kepanitiaan, point, status) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'approved')`,
-                [userId, nama, nis, kelas, grha, jurusan, jabatan_kepanitiaan, foto_path, kategori_kepanitiaan, point]
+                (user_id, nama, nis, kelas, grha, jabatan_kepanitiaan, foto, kategori_kepanitiaan, point, status) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'approved')`,
+                [userId, nama, nis, kelas, grha, jabatan_kepanitiaan, finalFotoPath, kategori_kepanitiaan, point]
             );
             
             await applyIpcChange(
@@ -273,9 +381,9 @@ router.post('/kepanitiaan/submit', auth, checkInputAccess('kepanitiaan'), upload
         // SISWA/GURU: Submit for approval (superadmin only)
         const [result] = await db.query(
             `INSERT INTO kepanitiaan_approvals
-            (user_id, nama, nis, kelas, grha, jurusan, pembina, jabatan_kepanitiaan, kategori_kepanitiaan, foto_path)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [userId, nama, nis, kelas, grha, jurusan, pembina, jabatan_kepanitiaan, kategori_kepanitiaan, foto_path]
+            (user_id, nama, nis, kelas, grha, pembina, jabatan_kepanitiaan, kategori_kepanitiaan, foto_path)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [userId, nama, nis, kelas, grha, pembina, jabatan_kepanitiaan, kategori_kepanitiaan, foto_path]
         );
 
         // Create notification for superadmin only
@@ -369,20 +477,29 @@ router.put('/superadmin/:type/:id', auth, superAdminOnly, async (req, res) => {
                 pointChange = calculateOrganisasiPoints(data[pointField]);
             }
 
+            // Move photo to organized folder if exists
+            let finalFotoPath = data.foto_path;
+            if (data.foto_path) {
+                const movedPath = movePhotoToApprovedFolder(data.foto_path, type);
+                if (movedPath) {
+                    finalFotoPath = path.join('uploads', movedPath).replace(/\\/g, '/');
+                }
+            }
+
             // Insert to actual table
             let insertQuery, insertParams;
             if (type === 'prestasi') {
-                insertQuery = `INSERT INTO prestasi (user_id, nama, nis, jenis, nama_lomba, jurusan, kelas, pembina, grha, juara, kategori, foto, point, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'approved')`;
-                insertParams = [data.user_id, data.nama || 'Unknown', data.nis || '', normalizePrestasiJenis(data.jenis || 'akademik'), data.nama_lomba || '', data.jurusan || '', data.kelas || '', data.pembina || '', data.grha || '', data.juara || '', data.kategori || '', data.foto_path || null, pointChange];
+                insertQuery = `INSERT INTO prestasi (user_id, nama, nis, jenis, nama_lomba, kelas, pembina, grha, juara, kategori, foto, point, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'approved')`;
+                insertParams = [data.user_id, data.nama || 'Unknown', data.nis || '', normalizePrestasiJenis(data.jenis || 'akademik'), data.nama_lomba || '', data.kelas || '', data.pembina || '', data.grha || '', data.juara || '', data.kategori || '', finalFotoPath || null, pointChange];
             } else if (type === 'event') {
-                insertQuery = `INSERT INTO event (user_id, nama, nis, kelas, grha, jurusan, nama_event, tingkat, foto, point, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'approved')`;
-                insertParams = [data.user_id, data.nama || 'Unknown', data.nis || '', data.kelas || '', data.grha || '', data.jurusan || '', data.nama_event || '', data.tingkat || '', data.foto_path || null, pointChange];
+                insertQuery = `INSERT INTO event (user_id, nama, nis, kelas, grha, nama_event, tingkat, foto, point, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'approved')`;
+                insertParams = [data.user_id, data.nama || 'Unknown', data.nis || '', data.kelas || '', data.grha || '', data.nama_event || '', data.tingkat || '', finalFotoPath || null, pointChange];
             } else if (type === 'kepanitiaan') {
-                insertQuery = `INSERT INTO kepanitiaan (user_id, nama, nis, kelas, grha, jurusan, jabatan_kepanitiaan, kategori_kepanitiaan, foto, point, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'approved')`;
-                insertParams = [data.user_id, data.nama || 'Unknown', data.nis || '', data.kelas || '', data.grha || '', data.jurusan || '', data.jabatan_kepanitiaan || '', data.kategori_kepanitiaan || '', data.foto_path || null, pointChange];
+                insertQuery = `INSERT INTO kepanitiaan (user_id, nama, nis, kelas, grha, jabatan_kepanitiaan, kategori_kepanitiaan, foto, point, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'approved')`;
+                insertParams = [data.user_id, data.nama || 'Unknown', data.nis || '', data.kelas || '', data.grha || '', data.jabatan_kepanitiaan || '', data.kategori_kepanitiaan || '', finalFotoPath || null, pointChange];
             } else {
-                insertQuery = `INSERT INTO organisasi (user_id, nama, nis, kelas, grha, jurusan, jabatan_organisasi, kategori_organisasi, foto, point, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'approved')`;
-                insertParams = [data.user_id, data.nama || 'Unknown', data.nis || '', data.kelas || '', data.grha || '', data.jurusan || '', data.jabatan_organisasi || '', data.kategori_organisasi || '', data.foto_path || null, pointChange];
+                insertQuery = `INSERT INTO organisasi (user_id, nama, nis, kelas, grha, jabatan_organisasi, kategori_organisasi, foto, point, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'approved')`;
+                insertParams = [data.user_id, data.nama || 'Unknown', data.nis || '', data.kelas || '', data.grha || '', data.jabatan_organisasi || '', data.kategori_organisasi || '', finalFotoPath || null, pointChange];
             }
 
             await db.query(insertQuery, insertParams);

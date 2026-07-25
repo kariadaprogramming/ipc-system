@@ -93,7 +93,7 @@ function StudentDetail({ student, onClose }) {
                                     <h3 style={{ margin: '0 0 8px 0' }}>{student.nama}</h3>
                                     <p style={{ margin: '4px 0', color: '#666' }}>NIS: {student.nis || '-'} · NISN: {student.nisn || '-'}</p>
                                     <p style={{ margin: '4px 0', color: '#666' }}>
-                                        {student.kelas || '-'} · {student.jurusan || '-'} · {student.grha || '-'}
+                                        {student.kelas || '-'} · {student.grha || '-'}
                                     </p>
                                     <p style={{ margin: '8px 0 0 0' }}>
                                         <strong>IPC:</strong>{' '}

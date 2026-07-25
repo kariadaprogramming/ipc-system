@@ -14,11 +14,8 @@ const movePhotoToApprovedFolder = (currentFilePath, recordType) => {
     }
 
     try {
-        // Get current year for folder organization
-        const year = new Date().getFullYear().toString();
-        
-        // Create organized folder path: uploads/approved/[type]/[year]/
-        const approvedDir = path.join('uploads', 'approved', recordType, year);
+        // Create organized folder path: uploads/approved/[type]/
+        const approvedDir = path.join('uploads', 'approved', recordType);
         
         // Ensure directory exists
         if (!fs.existsSync(approvedDir)) {
@@ -42,7 +39,7 @@ const movePhotoToApprovedFolder = (currentFilePath, recordType) => {
         fs.renameSync(oldFullPath, newFullPath);
 
         // Return relative path for database storage
-        return path.join('approved', recordType, year, filename).replace(/\\/g, '/');
+        return path.join('approved', recordType, filename).replace(/\\/g, '/');
     } catch (error) {
         console.error('Error moving photo to approved folder:', error);
         return null;
