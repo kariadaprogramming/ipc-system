@@ -39,9 +39,9 @@ const KEPANITIAAN_POINTS = {
 };
 
 const PELANGGARAN_POINTS = {
-    'ringan': 1,
-    'sedang': 5,
-    'berat': 25
+    'ringan': -1,
+    'sedang': -5,
+    'berat': -25
 };
 
 const PERILAKU_POINTS = {

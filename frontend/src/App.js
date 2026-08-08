@@ -12,6 +12,7 @@ import InputPerilaku from './components/InputPerilaku';
 import KelolaAkun from './components/KelolaAkun';
 import KelolaSiswa from './components/KelolaSiswa';
 import IzinAkun from './components/IzinAkun';
+import EditIPCAwal from './components/EditIPCAwal';
 import Leaderboard from './components/Leaderboard';
 import Profile from './components/Profile';
 import Logs from './components/Logs';
@@ -148,6 +149,11 @@ function App() {
             {(user) => <MainLayout user={user}><KelolaAkun /></MainLayout>}
           </ProtectedRoute>
         } />
+        <Route path="/edit-ipc-awal" element={
+          <ProtectedRoute allowedRoles={['superadmin']}>
+            {(user) => <MainLayout user={user}><EditIPCAwal /></MainLayout>}
+          </ProtectedRoute>
+        } />
         <Route path="/kelola-siswa" element={
           <ProtectedRoute allowedRoles={['guru']}>
             {(user) => <MainLayout user={user}><KelolaSiswa /></MainLayout>}
@@ -218,9 +224,12 @@ function MainLayout({ user, children }) {
 
   return (
     <div className="main-layout">
-      <button className="mobile-menu-toggle" onClick={toggleMobileMenu}>
-        {isMobileMenuOpen ? '✕' : '☰'}
-      </button>
+      <div className="mobile-header">
+        <button className="mobile-menu-toggle" onClick={toggleMobileMenu}>
+          {isMobileMenuOpen ? '✕' : '☰'}
+        </button>
+        <span className="mobile-header-title">Sistem IPC</span>
+      </div>
       <Navbar user={user} onLogout={handleLogout} isMobileMenuOpen={isMobileMenuOpen} toggleMobileMenu={toggleMobileMenu} />
       <div className="content">
         <div className="container">

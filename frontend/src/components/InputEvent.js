@@ -17,7 +17,6 @@ function InputEvent() {
   const [foto, setFoto] = useState(null);
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
-  const [teachers, setTeachers] = useState([]);
   const [submissions, setSubmissions] = useState([]);
   const [userRole, setUserRole] = useState('');
   const [hasAccess, setHasAccess] = useState(true);
@@ -48,7 +47,6 @@ function InputEvent() {
   // }, []);
 
   useEffect(() => {
-    fetchTeachers();
     fetchUserSubmissions();
     checkAccess();
     // Get user role from localStorage
@@ -113,18 +111,6 @@ function InputEvent() {
       setSubmissions(response.data.event || []);
     } catch (error) {
       console.error('Error fetching submissions:', error);
-    }
-  };
-
-  const fetchTeachers = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/prestasi/teachers', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setTeachers(response.data);
-    } catch (error) {
-      console.error('Error fetching teachers:', error);
     }
   };
 
@@ -244,6 +230,23 @@ function InputEvent() {
 
   const handleEdit = (item) => {
     editModal.openEditModal(item);
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Apakah Anda yakin ingin menghapus data ini? IPC akan dikembalikan jika sudah disetujui.')) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      await axios.delete(`/event/${id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setMessage('Event berhasil dihapus!');
+      fetchAllEvent();
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Gagal menghapus event');
+    }
   };
 
   const handleEditFileChange = (e) => {
@@ -389,9 +392,16 @@ function InputEvent() {
                         <button 
                           className="btn btn-info" 
                           onClick={() => handleEdit(item)} 
-                          style={{ padding: '3px 8px', fontSize: '12px' }}
+                          style={{ padding: '3px 8px', fontSize: '12px', marginRight: '5px' }}
                         >
                           Edit
+                        </button>
+                        <button 
+                          className="btn btn-danger" 
+                          onClick={() => handleDelete(item.id)} 
+                          style={{ padding: '3px 8px', fontSize: '12px' }}
+                        >
+                          Hapus
                         </button>
                       </td>
                     </tr>

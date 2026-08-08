@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-// Import from source to avoid CRA sourcemap warning on dist bundle
-import html2pdf from 'html2pdf.js/src';
-import IpcPrintSheet from './IpcPrintSheet';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import '../ipcPrint.css';
 
 function LaporanCetak({ user }) {
@@ -11,19 +10,16 @@ function LaporanCetak({ user }) {
   const [selectedClass, setSelectedClass] = useState('');
   const [classes, setClasses] = useState([]);
   const [selectedStudentId, setSelectedStudentId] = useState('');
-  const [ipcCardData, setIpcCardData] = useState(null);
   const [ipcLoading, setIpcLoading] = useState(false);
-  const [bulkPrintCards, setBulkPrintCards] = useState([]);
-  const [bulkLoading, setBulkLoading] = useState(false);
-
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState(null);
+  
   useEffect(() => {
     fetchStudents();
   }, []);
 
   useEffect(() => {
     setSelectedStudentId('');
-    setIpcCardData(null);
-    setBulkPrintCards([]);
+    setPdfPreviewUrl(null);
   }, [selectedClass]);
 
   const fetchStudents = async () => {
@@ -56,53 +52,262 @@ function LaporanCetak({ user }) {
     return response.data;
   };
 
-  const handleLoadIpcPreview = async () => {
-    if (!selectedStudentId) {
-      alert('Pilih siswa terlebih dahulu');
-      return;
+  const generatePdfBlob = async () => {
+    let data = [];
+    
+    // If no data yet but a student is selected, fetch it
+    if (data.length === 0 && selectedStudentId) {
+      try {
+        const studentData = await fetchIpcCard(selectedStudentId);
+        data = [studentData];
+      } catch (error) {
+        console.error('Error fetching IPC card:', error);
+        return null;
+      }
+    }
+    
+    if (data.length === 0) {
+      return null;
     }
 
-    setIpcLoading(true);
-    setBulkPrintCards([]);
     try {
-      const data = await fetchIpcCard(selectedStudentId);
-      setIpcCardData(data);
-    } catch (error) {
-      console.error('Error fetching IPC card:', error);
-      alert(error.response?.data?.message || 'Gagal memuat data IPC');
-    } finally {
-      setIpcLoading(false);
+      // Create jsPDF instance with selected options
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+      
+      // Add content for each student
+      
+      data.forEach((cardData, index) => {
+        if (index > 0) {
+          doc.addPage();
+        }
+
+        const { student, wali, points, ipcTotal } = cardData;
+        const breakdown = points || {
+          point_awal: student?.ipc_awal ?? 80,
+          prestasi_akademik: 0,
+          prestasi_nonakademik: 0,
+          tanggung_jawab: 0,
+          disiplin: 0,
+          kepedulian: 0,
+          kemandirian: 0,
+          spiritual: 0,
+          kejujuran: 0,
+          kepercayaan_diri: 0,
+          organisasi: 0,
+          kepanitiaan: 0,
+          event: 0,
+          pelanggaran_ringan: 0,
+          pelanggaran_sedang: 0,
+          pelanggaran_berat: 0
+        };
+
+        const total = ipcTotal ?? student?.ipc_total ?? breakdown.point_awal;
+
+        // Header Image
+        try {
+          const headerImg = '/header.png';
+          doc.addImage(headerImg, 'PNG', 20, 10, doc.internal.pageSize.getWidth() - 40, 40);
+        } catch (e) {
+          console.log('Header image not found, using text fallback');
+          // Fallback to text if image fails
+          doc.setFontSize(12);
+          doc.setFont('helvetica', 'bold');
+          doc.text('SMK NEGERI BALI MANDARA', doc.internal.pageSize.getWidth() / 2, 16, { align: 'center' });
+        }
+        
+        // Title
+        doc.setFontSize(10);
+        doc.setFont('times', 'bold');
+        doc.text('INDIVIDUAL POINT CARD', doc.internal.pageSize.getWidth() / 2, 55, { align: 'center' });
+        doc.text('SMK NEGERI BALI MANDARA', doc.internal.pageSize.getWidth() / 2, 60, { align: 'center' }); 
+        doc.text(`TAHUN PELAJARAN ${new Date().getFullYear()}/${new Date().getFullYear() + 1}`, doc.internal.pageSize.getWidth() / 2, 65, { align: 'center' });
+
+        // Student Info
+        let yPos = 72;
+        doc.setFontSize(8);
+        doc.setFont('times', 'bold');
+        
+        // Left column
+        doc.text('Nama:', 20, yPos);
+        doc.setFont('times', 'normal');
+        doc.text(student?.nama || '-', 20 + 20, yPos);
+        
+        yPos += 5;
+        doc.setFont('times', 'bold');
+        doc.text('NIS:', 20, yPos);
+        doc.setFont('times', 'normal');
+        const nisNisn = `${student.nis}` || '-';
+        doc.text(nisNisn, 20 + 20, yPos);
+        
+        yPos += 5;
+        doc.setFont('times', 'bold');
+        doc.text('Wali Kelas:', 20, yPos);
+        doc.setFont('times', 'normal');
+        doc.text(wali?.nama || 'Putu Andika Wirasatriya, S.Pd.', 20 + 20, yPos);
+
+        // Right column
+        yPos = 72;
+        const rightX = doc.internal.pageSize.getWidth() - 55;
+        doc.setFont('times', 'bold');
+        doc.text('Kelas:', rightX, yPos);
+        doc.setFont('times', 'normal');
+        doc.text(student?.kelas || '-', rightX + 15, yPos);
+        
+        yPos += 5;
+        doc.setFont('times', 'bold');
+        doc.text('Grha:', rightX, yPos);
+        doc.setFont('times', 'normal');
+        doc.text(student?.grha || '-', rightX + 15, yPos);
+        
+        yPos += 5;
+        doc.setFont('times', 'bold');
+        doc.text('Semester:', rightX, yPos);
+        doc.setFont('times', 'normal');
+        doc.text(`${new Date().getFullYear()}/${new Date().getFullYear() + 1}`, rightX + 15, yPos);
+
+        // Table using jspdf-autotable
+        const tableData = [
+          ['I Point Awal', ''],
+          ['', breakdown.point_awal],
+          ['II Prestasi', ''],
+          ['1. Akademik', breakdown.prestasi_akademik],
+          ['2. Non-Akademik', breakdown.prestasi_nonakademik],
+          ['III Perkembangan Karakter', ''],
+          ['1. Tanggung Jawab', breakdown.tanggung_jawab],
+          ['2. Disiplin', breakdown.disiplin],
+          ['3. Kepedulian', breakdown.kepedulian],
+          ['4. Kemandirian', breakdown.kemandirian],
+          ['5. Spiritual', breakdown.spiritual],
+          ['6. Kejujuran', breakdown.kejujuran],
+          ['7. Kepercayaan Diri', breakdown.kepercayaan_diri],
+          ['IV Organisasi', ''],
+          ['', breakdown.organisasi],
+          ['V Kepanitiaan', ''],
+          ['', breakdown.kepanitiaan],
+          ['VI Event', ''],
+          ['', breakdown.event],
+          ['VII Pelanggaran', ''],
+          ['1. Ringan', breakdown.pelanggaran_ringan],
+          ['2. Sedang', breakdown.pelanggaran_sedang],
+          ['3. Berat', breakdown.pelanggaran_berat],
+          ['TOTAL POINT IPC', total]
+        ];
+
+        autoTable(doc, {
+          startY: 88,
+          head: [['Point IPC', 'Point']],
+          body: tableData,
+          theme: 'grid',
+          styles: {
+            font: 'times',
+            fontSize: 8,
+            cellPadding: 1.5,
+            lineColor: [0, 0, 0],
+            lineWidth: 0.1,
+            textColor: [0, 0, 0]
+          },
+          headStyles: {
+            fillColor: [240, 240, 240],
+            fontStyle: 'bold',
+            halign: 'center',
+            fontSize: 8,
+            textColor: [0, 0, 0]
+          },
+          columnStyles: {
+            0: { cellWidth: 'auto' },
+            1: { cellWidth: 'auto', halign: 'right' }
+          },
+          margin: { left: 20, right: 20, top: 10, bottom: 20 },
+          didParseCell: function(data) {
+            // Style section headers (rows where first cell contains Roman numerals or section names)
+            const sectionHeaders = ['I Point Awal', 'II Prestasi', 'III Perkembangan Karakter', 'IV Organisasi', 'V Kepanitiaan', 'VI Event', 'VII Pelanggaran', 'TOTAL POINT IPC'];
+            if (sectionHeaders.includes(data.row.raw[0])) {
+              data.cell.styles.fillColor = [224, 224, 224];
+              data.cell.styles.fontStyle = 'bold';
+            }
+            // Style total row specifically
+            if (data.row.raw[0] === 'TOTAL POINT IPC') {
+              data.cell.styles.fillColor = [240, 240, 240];
+              data.cell.styles.fontStyle = 'bold';
+            }
+            // Style negative values in red
+            if (data.section === 'body' && data.column.index === 1 && typeof data.cell.raw === 'number' && data.cell.raw < 0) {
+              data.cell.styles.textColor = [255, 0, 0];
+            }
+          }
+        });
+
+        // Signatures - get the final Y position from the table
+        const finalY = doc.lastAutoTable.finalY || 78;
+        const sigY = finalY + 8;
+        const leftSigX = 20;
+        const rightSigX = doc.internal.pageSize.getWidth() - 75;
+        
+        const formatDate = () => {
+          const options = { day: 'numeric', month: 'long', year: 'numeric' };
+          return new Date().toLocaleDateString('id-ID', options);
+        };
+
+        doc.setFontSize(8);
+        doc.setFont('times', 'normal');
+        doc.text('Mengetahui,', leftSigX, sigY);
+        doc.text(`Kubutambahan, ${formatDate()}`, rightSigX, sigY);
+        
+        doc.setFont('times', 'bold');
+        doc.setFontSize(8);
+        doc.text('Kepala SMK Negeri Bali Mandara', leftSigX, sigY + 5);
+        doc.text('Wali Kelas', rightSigX, sigY + 5);
+        
+        doc.setFont('times', 'bold');
+        doc.setFontSize(8);
+        doc.text('Ketut Susila Widiarsana, S.Pd., M.Pd.', leftSigX, sigY + 20);
+        doc.text(wali?.nama || 'ERROR', rightSigX, sigY + 20);
+        
+        doc.setFont('times', 'normal');
+        doc.setFontSize(7);
+        doc.text('NIP.  19831101 200803 1 001', leftSigX, sigY + 25);
+        doc.text(`NIP. ${wali?.nip || '19980913 202321 1 004'}`, rightSigX, sigY + 25);
+      });
+
+      return doc.output('blob');
+    } catch (e) {
+      console.error(e);
+      return null;
     }
   };
 
   const handleDownloadPdf = async () => {
-    const el = document.getElementById('ipc-print-area');
-    if (!el) {
-      alert('Area print tidak ditemukan');
-      return;
+    let filename;
+    
+    if (selectedStudentId) {
+      // Fetch student data to get the name
+      try {
+        const studentData = await fetchIpcCard(selectedStudentId);
+        filename = `IPC_${studentData.student.nama || 'SISWA'}.pdf`;
+      } catch {
+        filename = `IPC_SISWA.pdf`;
+      }
+    } else {
+      filename = `IPC_SISWA.pdf`;
     }
-    if (!ipcCardData && bulkPrintCards.length === 0) {
-      alert('Muat preview IPC terlebih dahulu');
-      return;
-    }
-
-    const filename = bulkPrintCards.length > 0
-      ? `IPC_${selectedClass || 'KELAS'}.pdf`
-      : `IPC_${ipcCardData?.student?.nama || 'SISWA'}.pdf`;
 
     try {
       setIpcLoading(true);
-      await html2pdf()
-        .set({
-          margin: 0,
-          filename,
-          image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 1.5, useCORS: true, logging: false },
-          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-          pagebreak: { mode: 'css' },
-        })
-        .from(el)
-        .save();
+      const blob = await generatePdfBlob();
+      if (blob) {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        link.click();
+        URL.revokeObjectURL(url);
+      } else {
+        alert('Gagal membuat PDF');
+      }
     } catch (e) {
       console.error(e);
       alert('Gagal membuat PDF');
@@ -111,30 +316,21 @@ function LaporanCetak({ user }) {
     }
   };
 
-  const handleBulkPrintClass = async () => {
-    if (!selectedClass) {
-      alert('Pilih kelas terlebih dahulu');
-      return;
-    }
-
-    const classStudents = getFilteredStudents();
-    if (classStudents.length === 0) {
-      alert('Tidak ada siswa di kelas ini');
-      return;
-    }
-
-    setBulkLoading(true);
-    setIpcCardData(null);
+  const handleGeneratePreview = async () => {
     try {
-      const cards = await Promise.all(
-        classStudents.map(async (student) => fetchIpcCard(student.id))
-      );
-      setBulkPrintCards(cards);
-    } catch (error) {
-      console.error('Error loading bulk IPC cards:', error);
-      alert(error.response?.data?.message || 'Gagal memuat data IPC kelas');
+      setIpcLoading(true);
+      const blob = await generatePdfBlob();
+      if (blob) {
+        const url = URL.createObjectURL(blob);
+        setPdfPreviewUrl(url);
+      } else {
+        alert('Gagal membuat preview PDF');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Gagal membuat preview PDF');
     } finally {
-      setBulkLoading(false);
+      setIpcLoading(false);
     }
   };
 
@@ -143,7 +339,6 @@ function LaporanCetak({ user }) {
   }
 
   const filteredStudents = getFilteredStudents();
-  const hasPrintPreview = ipcCardData || bulkPrintCards.length > 0;
 
   return (
     <div className="container" style={{ padding: '20px' }}>
@@ -169,6 +364,7 @@ function LaporanCetak({ user }) {
           Format cetak mengikuti lembar IPC resmi sekolah (satu siswa per halaman A4).
         </p>
 
+
         <div className="ipc-print-toolbar">
           <div>
             <label htmlFor="ipc-student-select">Siswa:</label>
@@ -184,78 +380,33 @@ function LaporanCetak({ user }) {
               ))}
             </select>
           </div>
-          <button type="button" onClick={handleLoadIpcPreview} disabled={!selectedStudentId || ipcLoading}>
-            {ipcLoading ? 'Memuat...' : 'Muat Preview'}
+          <button type="button" onClick={handleGeneratePreview} disabled={(!selectedStudentId) || ipcLoading}>
+            {ipcLoading ? 'Membuat Preview PDF...' : 'Preview PDF'}
           </button>
-          <button type="button" onClick={handleBulkPrintClass} disabled={!selectedClass || bulkLoading}>
-            {bulkLoading ? 'Memuat kelas...' : 'Muat Semua Siswa Kelas'}
-          </button>
-          <button type="button" onClick={handleDownloadPdf} disabled={!hasPrintPreview || ipcLoading}>
+          <button type="button" onClick={handleDownloadPdf} disabled={(!selectedStudentId) || ipcLoading}>
             {ipcLoading ? 'Membuat PDF...' : 'Download PDF'}
           </button>
         </div>
       </div>
 
-      {hasPrintPreview && (
+      {pdfPreviewUrl && (
         <div className="ipc-print-preview-wrap">
           <h3 className="ipc-print-no-print" style={{ marginBottom: '16px' }}>
-            Preview IPC
-            {bulkPrintCards.length > 0
-              ? ` — ${bulkPrintCards.length} siswa`
-              : ipcCardData?.student?.nama
-                ? ` — ${ipcCardData.student.nama}`
-                : ''}
+            Preview PDF
+            {selectedStudentId
+              ? ` — Siswa Terpilih`
+              : ''}
           </h3>
 
-          <div id="ipc-print-area">
-            {bulkPrintCards.length > 0
-              ? bulkPrintCards.map((card) => (
-                <IpcPrintSheet
-                  key={card.student.id}
-                  student={card.student}
-                  wali={card.wali}
-                  points={card.points}
-                  ipcTotal={card.ipc_total}
-                />
-              ))
-              : ipcCardData && (
-                <IpcPrintSheet
-                  student={ipcCardData.student}
-                  wali={ipcCardData.wali}
-                  points={ipcCardData.points}
-                  ipcTotal={ipcCardData.ipc_total}
-                />
-              )}
+          <div style={{ width: '100%', height: '800px', border: '1px solid #ddd', borderRadius: '8px', overflow: 'hidden' }}>
+            <iframe
+              src={pdfPreviewUrl}
+              style={{ width: '100%', height: '100%', border: 'none' }}
+              title="PDF Preview"
+            />
           </div>
         </div>
       )}
-
-      <div className="ipc-print-no-print laporan-cetak-bulk" style={{ marginTop: '24px', backgroundColor: 'white', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-        <h3 style={{ marginBottom: '15px' }}>
-          Preview Data ({selectedClass ? `Kelas ${selectedClass}` : 'Semua Kelas'}) - {filteredStudents.length} Siswa
-        </h3>
-
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ backgroundColor: '#4CAF50', color: 'white' }}>
-              <th style={{ padding: '12px', textAlign: 'left', border: '1px solid #ddd' }}>Nama</th>
-              <th style={{ padding: '12px', textAlign: 'left', border: '1px solid #ddd' }}>NIS</th>
-              <th style={{ padding: '12px', textAlign: 'left', border: '1px solid #ddd' }}>Kelas</th>
-              <th style={{ padding: '12px', textAlign: 'left', border: '1px solid #ddd' }}>Total IPC</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredStudents.map((student, index) => (
-              <tr key={student.id} style={{ backgroundColor: index % 2 === 0 ? '#f9f9f9' : 'white' }}>
-                <td style={{ padding: '10px', border: '1px solid #ddd' }}>{student.nama}</td>
-                <td style={{ padding: '10px', border: '1px solid #ddd' }}>{student.nis}</td>
-                <td style={{ padding: '10px', border: '1px solid #ddd' }}>{student.kelas}</td>
-                <td style={{ padding: '10px', border: '1px solid #ddd', fontWeight: 'bold' }}>{student.ipc_total}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
     </div>
   );
 }

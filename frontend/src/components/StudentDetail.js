@@ -8,6 +8,15 @@ function StudentDetail({ student, onClose }) {
     const [ipcHistory, setIpcHistory] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
+    useEffect(() => {
+        const handleResize = () => {
+            setIsMobile(window.innerWidth <= 768);
+        };
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     useEffect(() => {
         if (!student?.id) return;
@@ -53,7 +62,9 @@ function StudentDetail({ student, onClose }) {
         }}>
             <div style={{
                 maxWidth: 900,
-                margin: '0 auto',
+                margin: isMobile ? '20px auto' : '80px auto 0 auto',
+                marginLeft: isMobile ? 'auto' : 'calc(50% + 140px)',
+                transform: isMobile ? 'none' : 'translateX(-50%)',
                 background: 'var(--bg-primary, #fff)',
                 borderRadius: 12,
                 padding: 24,
@@ -122,8 +133,8 @@ function StudentDetail({ student, onClose }) {
                                             <th>Jenis</th>
                                             <th>Perubahan</th>
                                             <th>IPC</th>
-                                            <th>Keterangan</th>
-                                            <th>Tanggal</th>
+                                            {!isMobile && <th>Keterangan</th>}
+                                            {!isMobile && <th>Tanggal</th>}
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -134,8 +145,8 @@ function StudentDetail({ student, onClose }) {
                                                     {row.point_change >= 0 ? '+' : ''}{row.point_change}
                                                 </td>
                                                 <td>{row.ipc_sebelum} → {row.ipc_sesudah}</td>
-                                                <td>{row.keterangan}</td>
-                                                <td>{new Date(row.created_at).toLocaleDateString('id-ID')}</td>
+                                                {!isMobile && <td>{row.keterangan}</td>}
+                                                {!isMobile && <td>{new Date(row.created_at).toLocaleDateString('id-ID')}</td>}
                                             </tr>
                                         ))}
                                     </tbody>

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { auth } = require('../middleware/auth');
+const { auth, superAdminOnly } = require('../middleware/auth');
 const db = require('../config/database');
 const multer = require('multer');
 const path = require('path');
@@ -218,6 +218,57 @@ router.put('/:id', auth, upload.single('foto'), async (req, res) => {
         );
 
         res.json({ message: 'Kepanitiaan updated successfully' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Delete kepanitiaan (superadmin only)
+router.delete('/:id', auth, superAdminOnly, async (req, res) => {
+    try {
+        const kepanitiaanId = req.params.id;
+        
+        const [kepanitiaan] = await db.query('SELECT * FROM kepanitiaan WHERE id = ?', [kepanitiaanId]);
+        if (kepanitiaan.length === 0) {
+            return res.status(404).json({ message: 'Kepanitiaan not found' });
+        }
+
+        const kepanitiaanData = kepanitiaan[0];
+
+        // If approved, revert IPC change
+        if (kepanitiaanData.status === 'approved') {
+            const [user] = await db.query('SELECT ipc_total FROM users WHERE id = ?', [kepanitiaanData.user_id]);
+            const ipcSebelum = user[0].ipc_total;
+            const ipcSesudah = ipcSebelum - kepanitiaanData.point;
+            
+            await db.query('UPDATE users SET ipc_total = ? WHERE id = ?', [ipcSesudah, kepanitiaanData.user_id]);
+            
+            // Log IPC history
+            await db.query(
+                'INSERT INTO ipc_history (user_id, jenis_perubahan, point_change, ipc_sebelum, ipc_sesudah, keterangan) VALUES (?, ?, ?, ?, ?, ?)',
+                [kepanitiaanData.user_id, 'kepanitiaan_delete', -kepanitiaanData.point, ipcSebelum, ipcSesudah, `Delete Kepanitiaan: ${kepanitiaanData.jabatan_kepanitiaan}`]
+            );
+        }
+
+        // Delete photo file if exists
+        if (kepanitiaanData.foto) {
+            const photoPath = path.join('uploads', kepanitiaanData.foto);
+            if (fs.existsSync(photoPath)) {
+                fs.unlinkSync(photoPath);
+            }
+        }
+
+        // Delete from database
+        await db.query('DELETE FROM kepanitiaan WHERE id = ?', [kepanitiaanId]);
+
+        // Log activity
+        await db.query(
+            'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
+            [req.user.id, 'Delete Kepanitiaan', `Deleted kepanitiaan ID ${kepanitiaanId}`]
+        );
+
+        res.json({ message: 'Kepanitiaan deleted successfully' });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error' });

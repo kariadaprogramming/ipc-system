@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { auth } = require('../middleware/auth');
+const { auth, superAdminOnly } = require('../middleware/auth');
 const db = require('../config/database');
 const multer = require('multer');
 const path = require('path');
@@ -218,6 +218,57 @@ router.put('/:id', auth, upload.single('foto'), async (req, res) => {
         );
 
         res.json({ message: 'Organisasi updated successfully' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Delete organisasi (superadmin only)
+router.delete('/:id', auth, superAdminOnly, async (req, res) => {
+    try {
+        const organisasiId = req.params.id;
+        
+        const [organisasi] = await db.query('SELECT * FROM organisasi WHERE id = ?', [organisasiId]);
+        if (organisasi.length === 0) {
+            return res.status(404).json({ message: 'Organisasi not found' });
+        }
+
+        const organisasiData = organisasi[0];
+
+        // If approved, revert IPC change
+        if (organisasiData.status === 'approved') {
+            const [user] = await db.query('SELECT ipc_total FROM users WHERE id = ?', [organisasiData.user_id]);
+            const ipcSebelum = user[0].ipc_total;
+            const ipcSesudah = ipcSebelum - organisasiData.point;
+            
+            await db.query('UPDATE users SET ipc_total = ? WHERE id = ?', [ipcSesudah, organisasiData.user_id]);
+            
+            // Log IPC history
+            await db.query(
+                'INSERT INTO ipc_history (user_id, jenis_perubahan, point_change, ipc_sebelum, ipc_sesudah, keterangan) VALUES (?, ?, ?, ?, ?, ?)',
+                [organisasiData.user_id, 'organisasi_delete', -organisasiData.point, ipcSebelum, ipcSesudah, `Delete Organisasi: ${organisasiData.jabatan_organisasi}`]
+            );
+        }
+
+        // Delete photo file if exists
+        if (organisasiData.foto) {
+            const photoPath = path.join('uploads', organisasiData.foto);
+            if (fs.existsSync(photoPath)) {
+                fs.unlinkSync(photoPath);
+            }
+        }
+
+        // Delete from database
+        await db.query('DELETE FROM organisasi WHERE id = ?', [organisasiId]);
+
+        // Log activity
+        await db.query(
+            'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
+            [req.user.id, 'Delete Organisasi', `Deleted organisasi ID ${organisasiId}`]
+        );
+
+        res.json({ message: 'Organisasi deleted successfully' });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error' });

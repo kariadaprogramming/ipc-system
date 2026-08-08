@@ -179,6 +179,23 @@ function InputPelanggaran() {
     editModal.openEditModal(item);
   };
 
+  const handleDelete = async (id) => {
+    if (!window.confirm('Apakah Anda yakin ingin menghapus data ini? IPC akan dikembalikan jika sudah disetujui.')) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      await axios.delete(`/pelanggaran/${id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setMessage('Pelanggaran berhasil dihapus!');
+      fetchAllPelanggaran();
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Gagal menghapus pelanggaran');
+    }
+  };
+
   const handleEditFileChange = (e) => {
     editModal.setEditFoto(e.target.files[0]);
   };
@@ -281,9 +298,16 @@ function InputPelanggaran() {
                         <button 
                           className="btn btn-info" 
                           onClick={() => handleEdit(item)} 
-                          style={{ padding: '3px 8px', fontSize: '12px' }}
+                          style={{ padding: '3px 8px', fontSize: '12px', marginRight: '5px' }}
                         >
                           Edit
+                        </button>
+                        <button 
+                          className="btn btn-danger" 
+                          onClick={() => handleDelete(item.id)} 
+                          style={{ padding: '3px 8px', fontSize: '12px' }}
+                        >
+                          Hapus
                         </button>
                       </td>
                     </tr>

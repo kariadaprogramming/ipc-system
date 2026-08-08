@@ -30,6 +30,7 @@ function Logs() {
   return (
     <div>
       <h2>Activity Logs</h2>
+      <p>Logs ini menampilkan semua aktivitas yang direkam dalam sistem<br /><em>*Dibuat untuk memudahkan pengembang website</em></p>
       <div className="card">
         <table className="table">
           <thead>

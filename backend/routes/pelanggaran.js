@@ -122,7 +122,7 @@ router.put('/:id/approve', auth, superAdminOnly, async (req, res) => {
         await applyIpcChange(
             pelanggaranData.user_id,
             'pelanggaran',
-            -pelanggaranData.point_dikurangi,
+            pelanggaranData.point_dikurangi,
             `Pelanggaran: ${pelanggaranData.jenis_pelanggaran}`
         );
 
@@ -205,13 +205,13 @@ router.put('/:id', auth, upload.single('foto'), async (req, res) => {
             const pointDiff = point_dikurangi - pelanggaranData.point_dikurangi;
             const [userBefore] = await db.query('SELECT ipc_total FROM users WHERE id = ?', [pelanggaranData.user_id]);
             const ipcSebelum = userBefore[0].ipc_total;
-            const ipcSesudah = ipcSebelum - pointDiff;
+            const ipcSesudah = ipcSebelum + pointDiff;
             
             await db.query('UPDATE users SET ipc_total = ? WHERE id = ?', [ipcSesudah, pelanggaranData.user_id]);
             
             await db.query(
                 'INSERT INTO ipc_history (user_id, jenis_perubahan, point_change, ipc_sebelum, ipc_sesudah, keterangan) VALUES (?, ?, ?, ?, ?, ?)',
-                [pelanggaranData.user_id, 'pelanggaran_update', -pointDiff, ipcSebelum, ipcSesudah, `Update Pelanggaran: ${jenis_pelanggaran}`]
+                [pelanggaranData.user_id, 'pelanggaran_update', pointDiff, ipcSebelum, ipcSesudah, `Update Pelanggaran: ${jenis_pelanggaran}`]
             );
         }
 
@@ -222,6 +222,57 @@ router.put('/:id', auth, upload.single('foto'), async (req, res) => {
         );
 
         res.json({ message: 'Pelanggaran updated successfully' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Delete pelanggaran (superadmin only)
+router.delete('/:id', auth, superAdminOnly, async (req, res) => {
+    try {
+        const pelanggaranId = req.params.id;
+        
+        const [pelanggaran] = await db.query('SELECT * FROM pelanggaran WHERE id = ?', [pelanggaranId]);
+        if (pelanggaran.length === 0) {
+            return res.status(404).json({ message: 'Pelanggaran not found' });
+        }
+
+        const pelanggaranData = pelanggaran[0];
+
+        // If approved, revert IPC change
+        if (pelanggaranData.status === 'approved') {
+            const [user] = await db.query('SELECT ipc_total FROM users WHERE id = ?', [pelanggaranData.user_id]);
+            const ipcSebelum = user[0].ipc_total;
+            const ipcSesudah = ipcSebelum - pelanggaranData.point_dikurangi;
+            
+            await db.query('UPDATE users SET ipc_total = ? WHERE id = ?', [ipcSesudah, pelanggaranData.user_id]);
+            
+            // Log IPC history
+            await db.query(
+                'INSERT INTO ipc_history (user_id, jenis_perubahan, point_change, ipc_sebelum, ipc_sesudah, keterangan) VALUES (?, ?, ?, ?, ?, ?)',
+                [pelanggaranData.user_id, 'pelanggaran_delete', pelanggaranData.point_dikurangi, ipcSebelum, ipcSesudah, `Delete Pelanggaran: ${pelanggaranData.jenis_pelanggaran}`]
+            );
+        }
+
+        // Delete photo file if exists
+        if (pelanggaranData.foto) {
+            const photoPath = path.join('uploads', pelanggaranData.foto);
+            if (fs.existsSync(photoPath)) {
+                fs.unlinkSync(photoPath);
+            }
+        }
+
+        // Delete from database
+        await db.query('DELETE FROM pelanggaran WHERE id = ?', [pelanggaranId]);
+
+        // Log activity
+        await db.query(
+            'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
+            [req.user.id, 'Delete Pelanggaran', `Deleted pelanggaran ID ${pelanggaranId}`]
+        );
+
+        res.json({ message: 'Pelanggaran deleted successfully' });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error' });

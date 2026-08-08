@@ -8,10 +8,8 @@ import { GRHA_OPTIONS, getRowField, normalizeGrha } from '../utils/excelImport';
 function KelolaAkun() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({});
   const [message, setMessage] = useState('');
-  const [showEditForm, setShowEditForm] = useState(false);
   const [editStudent, setEditStudent] = useState(null);
   const [userRole, setUserRole] = useState(null);
   const [filters, setFilters] = useState({
@@ -26,10 +24,6 @@ function KelolaAkun() {
   const [detailStudent, setDetailStudent] = useState(null);
   const [selectedIds, setSelectedIds] = useState([]);
   const [selectionRole, setSelectionRole] = useState(null);
-  const [showIpcModal, setShowIpcModal] = useState(false);
-  const [ipcEditTarget, setIpcEditTarget] = useState(null);
-  const [ipcAwalValue, setIpcAwalValue] = useState('');
-  const [ipcSaving, setIpcSaving] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createModalType, setCreateModalType] = useState('');
   const [showImportModal, setShowImportModal] = useState(false);
@@ -88,7 +82,7 @@ function KelolaAkun() {
         headers: { Authorization: `Bearer ${token}` }
       });
       setMessage('Akun siswa berhasil dibuat!');
-      setShowForm(false);
+      setShowCreateModal(false);
       setFormData({});
       fetchUsers();
     } catch (error) {
@@ -104,7 +98,7 @@ function KelolaAkun() {
         headers: { Authorization: `Bearer ${token}` }
       });
       setMessage('Akun guru berhasil dibuat!');
-      setShowForm(false);
+      setShowCreateModal(false);
       setFormData({});
       fetchUsers();
     } catch (error) {
@@ -125,22 +119,6 @@ function KelolaAkun() {
     } catch (error) {
       setMessage(error.response?.data?.message || 'Gagal menghapus akun');
     }
-  };
-
-  const handleUpdateIPC = (user) => {
-    setIpcEditTarget({ type: 'single', user });
-    setIpcAwalValue(String(user.ipc_awal ?? user.ipc_total ?? 80));
-    setShowIpcModal(true);
-  };
-
-  const openBulkIpcModal = () => {
-    if (selectedIds.length === 0) {
-      setMessage('Pilih minimal satu pengguna');
-      return;
-    }
-    setIpcEditTarget({ type: 'bulk', role: selectionRole, count: selectedIds.length });
-    setIpcAwalValue('80');
-    setShowIpcModal(true);
   };
 
   const handleBulkDelete = async () => {
@@ -165,45 +143,6 @@ function KelolaAkun() {
       fetchUsers();
     } catch (error) {
       setMessage(error.response?.data?.message || 'Gagal menghapus akun (bulk)');
-    }
-  };
-
-  const handleSaveIpcAwal = async (e) => {
-    e.preventDefault();
-    const parsed = parseInt(ipcAwalValue, 10);
-    if (Number.isNaN(parsed) || parsed < 0) {
-      setMessage('IPC awal harus angka valid (min 0)');
-      return;
-    }
-
-    setIpcSaving(true);
-    try {
-      const token = localStorage.getItem('token');
-      if (ipcEditTarget?.type === 'bulk') {
-        await axios.put('/users/bulk/ipc-awal', {
-          user_ids: selectedIds,
-          ipc_awal: parsed
-        }, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setMessage(`IPC awal berhasil diupdate untuk ${selectedIds.length} pengguna`);
-        setSelectedIds([]);
-        setSelectionRole(null);
-      } else {
-        await axios.put(`/users/${ipcEditTarget.user.id}/ipc`, {
-          ipc_awal: parsed
-        }, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setMessage(`IPC awal ${ipcEditTarget.user.nama} berhasil diupdate`);
-      }
-      setShowIpcModal(false);
-      setIpcEditTarget(null);
-      fetchUsers();
-    } catch (error) {
-      setMessage(error.response?.data?.message || 'Gagal update IPC awal');
-    } finally {
-      setIpcSaving(false);
     }
   };
 
@@ -276,7 +215,7 @@ function KelolaAkun() {
         no_hp: user.no_hp
       });
     }
-    setShowEditForm(true);
+    setShowEditBiodataModal(true);
   };
 
   const handleUpdateUser = async (e) => {
@@ -298,7 +237,7 @@ function KelolaAkun() {
         setMessage(`Data ${editStudent.role === 'siswa' ? 'siswa' : 'guru'} berhasil diupdate!`);
       }
       
-      setShowEditForm(false);
+      setShowEditBiodataModal(false);
       setEditStudent(null);
       setFormData({});
       fetchUsers();
@@ -508,9 +447,6 @@ function KelolaAkun() {
               </button>
               {selectedIds.length > 0 && (
                 <>
-                  <button type="button" className="btn btn-warning" onClick={openBulkIpcModal} style={{ fontSize: 13 }}>
-                    Edit IPC Awal ({selectedIds.length} {selectionRole === 'guru' ? 'guru' : 'siswa'})
-                  </button>
                   <button type="button" className="btn btn-danger" onClick={handleBulkDelete} style={{ fontSize: 13 }}>
                     Hapus ({selectedIds.length})
                   </button>
@@ -527,117 +463,64 @@ function KelolaAkun() {
             Mode pilihan: <strong>{selectionRole === 'siswa' ? 'Siswa' : 'Guru'}</strong> — hanya role yang sama yang bisa dipilih.
           </p>
         )}
-        <table className="table">
-          <thead>
-            <tr>
-              {userRole === 'superadmin' && <th style={{ width: 40 }}></th>}
-              <th>Nama</th>
-              <th>{userRole === 'guru' ? 'NIS' : 'NIS/NIP'}</th>
-              {userRole !== 'guru' && <th>NISN</th>}
-              <th>Role</th>
-              <th>Kelas</th>
-              <th>IPC Awal</th>
-              <th>IPC Total</th>
-              <th>Aksi</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredUsers.map(user => (
-              <tr key={user.id} style={isUserDisabled(user) && selectionRole ? { opacity: 0.45 } : undefined}>
-                {userRole === 'superadmin' && (
+        <div style={{ overflowX: 'auto' }}>
+          <table className="table">
+            <thead>
+              <tr>
+                {userRole === 'superadmin' && <th style={{ width: 40 }}></th>}
+                <th>Nama</th>
+                <th>{userRole === 'guru' ? 'NIS' : 'NIS/NIP'}</th>
+                {userRole !== 'guru' && <th>NISN</th>}
+                <th>Role</th>
+                <th>Kelas</th>
+                <th>IPC Total</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredUsers.map(user => (
+                <tr key={user.id} style={isUserDisabled(user) && selectionRole ? { opacity: 0.45 } : undefined}>
+                  {userRole === 'superadmin' && (
+                    <td>
+                      {isUserSelectable(user) && (
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(user.id)}
+                          disabled={isUserDisabled(user)}
+                          onChange={() => toggleUserSelection(user)}
+                        />
+                      )}
+                    </td>
+                  )}
+                  <td>{user.nama}</td>
+                  <td>{user.nis || user.nip || '-'}</td>
+                  {userRole !== 'guru' && <td>{user.nisn || '-'}</td>}
+                  <td><span className={`badge badge-${user.role === 'superadmin' ? 'danger' : user.role === 'guru' ? 'warning' : 'info'}`}>{user.role}</span></td>
+                  <td>{user.kelas || '-'}</td>
+                  <td>{user.ipc_total ?? 0}</td>
                   <td>
-                    {isUserSelectable(user) && (
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.includes(user.id)}
-                        disabled={isUserDisabled(user)}
-                        onChange={() => toggleUserSelection(user)}
-                      />
+                    {userRole === 'superadmin' && user.role !== 'superadmin' && (
+                      <>
+                        {user.role === 'siswa' && (
+                          <button className="btn btn-primary" onClick={() => setDetailStudent(user)} style={{ padding: '5px 10px', marginRight: '5px' }}>Detail</button>
+                        )}
+                        <button className="btn btn-info" onClick={() => { handleEditUser(user); setShowEditBiodataModal(true); }} style={{ padding: '5px 10px', marginRight: '5px' }}>Edit Biodata</button>
+                        <button className="btn btn-danger" onClick={() => handleDeleteUser(user.id)} style={{ padding: '5px 10px' }}>Hapus</button>
+                      </>
+                    )}
+                    {userRole === 'guru' && user.role === 'siswa' && (
+                      <>
+                        <button className="btn btn-primary" onClick={() => setDetailStudent(user)} style={{ padding: '5px 10px', marginRight: '5px' }}>Detail</button>
+                        <button className="btn btn-info" onClick={() => { handleEditUser(user); setShowEditBiodataModal(true); }} style={{ padding: '5px 10px' }}>Edit Biodata</button>
+                      </>
                     )}
                   </td>
-                )}
-                <td>{user.nama}</td>
-                <td>{user.nis || user.nip || '-'}</td>
-                {userRole !== 'guru' && <td>{user.nisn || '-'}</td>}
-                <td><span className={`badge badge-${user.role === 'superadmin' ? 'danger' : user.role === 'guru' ? 'warning' : 'info'}`}>{user.role}</span></td>
-                <td>{user.kelas || '-'}</td>
-                <td>{user.ipc_awal ?? '-'}</td>
-                <td>{user.ipc_total ?? 0}</td>
-                <td>
-                  {userRole === 'superadmin' && user.role !== 'superadmin' && (
-                    <>
-                      {user.role === 'siswa' && (
-                        <button className="btn btn-primary" onClick={() => setDetailStudent(user)} style={{ padding: '5px 10px', marginRight: '5px' }}>Detail</button>
-                      )}
-                      <button className="btn btn-info" onClick={() => { handleEditUser(user); setShowEditBiodataModal(true); }} style={{ padding: '5px 10px', marginRight: '5px' }}>Edit Biodata</button>
-                      {(user.role === 'siswa' || user.role === 'guru') && (
-                        <button className="btn btn-warning" onClick={() => handleUpdateIPC(user)} style={{ padding: '5px 10px', marginRight: '5px' }}>Edit IPC Awal</button>
-                      )}
-                      <button className="btn btn-danger" onClick={() => handleDeleteUser(user.id)} style={{ padding: '5px 10px' }}>Hapus</button>
-                    </>
-                  )}
-                  {userRole === 'guru' && user.role === 'siswa' && (
-                    <>
-                      <button className="btn btn-primary" onClick={() => setDetailStudent(user)} style={{ padding: '5px 10px', marginRight: '5px' }}>Detail</button>
-                      <button className="btn btn-info" onClick={() => { handleEditUser(user); setShowEditBiodataModal(true); }} style={{ padding: '5px 10px' }}>Edit Biodata</button>
-                    </>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {showIpcModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000
-        }}>
-          <div className="card" style={{ width: 420, maxWidth: '90%' }}>
-            <h3>
-              {ipcEditTarget?.type === 'bulk'
-                ? `Edit IPC Awal — ${ipcEditTarget.count} ${ipcEditTarget.role === 'guru' ? 'guru' : 'siswa'}`
-                : `Edit IPC Awal — ${ipcEditTarget?.user?.nama}`}
-            </h3>
-            <p style={{ fontSize: 14, color: '#666', marginBottom: 16 }}>
-              Mengubah IPC awal juga menyesuaikan IPC total dengan selisih yang sama.
-            </p>
-            <form onSubmit={handleSaveIpcAwal}>
-              <div className="form-group">
-                <label>IPC Awal</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={ipcAwalValue}
-                  onChange={(e) => setIpcAwalValue(e.target.value)}
-                  required
-                />
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button type="submit" className="btn btn-primary" disabled={ipcSaving}>
-                  {ipcSaving ? 'Menyimpan...' : 'Simpan'}
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => { setShowIpcModal(false); setIpcEditTarget(null); }}
-                >
-                  Batal
-                </button>
-              </div>
-            </form>
-          </div>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-      )}
+      </div>
 
       {detailStudent && (
         <StudentDetail student={detailStudent} onClose={() => setDetailStudent(null)} />

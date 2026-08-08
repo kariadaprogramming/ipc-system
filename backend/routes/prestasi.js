@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { auth } = require('../middleware/auth');
+const { auth, superAdminOnly } = require('../middleware/auth');
 const db = require('../config/database');
 const multer = require('multer');
 const path = require('path');
@@ -232,6 +232,57 @@ router.put('/:id', auth, upload.single('foto'), async (req, res) => {
         );
 
         res.json({ message: 'Prestasi updated successfully' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Delete prestasi (superadmin only)
+router.delete('/:id', auth, superAdminOnly, async (req, res) => {
+    try {
+        const prestasiId = req.params.id;
+        
+        const [prestasi] = await db.query('SELECT * FROM prestasi WHERE id = ?', [prestasiId]);
+        if (prestasi.length === 0) {
+            return res.status(404).json({ message: 'Prestasi not found' });
+        }
+
+        const prestasiData = prestasi[0];
+
+        // If approved, revert IPC change
+        if (prestasiData.status === 'approved') {
+            const [user] = await db.query('SELECT ipc_total FROM users WHERE id = ?', [prestasiData.user_id]);
+            const ipcSebelum = user[0].ipc_total;
+            const ipcSesudah = ipcSebelum - prestasiData.point;
+            
+            await db.query('UPDATE users SET ipc_total = ? WHERE id = ?', [ipcSesudah, prestasiData.user_id]);
+            
+            // Log IPC history
+            await db.query(
+                'INSERT INTO ipc_history (user_id, jenis_perubahan, point_change, ipc_sebelum, ipc_sesudah, keterangan) VALUES (?, ?, ?, ?, ?, ?)',
+                [prestasiData.user_id, 'prestasi_delete', -prestasiData.point, ipcSebelum, ipcSesudah, `Delete Prestasi: ${prestasiData.nama_lomba}`]
+            );
+        }
+
+        // Delete photo file if exists
+        if (prestasiData.foto) {
+            const photoPath = path.join('uploads', prestasiData.foto);
+            if (fs.existsSync(photoPath)) {
+                fs.unlinkSync(photoPath);
+            }
+        }
+
+        // Delete from database
+        await db.query('DELETE FROM prestasi WHERE id = ?', [prestasiId]);
+
+        // Log activity
+        await db.query(
+            'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
+            [req.user.id, 'Delete Prestasi', `Deleted prestasi ID ${prestasiId}`]
+        );
+
+        res.json({ message: 'Prestasi deleted successfully' });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error' });

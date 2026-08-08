@@ -67,6 +67,23 @@ function InputPrestasi() {
     editModal.openEditModal(item);
   };
 
+  const handleDelete = async (id) => {
+    if (!window.confirm('Apakah Anda yakin ingin menghapus data ini? IPC akan dikembalikan jika sudah disetujui.')) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      await axios.delete(`/prestasi/${id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setMessage('Prestasi berhasil dihapus!');
+      fetchAllPrestasi();
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Gagal menghapus prestasi');
+    }
+  };
+
   const handleUpdate = async () => {
     editModal.setIsLoading(true);
     try {
@@ -347,7 +364,8 @@ function InputPrestasi() {
                       <td>{item.point}</td>
                       <td>{getStatusBadge(item)}</td>
                       <td>
-                        <button className="btn btn-info" onClick={() => handleEdit(item)} style={{ padding: '3px 8px', fontSize: '12px' }}>Edit</button>
+                        <button className="btn btn-info" onClick={() => handleEdit(item)} style={{ padding: '3px 8px', fontSize: '12px', marginRight: '5px' }}>Edit</button>
+                        <button className="btn btn-danger" onClick={() => handleDelete(item.id)} style={{ padding: '3px 8px', fontSize: '12px' }}>Hapus</button>
                       </td>
                     </tr>
                   ))}

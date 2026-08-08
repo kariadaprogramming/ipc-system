@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { auth } = require('../middleware/auth');
+const { auth, superAdminOnly } = require('../middleware/auth');
 const db = require('../config/database');
 const multer = require('multer');
 const path = require('path');
@@ -217,6 +217,57 @@ router.put('/:id', auth, upload.single('foto'), async (req, res) => {
         );
 
         res.json({ message: 'Event updated successfully' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Delete event (superadmin only)
+router.delete('/:id', auth, superAdminOnly, async (req, res) => {
+    try {
+        const eventId = req.params.id;
+        
+        const [event] = await db.query('SELECT * FROM event WHERE id = ?', [eventId]);
+        if (event.length === 0) {
+            return res.status(404).json({ message: 'Event not found' });
+        }
+
+        const eventData = event[0];
+
+        // If approved, revert IPC change
+        if (eventData.status === 'approved') {
+            const [user] = await db.query('SELECT ipc_total FROM users WHERE id = ?', [eventData.user_id]);
+            const ipcSebelum = user[0].ipc_total;
+            const ipcSesudah = ipcSebelum - eventData.point;
+            
+            await db.query('UPDATE users SET ipc_total = ? WHERE id = ?', [ipcSesudah, eventData.user_id]);
+            
+            // Log IPC history
+            await db.query(
+                'INSERT INTO ipc_history (user_id, jenis_perubahan, point_change, ipc_sebelum, ipc_sesudah, keterangan) VALUES (?, ?, ?, ?, ?, ?)',
+                [eventData.user_id, 'event_delete', -eventData.point, ipcSebelum, ipcSesudah, `Delete Event: ${eventData.nama_event}`]
+            );
+        }
+
+        // Delete photo file if exists
+        if (eventData.foto) {
+            const photoPath = path.join('uploads', eventData.foto);
+            if (fs.existsSync(photoPath)) {
+                fs.unlinkSync(photoPath);
+            }
+        }
+
+        // Delete from database
+        await db.query('DELETE FROM event WHERE id = ?', [eventId]);
+
+        // Log activity
+        await db.query(
+            'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
+            [req.user.id, 'Delete Event', `Deleted event ID ${eventId}`]
+        );
+
+        res.json({ message: 'Event deleted successfully' });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error' });

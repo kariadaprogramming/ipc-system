@@ -142,21 +142,6 @@ function ApprovalsV2() {
     }
   };
 
-  const getStatusBadge = (pembinaStatus, superadminStatus) => {
-    if (pembinaStatus === 'rejected' || superadminStatus === 'rejected') {
-      return <span className="badge badge-danger">Ditolak</span>;
-    }
-    if (pembinaStatus === 'pending') {
-      return <span className="badge badge-warning">Menunggu Pembina</span>;
-    }
-    if (pembinaStatus === 'approved' && superadminStatus === 'pending') {
-      return <span className="badge badge-info">Menunggu SuperAdmin</span>;
-    }
-    if (superadminStatus === 'approved') {
-      return <span className="badge badge-success">Disetujui</span>;
-    }
-    return <span className="badge badge-secondary">Pending</span>;
-  };
 
   const getApprovalStatus = (item) => item.superadmin_status || item.status || 'pending';
 
@@ -172,8 +157,6 @@ function ApprovalsV2() {
       kepanitiaan: ['Nama', 'NIS', 'Kepanitiaan', 'Jabatan', 'Foto', 'Status', 'Aksi'],
       pelanggaran: ['Nama', 'NIS', 'Keterangan', 'Jenis', 'Foto', 'Status', 'Aksi'],
       perilaku: ['Nama', 'NIS', 'Karakter', 'Status', 'Aksi'],
-      biodata: ['Siswa', 'NIS Lama', 'NIS Baru', 'Perubahan', 'Diajukan Oleh', 'Status', 'Aksi'],
-      student_creation: ['Nama', 'NIS', 'NISN', 'Kelas', 'Diajukan Oleh', 'Status', 'Aksi']
     };
 
     const getPhotoUrl = (path, uploadFolder = 'approvals') => {
@@ -387,8 +370,6 @@ function ApprovalsV2() {
     { key: 'kepanitiaan', label: 'Kepanitiaan', count: approvals.kepanitiaan.length },
     { key: 'pelanggaran', label: 'Pelanggaran', count: approvals.pelanggaran?.length || 0 },
     { key: 'perilaku', label: 'Perilaku', count: approvals.perilaku?.length || 0 },
-    { key: 'biodata', label: 'Update Biodata', count: approvals.biodata?.length || 0 },
-    { key: 'student_creation', label: 'Buat Akun Siswa', count: approvals.student_creation?.length || 0 }
   ];
 
   return (

@@ -59,6 +59,42 @@ async function applyIpcAwalUpdate(userId, newIpcAwal, adminId) {
     return { ipc_awal: parsedAwal, ipc_total: newTotal };
 }
 
+// Bulk update IPC awal for multiple users
+router.post('/bulk-update-ipc-awal', auth, superAdminOnly, async (req, res) => {
+    try {
+        const { userIds, ipcAwal } = req.body;
+        
+        if (!Array.isArray(userIds) || userIds.length === 0) {
+            return res.status(400).json({ message: 'User IDs array is required' });
+        }
+        
+        const parsedAwal = parseInt(ipcAwal, 10);
+        if (Number.isNaN(parsedAwal) || parsedAwal < 0) {
+            return res.status(400).json({ message: 'IPC awal harus angka valid (min 0)' });
+        }
+
+        const results = [];
+        
+        for (const userId of userIds) {
+            try {
+                const result = await applyIpcAwalUpdate(userId, parsedAwal, req.user.id);
+                results.push({ userId, success: true, ...result });
+            } catch (error) {
+                results.push({ userId, success: false, message: error.message });
+            }
+        }
+
+        const successCount = results.filter(r => r.success).length;
+        res.json({ 
+            message: `IPC awal berhasil diupdate untuk ${successCount} dari ${userIds.length} pengguna`,
+            results 
+        });
+    } catch (error) {
+        console.error('Bulk update IPC awal error:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
 // Get student data by NIS (for auto-fill in input forms) - MUST BE BEFORE /:id
 router.get('/nis/:nis', auth, async (req, res) => {
     try {
