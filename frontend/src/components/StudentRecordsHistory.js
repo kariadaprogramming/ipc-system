@@ -5,6 +5,7 @@ const TABS = [
     { key: 'prestasi', label: 'Prestasi' },
     { key: 'event', label: 'Event' },
     { key: 'organisasi', label: 'Organisasi' },
+    { key: 'kepanitiaan', label: 'Kepanitiaan' },
     { key: 'pelanggaran', label: 'Pelanggaran' },
     { key: 'perilaku', label: 'Perilaku' }
 ];
@@ -96,6 +97,18 @@ function renderRecordDetails(item, type) {
                     </div>
                 </>
             );
+        case 'kepanitiaan':
+            return (
+                <>
+                    <strong>{item.kategori_kepanitiaan}</strong>
+                    <div style={{ fontSize: 13, color: 'var(--text-secondary, #666)', marginTop: 4 }}>
+                        Jabatan: {item.jabatan_kepanitiaan}
+                    </div>
+                    <div style={{ fontSize: 13, marginTop: 4 }}>
+                        <span className="badge badge-success">+{item.point} poin</span>
+                    </div>
+                </>
+            );
         case 'pelanggaran':
             return (
                 <>
@@ -134,7 +147,7 @@ function StudentRecordsHistory({ records, title = 'Riwayat Prestasi & Event', sh
 
     const visibleTabs = showAllTabs
         ? TABS
-        : TABS.filter((tab) => ['prestasi', 'event', 'organisasi'].includes(tab.key));
+        : TABS.filter((tab) => ['prestasi', 'event', 'organisasi', 'kepanitiaan'].includes(tab.key));
 
     const activeItems = records[activeTab] || [];
 
