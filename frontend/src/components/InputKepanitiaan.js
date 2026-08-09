@@ -34,8 +34,8 @@ function InputKepanitiaan() {
   ];
 
   const jabatanOptions = [
-    { value: 'ketua', label: 'Ketua Kepanitiaan (6 point)' },
-    { value: 'wakil ketua', label: 'Wakil Ketua (5 point)' },
+    { value: 'ketua', label: 'Ketua Kepanitiaan (5 point)' },
+    { value: 'wakil ketua', label: 'Wakil Ketua (4 point)' },
     { value: 'sekretaris', label: 'Sekretaris (4 point)' },
     { value: 'bendahara', label: 'Bendahara (3 point)' },
     { value: 'koordinator', label: 'Koordinator (2 point)' },
