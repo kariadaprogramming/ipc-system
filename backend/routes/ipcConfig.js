@@ -2,6 +2,61 @@ const express = require('express');
 const router = express.Router();
 const { auth, superAdminOnly } = require('../middleware/auth');
 const db = require('../config/database');
+const { clearConfigCache } = require('../utils/ipcConfig');
+
+async function getOrganisasiOptions(activeOnly = false) {
+    const [rows] = await db.query(
+        `SELECT id, name, is_active, created_at, updated_at
+         FROM ipc_organisasi
+         ${activeOnly ? 'WHERE is_active = TRUE' : ''}
+         ORDER BY name`
+    );
+    return rows;
+}
+
+async function getPerilakuCharacters(activeOnly = false) {
+    const [rows] = await db.query(
+        `SELECT id, name, is_active, created_at, updated_at
+         FROM ipc_perilaku_karakter
+         ${activeOnly ? 'WHERE is_active = TRUE' : ''}
+         ORDER BY name`
+    );
+    return rows;
+}
+
+async function getPerilakuRatings(activeOnly = false) {
+    const [rows] = await db.query(
+        `SELECT id, name, is_active, created_at, updated_at
+         FROM ipc_perilaku_tingkat
+         ${activeOnly ? 'WHERE is_active = TRUE' : ''}
+         ORDER BY name`
+    );
+    return rows;
+}
+
+async function getPelanggaranConfigs(activeOnly = false) {
+    const activeClause = activeOnly ? 'WHERE l.is_active = TRUE' : '';
+    const [rows] = await db.query(`
+        SELECT CONCAT('level-', l.id) id, 'pelanggaran' category,
+               l.name field1, NULL field2, l.point_value,
+               l.description, l.is_active, l.created_at, l.updated_at
+        FROM ipc_pelanggaran_level l ${activeClause}
+        UNION ALL
+        SELECT CONCAT('detail-', d.id), 'pelanggaran',
+               d.name, l.name, l.point_value,
+               NULL, d.is_active, d.created_at, d.updated_at
+        FROM ipc_pelanggaran_detail d
+        JOIN ipc_pelanggaran_level l ON l.id = d.level_id
+        ${activeOnly ? 'WHERE d.is_active = TRUE AND l.is_active = TRUE' : ''}
+        ORDER BY category, field1
+    `);
+    return rows;
+}
+
+function parsePelanggaranId(id) {
+    const match = /^(level|detail)-(\d+)$/.exec(String(id));
+    return match ? { type: match[1], value: Number(match[2]) } : null;
+}
 
 // Get all IPC configurations
 router.get('/all', auth, superAdminOnly, async (req, res) => {
@@ -10,8 +65,8 @@ router.get('/all', auth, superAdminOnly, async (req, res) => {
             SELECT 
                 id,
                 category,
-                indicator,
-                sub_indicator,
+                field1,
+                field2,
                 point_value,
                 description,
                 is_active,
@@ -20,9 +75,9 @@ router.get('/all', auth, superAdminOnly, async (req, res) => {
                 updated_by,
                 (SELECT nama FROM users WHERE id = ipc_config.updated_by) as updated_by_name
             FROM ipc_config
-            ORDER BY category, indicator, sub_indicator
+            ORDER BY category, field1, field2
         `);
-        res.json(configs);
+        res.json(configs.concat(await getPelanggaranConfigs()));
     } catch (error) {
         console.error('Error fetching IPC configurations:', error);
         res.status(500).json({ message: 'Server error' });
@@ -37,8 +92,8 @@ router.get('/category/:category', auth, superAdminOnly, async (req, res) => {
             SELECT 
                 id,
                 category,
-                indicator,
-                sub_indicator,
+                field1,
+                field2,
                 point_value,
                 description,
                 is_active,
@@ -48,9 +103,9 @@ router.get('/category/:category', auth, superAdminOnly, async (req, res) => {
                 (SELECT nama FROM users WHERE id = ipc_config.updated_by) as updated_by_name
             FROM ipc_config
             WHERE category = ?
-            ORDER BY indicator, sub_indicator
+            ORDER BY field1, field2
         `, [category]);
-        res.json(configs);
+        res.json(category === 'pelanggaran' ? await getPelanggaranConfigs() : configs);
     } catch (error) {
         console.error('Error fetching IPC configurations by category:', error);
         res.status(500).json({ message: 'Server error' });
@@ -61,22 +116,25 @@ router.get('/category/:category', auth, superAdminOnly, async (req, res) => {
 router.get('/active', auth, async (req, res) => {
     try {
         const [configs] = await db.query(`
-            SELECT category, indicator, sub_indicator, point_value
+            SELECT category, field1, field2, point_value
             FROM ipc_config
             WHERE is_active = TRUE
-            ORDER BY category, indicator, sub_indicator
+            ORDER BY category, field1, field2
         `);
         
         // Group by category for easier access
         const grouped = {};
-        configs.forEach(config => {
+        const allConfigs = configs.concat(await getPelanggaranConfigs(true));
+        allConfigs.forEach(config => {
             if (!grouped[config.category]) {
-                grouped[config.category] = {};
+                grouped[config.category] = [];
             }
-            if (!grouped[config.category][config.indicator]) {
-                grouped[config.category][config.indicator] = {};
-            }
-            grouped[config.category][config.indicator][config.sub_indicator || 'default'] = config.point_value;
+            grouped[config.category].push({
+                field1: config.field1,
+                field2: config.field2,
+                point_value: config.point_value
+            });
+
         });
         
         res.json(grouped);
@@ -86,16 +144,160 @@ router.get('/active', auth, async (req, res) => {
     }
 });
 
+router.get('/organisasi-options', auth, async (req, res) => {
+    try {
+        res.json((await getOrganisasiOptions()).filter(option => option.is_active));
+    } catch (error) {
+        console.error('Error fetching organisasi options:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+router.post('/organisasi-options', auth, superAdminOnly, async (req, res) => {
+    try {
+        const { name } = req.body;
+        if (!name?.trim()) return res.status(400).json({ message: 'Nama organisasi wajib diisi' });
+        const [result] = await db.query(
+            'INSERT INTO ipc_organisasi (name, is_active) VALUES (?, TRUE)', [name.trim()]
+        );
+        const options = await getOrganisasiOptions();
+        res.status(201).json(options.find(option => option.id === result.insertId));
+    } catch (error) {
+        if (error.code === 'ER_DUP_ENTRY') return res.status(400).json({ message: 'Organisasi sudah terdaftar' });
+        console.error('Error creating organisasi option:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+router.delete('/organisasi-options/:id', auth, superAdminOnly, async (req, res) => {
+    try {
+        const [option] = await db.query('SELECT name FROM ipc_organisasi WHERE id = ?', [req.params.id]);
+        if (!option.length) return res.status(404).json({ message: 'Organisasi tidak ditemukan' });
+        const [configs] = await db.query(
+            `SELECT COUNT(*) count FROM ipc_config WHERE category = 'organisasi' AND field1 = ?`,
+            [option[0].name]
+        );
+        if (configs[0].count > 0) {
+            return res.status(409).json({
+                message: `Organisasi ${option[0].name} tidak dapat dihapus karena masih memiliki konfigurasi point IPC`
+            });
+        }
+        await db.query('DELETE FROM ipc_organisasi WHERE id = ?', [req.params.id]);
+        res.json({ message: 'Organisasi berhasil dihapus' });
+    } catch (error) {
+        console.error('Error deleting organisasi option:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+router.get('/perilaku-characters', auth, async (req, res) => {
+    try {
+        res.json(await getPerilakuCharacters(true));
+    } catch (error) {
+        console.error('Error fetching perilaku characters:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+router.post('/perilaku-characters', auth, superAdminOnly, async (req, res) => {
+    try {
+        const { name } = req.body;
+        if (!name?.trim()) return res.status(400).json({ message: 'Nama karakter wajib diisi' });
+        const [result] = await db.query(
+            'INSERT INTO ipc_perilaku_karakter (name, is_active) VALUES (?, TRUE)', [name.trim()]
+        );
+        const options = await getPerilakuCharacters();
+        res.status(201).json(options.find(option => option.id === result.insertId));
+    } catch (error) {
+        if (error.code === 'ER_DUP_ENTRY') return res.status(400).json({ message: 'Karakter sudah terdaftar' });
+        console.error('Error creating perilaku character:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+router.delete('/perilaku-characters/:id', auth, superAdminOnly, async (req, res) => {
+    try {
+        const [option] = await db.query('SELECT name FROM ipc_perilaku_karakter WHERE id = ?', [req.params.id]);
+        if (!option.length) return res.status(404).json({ message: 'Karakter tidak ditemukan' });
+        const [configs] = await db.query(
+            `SELECT COUNT(*) count FROM ipc_config WHERE category = 'perilaku' AND field1 = ?`,
+            [option[0].name]
+        );
+        if (configs[0].count > 0) {
+            return res.status(409).json({
+                message: `Karakter ${option[0].name} tidak dapat dihapus karena masih memiliki konfigurasi point IPC`
+            });
+        }
+        await db.query('DELETE FROM ipc_perilaku_karakter WHERE id = ?', [req.params.id]);
+        res.json({ message: 'Karakter berhasil dihapus' });
+    } catch (error) {
+        console.error('Error deleting perilaku character:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+router.get('/perilaku-ratings', auth, async (req, res) => {
+    try {
+        res.json(await getPerilakuRatings(true));
+    } catch (error) {
+        console.error('Error fetching perilaku ratings:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+router.post('/perilaku-ratings', auth, superAdminOnly, async (req, res) => {
+    try {
+        const { name } = req.body;
+        if (!name?.trim()) return res.status(400).json({ message: 'Nama tingkat penilaian wajib diisi' });
+        const [result] = await db.query(
+            'INSERT INTO ipc_perilaku_tingkat (name, is_active) VALUES (?, TRUE)', [name.trim()]
+        );
+        const options = await getPerilakuRatings();
+        res.status(201).json(options.find(option => option.id === result.insertId));
+    } catch (error) {
+        if (error.code === 'ER_DUP_ENTRY') return res.status(400).json({ message: 'Tingkat penilaian sudah terdaftar' });
+        console.error('Error creating perilaku rating:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+router.delete('/perilaku-ratings/:id', auth, superAdminOnly, async (req, res) => {
+    try {
+        const [option] = await db.query('SELECT name FROM ipc_perilaku_tingkat WHERE id = ?', [req.params.id]);
+        if (!option.length) return res.status(404).json({ message: 'Tingkat penilaian tidak ditemukan' });
+        const [configs] = await db.query(
+            `SELECT COUNT(*) count FROM ipc_config WHERE category = 'perilaku' AND field2 = ?`,
+            [option[0].name]
+        );
+        if (configs[0].count > 0) {
+            return res.status(409).json({
+                message: `Tingkat penilaian ${option[0].name} tidak dapat dihapus karena masih memiliki konfigurasi point IPC`
+            });
+        }
+        await db.query('DELETE FROM ipc_perilaku_tingkat WHERE id = ?', [req.params.id]);
+        res.json({ message: 'Tingkat penilaian berhasil dihapus' });
+    } catch (error) {
+        console.error('Error deleting perilaku rating:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
 // Get single configuration
 router.get('/:id', auth, superAdminOnly, async (req, res) => {
     try {
         const { id } = req.params;
+        const pelanggaranId = parsePelanggaranId(id);
+        if (pelanggaranId) {
+            const configs = await getPelanggaranConfigs();
+            const config = configs.find(item => item.id === id);
+            return config ? res.json(config) : res.status(404).json({ message: 'Configuration not found' });
+        }
         const [configs] = await db.query(`
             SELECT 
                 id,
                 category,
-                indicator,
-                sub_indicator,
+                field1,
+                field2,
                 point_value,
                 description,
                 is_active,
@@ -121,24 +323,43 @@ router.get('/:id', auth, superAdminOnly, async (req, res) => {
 // Create new configuration
 router.post('/', auth, superAdminOnly, async (req, res) => {
     try {
-        const { category, indicator, sub_indicator, point_value, description, is_active } = req.body;
+        const { category, field1, field2, point_value, description, is_active } = req.body;
         const userId = req.user.id;
+        if (category === 'pelanggaran') {
+            if (field2) {
+                const [level] = await db.query('SELECT id FROM ipc_pelanggaran_level WHERE name = ?', [field2]);
+                if (!level.length) return res.status(400).json({ message: 'Violation level not found' });
+                const [result] = await db.query(
+                    'INSERT INTO ipc_pelanggaran_detail (name, level_id, is_active) VALUES (?, ?, ?)',
+                    [field1, level[0].id, is_active !== undefined ? is_active : true]
+                );
+                clearConfigCache();
+                return res.status(201).json((await getPelanggaranConfigs()).find(item => item.id === `detail-${result.insertId}`));
+            }
+            const [result] = await db.query(
+                'INSERT INTO ipc_pelanggaran_level (name, point_value, description, is_active) VALUES (?, ?, ?, ?)',
+                [field1, point_value, description || null, is_active !== undefined ? is_active : true]
+            );
+            clearConfigCache();
+            return res.status(201).json((await getPelanggaranConfigs()).find(item => item.id === `level-${result.insertId}`));
+        }
         
-        if (!category || !indicator || point_value === undefined) {
-            return res.status(400).json({ message: 'Category, indicator, and point_value are required' });
+        if (!category || !field1 || point_value === undefined) {
+            return res.status(400).json({ message: 'Category, field1, and point_value are required' });
         }
         
         const [result] = await db.query(`
-            INSERT INTO ipc_config (category, indicator, sub_indicator, point_value, description, is_active, updated_by)
+            INSERT INTO ipc_config (category, field1, field2, point_value, description, is_active, updated_by)
             VALUES (?, ?, ?, ?, ?, ?, ?)
-        `, [category, indicator, sub_indicator || null, point_value, description || null, is_active !== undefined ? is_active : true, userId]);
+        `, [category, field1, field2 || null, point_value, description || null, is_active !== undefined ? is_active : true, userId]);
         
+        clearConfigCache();
         const [newConfig] = await db.query('SELECT * FROM ipc_config WHERE id = ?', [result.insertId]);
         res.status(201).json(newConfig[0]);
     } catch (error) {
         console.error('Error creating IPC configuration:', error);
         if (error.code === 'ER_DUP_ENTRY') {
-            return res.status(400).json({ message: 'Configuration with this category, indicator, and sub_indicator already exists' });
+            return res.status(400).json({ message: 'Configuration with this category, field1, and field2 already exists' });
         }
         res.status(500).json({ message: 'Server error' });
     }
@@ -148,8 +369,21 @@ router.post('/', auth, superAdminOnly, async (req, res) => {
 router.put('/:id', auth, superAdminOnly, async (req, res) => {
     try {
         const { id } = req.params;
-        const { category, indicator, sub_indicator, point_value, description, is_active } = req.body;
+        const { category, field1, field2, point_value, description, is_active } = req.body;
         const userId = req.user.id;
+        const pelanggaranId = parsePelanggaranId(id);
+        if (pelanggaranId) {
+            const table = pelanggaranId.type === 'level' ? 'ipc_pelanggaran_level' : 'ipc_pelanggaran_detail';
+            const fieldUpdates = pelanggaranId.type === 'level'
+                ? ['point_value = ?', 'description = ?', 'is_active = ?']
+                : ['is_active = ?'];
+            const values = pelanggaranId.type === 'level'
+                ? [point_value, description ?? null, is_active, pelanggaranId.value]
+                : [is_active, pelanggaranId.value];
+            await db.query(`UPDATE ${table} SET ${fieldUpdates.join(', ')} WHERE id = ?`, values);
+            clearConfigCache();
+            return res.json((await getPelanggaranConfigs()).find(item => item.id === id));
+        }
         
         // Check if configuration exists
         const [existing] = await db.query('SELECT * FROM ipc_config WHERE id = ?', [id]);
@@ -157,14 +391,14 @@ router.put('/:id', auth, superAdminOnly, async (req, res) => {
             return res.status(404).json({ message: 'Configuration not found' });
         }
         
-        const [result] = await db.query(`
+        await db.query(`
             UPDATE ipc_config
-            SET category = ?, indicator = ?, sub_indicator = ?, point_value = ?, description = ?, is_active = ?, updated_by = ?
+            SET category = ?, field1 = ?, field2 = ?, point_value = ?, description = ?, is_active = ?, updated_by = ?
             WHERE id = ?
         `, [
             category || existing[0].category,
-            indicator || existing[0].indicator,
-            sub_indicator !== undefined ? sub_indicator : existing[0].sub_indicator,
+            field1 || existing[0].field1,
+            field2 !== undefined ? field2 : existing[0].field2,
             point_value !== undefined ? point_value : existing[0].point_value,
             description !== undefined ? description : existing[0].description,
             is_active !== undefined ? is_active : existing[0].is_active,
@@ -172,12 +406,13 @@ router.put('/:id', auth, superAdminOnly, async (req, res) => {
             id
         ]);
         
+        clearConfigCache();
         const [updatedConfig] = await db.query('SELECT * FROM ipc_config WHERE id = ?', [id]);
         res.json(updatedConfig[0]);
     } catch (error) {
         console.error('Error updating IPC configuration:', error);
         if (error.code === 'ER_DUP_ENTRY') {
-            return res.status(400).json({ message: 'Configuration with this category, indicator, and sub_indicator already exists' });
+            return res.status(400).json({ message: 'Configuration with this category, field1, and field2 already exists' });
         }
         res.status(500).json({ message: 'Server error' });
     }
@@ -187,6 +422,16 @@ router.put('/:id', auth, superAdminOnly, async (req, res) => {
 router.delete('/:id', auth, superAdminOnly, async (req, res) => {
     try {
         const { id } = req.params;
+        const pelanggaranId = parsePelanggaranId(id);
+        if (pelanggaranId) {
+            const table = pelanggaranId.type === 'level' ? 'ipc_pelanggaran_level' : 'ipc_pelanggaran_detail';
+            const [result] = await db.query(`DELETE FROM ${table} WHERE id = ?`, [pelanggaranId.value]);
+            if (result.affectedRows) {
+                clearConfigCache();
+                return res.json({ message: 'Configuration deleted successfully' });
+            }
+            return res.status(404).json({ message: 'Configuration not found' });
+        }
         
         const [result] = await db.query('DELETE FROM ipc_config WHERE id = ?', [id]);
         
@@ -194,6 +439,7 @@ router.delete('/:id', auth, superAdminOnly, async (req, res) => {
             return res.status(404).json({ message: 'Configuration not found' });
         }
         
+        clearConfigCache();
         res.json({ message: 'Configuration deleted successfully' });
     } catch (error) {
         console.error('Error deleting IPC configuration:', error);
@@ -201,86 +447,22 @@ router.delete('/:id', auth, superAdminOnly, async (req, res) => {
     }
 });
 
-// Reset to default configurations
-router.post('/reset-defaults', auth, superAdminOnly, async (req, res) => {
+// Delete all configurations by category
+router.delete('/all/:category', auth, superAdminOnly, async (req, res) => {
     try {
-        const userId = req.user.id;
-        
-        // Delete all existing configurations
-        await db.query('DELETE FROM ipc_config');
-        
-        // Insert default configurations
-        const defaults = [
-            // PRESTASI
-            { category: 'prestasi', indicator: 'juara', sub_indicator: 'juara 1', point_value: 8, description: 'Juara 1 - prestasi tertinggi' },
-            { category: 'prestasi', indicator: 'juara', sub_indicator: 'juara 2', point_value: 6, description: 'Juara 2 - prestasi tinggi' },
-            { category: 'prestasi', indicator: 'juara', sub_indicator: 'juara 3', point_value: 5, description: 'Juara 3 - prestasi baik' },
-            { category: 'prestasi', indicator: 'juara', sub_indicator: 'juara harapan 1', point_value: 4, description: 'Juara Harapan 1' },
-            { category: 'prestasi', indicator: 'juara', sub_indicator: 'juara harapan 2', point_value: 3, description: 'Juara Harapan 2' },
-            { category: 'prestasi', indicator: 'juara', sub_indicator: 'juara harapan 3', point_value: 2, description: 'Juara Harapan 3' },
-            { category: 'prestasi', indicator: 'juara', sub_indicator: 'finalis', point_value: 2, description: 'Finalis' },
-            { category: 'prestasi', indicator: 'juara', sub_indicator: 'peserta', point_value: 1, description: 'Peserta' },
-            { category: 'prestasi', indicator: 'kategori', sub_indicator: 'kecamatan', point_value: 1, description: 'Multiplier untuk tingkat kecamatan' },
-            { category: 'prestasi', indicator: 'kategori', sub_indicator: 'kabupaten', point_value: 2, description: 'Multiplier untuk tingkat kabupaten' },
-            { category: 'prestasi', indicator: 'kategori', sub_indicator: 'provinsi', point_value: 3, description: 'Multiplier untuk tingkat provinsi' },
-            { category: 'prestasi', indicator: 'kategori', sub_indicator: 'nasional', point_value: 4, description: 'Multiplier untuk tingkat nasional' },
-            { category: 'prestasi', indicator: 'kategori', sub_indicator: 'internasional', point_value: 5, description: 'Multiplier untuk tingkat internasional' },
-            
-            // ORGANISASI
-            { category: 'organisasi', indicator: 'jabatan', sub_indicator: 'ketua', point_value: 5, description: 'Ketua Organisasi' },
-            { category: 'organisasi', indicator: 'jabatan', sub_indicator: 'wakil ketua', point_value: 4, description: 'Wakil Ketua Organisasi' },
-            { category: 'organisasi', indicator: 'jabatan', sub_indicator: 'sekretaris', point_value: 4, description: 'Sekretaris Organisasi' },
-            { category: 'organisasi', indicator: 'jabatan', sub_indicator: 'bendahara', point_value: 3, description: 'Bendahara Organisasi' },
-            { category: 'organisasi', indicator: 'jabatan', sub_indicator: 'koordinator', point_value: 2, description: 'Koordinator Organisasi' },
-            { category: 'organisasi', indicator: 'jabatan', sub_indicator: 'anggota', point_value: 1, description: 'Anggota Organisasi' },
-            
-            // KEPANITIAAN
-            { category: 'kepanitiaan', indicator: 'jabatan', sub_indicator: 'ketua', point_value: 5, description: 'Ketua Kepanitiaan' },
-            { category: 'kepanitiaan', indicator: 'jabatan', sub_indicator: 'wakil ketua', point_value: 4, description: 'Wakil Ketua Kepanitiaan' },
-            { category: 'kepanitiaan', indicator: 'jabatan', sub_indicator: 'sekretaris', point_value: 4, description: 'Sekretaris Kepanitiaan' },
-            { category: 'kepanitiaan', indicator: 'jabatan', sub_indicator: 'bendahara', point_value: 3, description: 'Bendahara Kepanitiaan' },
-            { category: 'kepanitiaan', indicator: 'jabatan', sub_indicator: 'koordinator', point_value: 2, description: 'Koordinator Kepanitiaan' },
-            { category: 'kepanitiaan', indicator: 'jabatan', sub_indicator: 'anggota', point_value: 1, description: 'Anggota Kepanitiaan' },
-            
-            // EVENT
-            { category: 'event', indicator: 'tingkat', sub_indicator: 'sekolah', point_value: 2, description: 'Event tingkat sekolah' },
-            { category: 'event', indicator: 'tingkat', sub_indicator: 'kecamatan', point_value: 4, description: 'Event tingkat kecamatan' },
-            { category: 'event', indicator: 'tingkat', sub_indicator: 'kabupaten', point_value: 6, description: 'Event tingkat kabupaten' },
-            { category: 'event', indicator: 'tingkat', sub_indicator: 'provinsi', point_value: 8, description: 'Event tingkat provinsi' },
-            { category: 'event', indicator: 'tingkat', sub_indicator: 'nasional', point_value: 10, description: 'Event tingkat nasional' },
-            { category: 'event', indicator: 'tingkat', sub_indicator: 'internasional', point_value: 12, description: 'Event tingkat internasional' },
-            
-            // PELANGGARAN
-            { category: 'pelanggaran', indicator: 'jenis', sub_indicator: 'ringan', point_value: -1, description: 'Pelanggaran ringan' },
-            { category: 'pelanggaran', indicator: 'jenis', sub_indicator: 'sedang', point_value: -5, description: 'Pelanggaran sedang' },
-            { category: 'pelanggaran', indicator: 'jenis', sub_indicator: 'berat', point_value: -25, description: 'Pelanggaran berat' },
-            
-            // PERILAKU
-            { category: 'perilaku', indicator: 'karakter', sub_indicator: 'kurang baik', point_value: 1, description: 'Penilaian karakter kurang baik' },
-            { category: 'perilaku', indicator: 'karakter', sub_indicator: 'cukup baik', point_value: 2, description: 'Penilaian karakter cukup baik' },
-            { category: 'perilaku', indicator: 'karakter', sub_indicator: 'baik', point_value: 3, description: 'Penilaian karakter baik' },
-            { category: 'perilaku', indicator: 'karakter', sub_indicator: 'sangat baik', point_value: 4, description: 'Penilaian karakter sangat baik' },
-            
-            // PERILAKU Indicators
-            { category: 'perilaku', indicator: 'indikator', sub_indicator: 'tanggung_jawab', point_value: 1, description: 'Indikator tanggung jawab' },
-            { category: 'perilaku', indicator: 'indikator', sub_indicator: 'disiplin', point_value: 1, description: 'Indikator disiplin' },
-            { category: 'perilaku', indicator: 'indikator', sub_indicator: 'kepedulian', point_value: 1, description: 'Indikator kepedulian' },
-            { category: 'perilaku', indicator: 'indikator', sub_indicator: 'kemandirian', point_value: 1, description: 'Indikator kemandirian' },
-            { category: 'perilaku', indicator: 'indikator', sub_indicator: 'spiritual', point_value: 1, description: 'Indikator spiritual' },
-            { category: 'perilaku', indicator: 'indikator', sub_indicator: 'kejujuran', point_value: 1, description: 'Indikator kejujuran' },
-            { category: 'perilaku', indicator: 'indikator', sub_indicator: 'kepercayaan_diri', point_value: 1, description: 'Indikator kepercayaan diri' }
-        ];
-        
-        for (const config of defaults) {
-            await db.query(`
-                INSERT INTO ipc_config (category, indicator, sub_indicator, point_value, description, is_active, updated_by)
-                VALUES (?, ?, ?, ?, ?, TRUE, ?)
-            `, [config.category, config.indicator, config.sub_indicator, config.point_value, config.description, userId]);
+        const { category } = req.params;
+
+        if (category === 'pelanggaran') {
+            await db.query('DELETE FROM ipc_pelanggaran_detail');
+            await db.query('DELETE FROM ipc_pelanggaran_level');
+        } else {
+            await db.query('DELETE FROM ipc_config WHERE category = ?', [category]);
         }
-        
-        res.json({ message: 'Configurations reset to defaults successfully' });
+
+        clearConfigCache();
+        res.json({ message: `All ${category} configurations deleted successfully` });
     } catch (error) {
-        console.error('Error resetting IPC configurations:', error);
+        console.error('Error deleting IPC configurations by category:', error);
         res.status(500).json({ message: 'Server error' });
     }
 });

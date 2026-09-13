@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { KELAS_OPTIONS, applyKelasChange } from '../utils/kelasJurusan';
 import EditModal from './EditModal';
 import useEditModal from '../hooks/useEditModal';
 import API_BASE_URL from '../config';
+import Select from 'react-select';
 
 function InputPrestasi() {
   const [formData, setFormData] = useState({
@@ -14,8 +14,8 @@ function InputPrestasi() {
     kelas: '',
     pembina: '',
     grha: '',
-    juara: 'juara 1',
-    kategori: 'kecamatan'
+    juara: 'juara_i',
+    kategori: 'sekolah'
   });
   const [foto, setFoto] = useState(null);
   const [message, setMessage] = useState('');
@@ -25,13 +25,47 @@ function InputPrestasi() {
   const [hasAccess, setHasAccess] = useState(true);
   const [checkingAccess, setCheckingAccess] = useState(true);
   const [accessMessage, setAccessMessage] = useState('');
-  const [isAutoFilled, setIsAutoFilled] = useState(false);
-  const [nisLoading, setNisLoading] = useState(false);
+  const [, setIsAutoFilled] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [allPrestasi, setAllPrestasi] = useState([]);
   const [loadingIndex, setLoadingIndex] = useState(false);
   const [userRole, setUserRole] = useState('');
   const editModal = useEditModal();
+  const [ipcConfig, setIpcConfig] = useState([]);
+  const [calculatedPoint, setCalculatedPoint] = useState(0);
+  const FIXED_TINGKAT_OPTIONS = [
+    'kecamatan',
+    'kabupaten',
+    'provinsi',
+    'nasional',
+    'internasional'
+  ];
+  const FIXED_JUARA_LOMBA_OPTIONS = [
+    'peserta',
+    'finalis',
+    'harapan_iii',
+    'harapan_ii',
+    'harapan_i',
+    'juara_iii',
+    'juara_ii',
+    'juara_i'
+  ];
+
+  const formatDisplayText = (text) => {
+    return text
+      .replace(/_/g, ' ')
+      .replace(/\b\w+\b/g, word => {
+        // Check if word is Roman numeral (I, II, III, etc.)
+        if (/^[ivx]+$/.test(word.toLowerCase())) {
+          return word.toUpperCase();
+        }
+        return word.charAt(0).toUpperCase() + word.slice(1);
+      });
+  };
+
+  const tingkatLombaOptions = FIXED_TINGKAT_OPTIONS;
+  const juaraLombaOptions = FIXED_JUARA_LOMBA_OPTIONS;
+  const [students, setStudents] = useState([]);
 
   const grhaOptions = [
     'Airsanya', 'Daksina', 'Genya', 'Madhya', 'Nairiti', 'Pascima', 'Purwa', 'Uttara', 'Wayabhya'
@@ -42,10 +76,13 @@ function InputPrestasi() {
     setUserRole(user.role || '');
     fetchTeachers();
     fetchUserSubmissions();
+    fetchIpcConfig();
+    fetchStudents();
     checkAccess();
     if (user.role === 'superadmin') {
       fetchAllPrestasi();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchAllPrestasi = async () => {
@@ -126,8 +163,6 @@ function InputPrestasi() {
         headers: { Authorization: `Bearer ${token}` }
       });
       
-      console.log('[Access Check] Response:', response.data);
-      
       const canInputPrestasi = response.data.prestasi;
       setHasAccess(canInputPrestasi);
       
@@ -189,29 +224,108 @@ function InputPrestasi() {
     }
   };
 
+  const fetchIpcConfig = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get('/ipc-config/active', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setIpcConfig(response.data);
+      const firstTingkat = response.data.prestasi?.[0]?.field1 || 'sekolah';
+      const firstJuara = response.data.prestasi?.[0]?.field2 || 'juara_i';
+      setFormData(prev => ({ ...prev, kategori: firstTingkat, juara: firstJuara }));
+      setCalculatedPoint(calculatePoint(firstTingkat, firstJuara, response.data));
+    } catch (error) {
+      console.error('Error fetching IPC config:', error);
+    }
+  };
+
+  const fetchStudents = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get('/users', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      // Filter only students
+      const studentList = response.data.filter(user => user.role === 'siswa');
+      setStudents(studentList);
+    } catch (error) {
+      console.error('Error fetching students:', error);
+    }
+  };
+
+  const calculatePoint = (tingkat, juara, configData = ipcConfig) => {
+    const config = (configData.prestasi || []).find(
+      c => c.field1 === tingkat && c.field2 === juara
+    );
+    return config ? config.point_value : 0;
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target;
-    if (name === 'kelas') {
-      setFormData(prev => applyKelasChange(prev, value));
-    } else {
-      setFormData({ ...formData, [name]: value });
+    setFormData({ ...formData, [name]: value });
+
+    // Reset auto-fill flag if user clears the field
+    if ((name === 'nis' || name === 'nama') && value === '') {
+      setIsAutoFilled(false);
     }
 
+    // Auto-fill student data when NIS is entered
     if (name === 'nis' && value.length >= 1) {
       fetchStudentData(value);
+    }
+
+    // Auto-fill student data when nama is entered
+    if (name === 'nama' && value.length >= 1) {
+      fetchStudentDataByName(value);
+    }
+
+    // Calculate point when tingkat lomba or juara changes
+    if (name === 'kategori' || name === 'juara') {
+      const newFormData = { ...formData, [name]: value };
+      // When tingkat changes, keep juara only if it exists for that tingkat
+      if (name === 'kategori') {
+        const juaraForTingkat = (ipcConfig.prestasi || [])
+          .filter(c => c.field1 === value)
+          .map(c => c.field2);
+        if (!juaraForTingkat.includes(newFormData.juara)) {
+          newFormData.juara = juaraForTingkat[0] || '';
+          setFormData(newFormData);
+        }
+      }
+      const point = calculatePoint(newFormData.kategori, newFormData.juara);
+      setCalculatedPoint(point);
+    }
+  };
+
+  const handleStudentSelect = (selectedOption) => {
+    if (selectedOption) {
+      setFormData(prev => ({
+        ...prev,
+        nama: selectedOption.nama,
+        nis: selectedOption.nis,
+        kelas: selectedOption.kelas || '',
+        grha: selectedOption.grha || ''
+      }));
+      setIsAutoFilled(true);
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        nama: '',
+        nis: '',
+        kelas: '',
+        grha: ''
+      }));
+      setIsAutoFilled(false);
     }
   };
 
   const fetchStudentData = async (nis) => {
     try {
-      setNisLoading(true);
-      console.log('Fetching student data for NIS:', nis);
       const token = localStorage.getItem('token');
       const response = await axios.get(`/users/nis/${nis}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
-      console.log('Student data response:', response.data);
       
       if (response.data) {
         setFormData(prev => ({
@@ -221,14 +335,30 @@ function InputPrestasi() {
           grha: response.data.grha || ''
         }));
         setIsAutoFilled(true);
-        console.log('Form data updated:', { nama: response.data.nama, kelas: response.data.kelas, grha: response.data.grha });
       }
     } catch (error) {
       // Student not found or error, don't show error to user and don't auto-fill
-      console.log('Student not found or error fetching data:', error.message);
-      // Don't update form data if student not found
-    } finally {
-      setNisLoading(false);
+    }
+  };
+
+  const fetchStudentDataByName = async (nama) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`/users/nama/${nama}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (response.data) {
+        setFormData(prev => ({
+          ...prev,
+          nis: response.data.nis || '',
+          kelas: response.data.kelas || '',
+          grha: response.data.grha || ''
+        }));
+        setIsAutoFilled(true);
+      }
+    } catch (error) {
+      // Student not found or error, don't show error to user and don't auto-fill
     }
   };
 
@@ -276,8 +406,8 @@ function InputPrestasi() {
         kelas: '',
         pembina: '',
         grha: '',
-        juara: 'juara 1',
-        kategori: 'kecamatan'
+        juara: 'juara_i',
+        kategori: 'sekolah'
       });
       setFoto(null);
       setIsAutoFilled(false);
@@ -341,9 +471,8 @@ function InputPrestasi() {
                     <th>Nama</th>
                     <th>NIS</th>
                     <th>Lomba</th>
-                    <th>Jenis</th>
                     <th>Juara</th>
-                    <th>Kategori</th>
+                    <th>Tingkat Lomba</th>
                     <th>Pembina</th>
                     <th>Point</th>
                     <th>Status</th>
@@ -357,9 +486,8 @@ function InputPrestasi() {
                       <td>{item.nama}</td>
                       <td>{item.nis}</td>
                       <td>{item.nama_lomba}</td>
-                      <td>{item.jenis}</td>
-                      <td>{item.juara}</td>
-                      <td>{item.kategori}</td>
+                      <td>{formatDisplayText(item.juara)}</td>
+                      <td>{formatDisplayText(item.kategori)}</td>
                       <td>{item.pembina || '-'}</td>
                       <td>{item.point}</td>
                       <td>{getStatusBadge(item)}</td>
@@ -385,64 +513,59 @@ function InputPrestasi() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <div className="form-group">
             <label>Nama <span className="required">*</span></label>
-            <input
-              type="text"
-              name="nama"
-              value={formData.nama}
-              onChange={handleChange}
-              placeholder="Nama siswa"
-              required
-              disabled={true}
-              style={{ backgroundColor: isAutoFilled ? '#f0f0f0' : '' }}
+            <Select
+              value={students.find(s => s.nama === formData.nama && s.nis === formData.nis) ? { value: formData.nama, label: formData.nama, nama: formData.nama, nis: formData.nis, kelas: formData.kelas, grha: formData.grha } : null}
+              onChange={(selected) => handleStudentSelect(selected)}
+              options={students.map(student => ({ value: student.nama, label: `${student.nama} (${student.nis})`, nama: student.nama, nis: student.nis, kelas: student.kelas, grha: student.grha }))}
+              placeholder="Cari nama siswa..."
+              isSearchable
+              isClearable
+              styles={{
+                control: (provided) => ({
+                  ...provided,
+                  minHeight: '40px'
+                })
+              }}
             />
-            {isAutoFilled && <p className="form-helper-text">Data diisi otomatis dari NIS</p>}
           </div>
           <div className="form-group">
             <label>NIS <span className="required">*</span></label>
-            <input
-              type="text"
-              name="nis"
-              value={formData.nis}
-              onChange={handleChange}
-              placeholder="Masukkan NIS siswa"
-              required
-              className={nisLoading ? 'auto-fill-loading' : (isAutoFilled ? 'auto-fill-success' : 'nis-input-highlight')}
+            <Select
+              value={students.find(s => s.nis === formData.nis) ? { value: formData.nis, label: formData.nis, nama: formData.nama, nis: formData.nis, kelas: formData.kelas, grha: formData.grha } : null}
+              onChange={(selected) => handleStudentSelect(selected)}
+              options={students.map(student => ({ value: student.nis, label: `${student.nis} - ${student.nama}`, nama: student.nama, nis: student.nis, kelas: student.kelas, grha: student.grha }))}
+              placeholder="Cari NIS siswa..."
+              isSearchable
+              isClearable
+              styles={{
+                control: (provided) => ({
+                  ...provided,
+                  minHeight: '40px'
+                })
+              }}
             />
-            <p className="form-helper-text">Masukkan NIS untuk mengisi data siswa secara otomatis</p>
           </div>
         </div>
         
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <div className="form-group">
             <label>Kelas</label>
-            <select name="kelas" 
-            value={formData.kelas} 
-            onChange={handleChange} required disabled={true} style={{ backgroundColor: isAutoFilled ? '#f0f0f0' : '' }}>
-              <option value="">Pilih Kelas</option>
-              {KELAS_OPTIONS.map(kelas => (
-                <option key={kelas} value={kelas}>{kelas}</option>
-              ))}
-            </select>
-            <p className="form-helper-text">Data diisi otomatis dari NIS</p>
+            <input 
+              type="text" 
+              name="kelas" 
+              value={formData.kelas} 
+              onChange={handleChange} 
+              placeholder="Data diisi otomatis"
+              disabled
+              style={{ backgroundColor: '#f0f0f0', cursor: 'not-allowed' }}
+            />
           </div>
           <div className="form-group">
             <label>Grha</label>
-            <select name="grha" value={formData.grha} onChange={handleChange} disabled={true} style={{ backgroundColor: isAutoFilled ? '#f0f0f0' : '' }}>
-              <option value="">Pilih Grha</option>
+            <select name="grha" value={formData.grha} disabled onChange={handleChange}>
               {grhaOptions.map(grha => (
                 <option key={grha} value={grha}>{grha}</option>
               ))}
-            </select>
-            <p className="form-helper-text">Data diisi otomatis dari NIS</p>
-          </div>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-          <div className="form-group">
-            <label>Jenis</label>
-            <select name="jenis" value={formData.jenis} onChange={handleChange}>
-              <option value="akademik">Akademik</option>
-              <option value="nonakademik">Non-Akademik</option>
             </select>
           </div>
         </div>
@@ -482,26 +605,37 @@ function InputPrestasi() {
           <div className="form-group">
             <label>Juara</label>
             <select name="juara" value={formData.juara} onChange={handleChange}>
-              <option value="juara 1">Juara 1</option>
-              <option value="juara 2">Juara 2</option>
-              <option value="juara 3">Juara 3</option>
-              <option value="juara harapan 1">Juara Harapan 1</option>
-              <option value="juara harapan 2">Juara Harapan 2</option>
-              <option value="juara harapan 3">Juara Harapan 3</option>
-              <option value="finalis">Finalis</option>
-              <option value="peserta">Peserta</option>
+              {juaraLombaOptions.map(juara => (
+                <option key={juara} value={juara}>{formatDisplayText(juara)}</option>
+              ))}
             </select>
           </div>
           <div className="form-group">
-            <label>Kategori</label>
+            <label>Tingkat Lomba</label>
             <select name="kategori" value={formData.kategori} onChange={handleChange}>
-              <option value="kecamatan">Kecamatan</option>
-              <option value="kabupaten">Kabupaten</option>
-              <option value="provinsi">Provinsi</option>
-              <option value="nasional">Nasional</option>
-              <option value="internasional">Internasional</option>
+              {tingkatLombaOptions.map(tingkat => (
+                <option key={tingkat} value={tingkat}>{formatDisplayText(tingkat)}</option>
+              ))}
             </select>
           </div>
+        </div>
+
+        <div className="form-group" style={{ 
+          padding: '12px', 
+          background: calculatedPoint > 0 ? '#EAFBF3' : '#FEE2E2',
+          borderRadius: '4px',
+          marginTop: '12px'
+        }}>
+          <label style={{ fontWeight: '600', marginBottom: '4px', display: 'block' }}>
+            Point IPC yang akan didapatkan:
+          </label>
+          <span style={{ 
+            fontSize: '18px', 
+            fontWeight: '700',
+            color: calculatedPoint > 0 ? '#0F7A55' : '#DC2626'
+          }}>
+            {calculatedPoint > 0 ? '+' : ''}{calculatedPoint}
+          </span>
         </div>
 
         <button
@@ -540,23 +674,20 @@ function InputPrestasi() {
             type="text"
             value={editModal.editFormData.nis || ''}
             onChange={(e) => editModal.setEditFormData({ ...editModal.editFormData, nis: e.target.value })}
+            disabled
             placeholder="NIS"
           />
         </div>
 
         <div className="form-group">
           <label>Kelas</label>
-          <select 
+          <input 
+            type="text" 
             value={editModal.editFormData.kelas || ''} 
-            required
-            disabled={true}
             onChange={(e) => editModal.setEditFormData({ ...editModal.editFormData, kelas: e.target.value })}
-          >
-            <option value="">Pilih Kelas</option>
-            {KELAS_OPTIONS.map(kelas => (
-              <option key={kelas} value={kelas}>{kelas}</option>
-            ))}
-          </select>
+            disabled
+            style={{ backgroundColor: '#f0f0f0', cursor: 'not-allowed' }}
+          />
         </div>
 
         <div className="form-group">
@@ -586,14 +717,6 @@ function InputPrestasi() {
         </div>
 
         <div className="form-group">
-          <label>Jenis</label>
-          <select name="jenis" value={editModal.editFormData.jenis || ''} onChange={(e) => editModal.setEditFormData({ ...editModal.editFormData, jenis: e.target.value })}>
-            <option value="akademik">Akademik</option>
-            <option value="nonakademik">Non-Akademik</option>
-          </select>
-        </div>
-
-        <div className="form-group">
           <label>Pembina</label>
           <select name="pembina" value={editModal.editFormData.pembina} onChange={(e) => editModal.setEditFormData({ ...editModal.editFormData, pembina: e.target.value })}>
             <option value="">Pilih Pembina</option>
@@ -606,25 +729,18 @@ function InputPrestasi() {
         <div className="form-group">
           <label>Juara</label>
           <select name="juara" value={editModal.editFormData.juara} onChange={(e) => editModal.setEditFormData({ ...editModal.editFormData, juara: e.target.value })}>
-            <option value="juara 1">Juara 1</option>
-            <option value="juara 2">Juara 2</option>
-            <option value="juara 3">Juara 3</option>
-            <option value="juara harapan 1">Juara Harapan 1</option>
-            <option value="juara harapan 2">Juara Harapan 2</option>
-            <option value="juara harapan 3">Juara Harapan 3</option>
-            <option value="finalis">Finalis</option>
-            <option value="peserta">Peserta</option>
+            {FIXED_JUARA_LOMBA_OPTIONS.map(juara => (
+              <option key={juara} value={juara}>{formatDisplayText(juara)}</option>
+            ))}
           </select>
         </div>
 
         <div className="form-group">
-          <label>Kategori</label>
+          <label>Tingkat Lomba</label>
           <select name="kategori" value={editModal.editFormData.kategori} onChange={(e) => editModal.setEditFormData({ ...editModal.editFormData, kategori: e.target.value })}>
-            <option value="kecamatan">Kecamatan</option>
-            <option value="kabupaten">Kabupaten</option>
-            <option value="provinsi">Provinsi</option>
-            <option value="nasional">Nasional</option>
-            <option value="internasional">Internasional</option>
+            {FIXED_TINGKAT_OPTIONS.map(tingkat => (
+              <option key={tingkat} value={tingkat}>{formatDisplayText(tingkat)}</option>
+            ))}
           </select>
         </div>
       </EditModal>
@@ -651,7 +767,7 @@ function InputPrestasi() {
                   <tr key={item.id}>
                     <td>{new Date(item.created_at).toLocaleDateString('id-ID')}</td>
                     <td>{item.nama_lomba}</td>
-                    <td>{item.juara}</td>
+                    <td>{formatDisplayText(item.juara)}</td>
                     <td>{item.pembina || '-'}</td>
                     <td>{getStatusBadge(item)}</td>
                   </tr>

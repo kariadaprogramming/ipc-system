@@ -1,7 +1,8 @@
 -- Database Schema for IPC School System
 -- Complete Schema - Import this file AFTER selecting database 'ipc_school' in phpMyAdmin
 -- This file contains all tables: users, permissions, prestasi, organisasi, event, pelanggaran, perilaku, 
--- activity_logs, ipc_history, wali_kelas_assignment, approvals, notifications, drive_links, input_access_control
+-- ipc configuration, activity_logs, ipc_history, wali_kelas_assignment, approvals,
+-- notifications, drive_links, input_access_control
 
 -- Disable foreign key checks to allow dropping tables in any order
 SET FOREIGN_KEY_CHECKS=0;
@@ -14,7 +15,6 @@ CREATE TABLE users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nama VARCHAR(100) NOT NULL,
     nis VARCHAR(20) UNIQUE,
-    nisn VARCHAR(20) UNIQUE,
     nip VARCHAR(20) UNIQUE,
     password VARCHAR(255) NOT NULL,
     role ENUM('superadmin', 'guru', 'siswa') NOT NULL,
@@ -26,7 +26,7 @@ CREATE TABLE users (
     ipc_awal INT DEFAULT 80,
     alamat TEXT,
     no_hp VARCHAR(20),
-    detail VARCHAR(100),
+    detail VARCHAR(100), -- Legacy database column; stores teacher jabatan
     foto VARCHAR(255),
     tahun_pelajaran VARCHAR(9) DEFAULT NULL COMMENT 'Academic year when student first enrolled (YYYY-YYYY format)',
     is_graduated TINYINT(1) DEFAULT 0 COMMENT 'Whether student has graduated (0=active, 1=graduated)',
@@ -41,11 +41,84 @@ CREATE TABLE permissions (
     user_id INT NOT NULL,
     can_input_prestasi BOOLEAN DEFAULT FALSE,
     can_input_organisasi BOOLEAN DEFAULT FALSE,
+    can_input_kepanitiaan BOOLEAN DEFAULT FALSE,
     can_input_event BOOLEAN DEFAULT FALSE,
     can_input_pelanggaran BOOLEAN DEFAULT FALSE,
     can_input_perilaku BOOLEAN DEFAULT FALSE,
     can_view_all_data BOOLEAN DEFAULT FALSE,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- ==================== IPC CONFIGURATION TABLES ====================
+
+-- Organization options managed by IPC configuration
+DROP TABLE IF EXISTS ipc_organisasi;
+CREATE TABLE ipc_organisasi (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+DROP TABLE IF EXISTS ipc_perilaku_karakter;
+CREATE TABLE ipc_perilaku_karakter (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+DROP TABLE IF EXISTS ipc_perilaku_tingkat;
+CREATE TABLE ipc_perilaku_tingkat (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Main IPC point configuration
+DROP TABLE IF EXISTS ipc_config;
+CREATE TABLE ipc_config (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    category VARCHAR(50) NOT NULL,
+    field1 VARCHAR(100) DEFAULT NULL,
+    field2 VARCHAR(100) DEFAULT NULL,
+    field3 VARCHAR(100) DEFAULT NULL COMMENT 'Legacy compatibility column',
+    point_value INT NOT NULL,
+    description TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    updated_by INT DEFAULT NULL,
+    UNIQUE KEY unique_config (category, field1, field2, field3),
+    FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
+);
+
+-- Pelanggaran configuration is split into levels and coarse details
+DROP TABLE IF EXISTS ipc_pelanggaran_detail;
+DROP TABLE IF EXISTS ipc_pelanggaran_level;
+CREATE TABLE ipc_pelanggaran_level (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    point_value INT NOT NULL,
+    description TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE ipc_pelanggaran_detail (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(150) NOT NULL UNIQUE,
+    level_id INT NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (level_id) REFERENCES ipc_pelanggaran_level(id)
+        ON UPDATE CASCADE ON DELETE RESTRICT
 );
 
 -- ==================== DATA TABLES ====================
@@ -63,8 +136,8 @@ CREATE TABLE prestasi (
     kelas VARCHAR(50),
     pembina VARCHAR(100),
     grha VARCHAR(50),
-    juara ENUM('juara 1', 'juara 2', 'juara 3', 'juara harapan 1', 'juara harapan 2', 'juara harapan 3', 'finalis', 'peserta') NOT NULL,
-    kategori ENUM('kecamatan', 'kabupaten', 'provinsi', 'nasional', 'internasional') NOT NULL,
+    juara VARCHAR(100) NOT NULL COMMENT 'Driven by ipc_config prestasi.field2',
+    kategori VARCHAR(100) NOT NULL COMMENT 'Driven by ipc_config prestasi.field1 (tingkat)',
     point INT NOT NULL,
     status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
     rejection_reason TEXT,
@@ -120,7 +193,7 @@ CREATE TABLE event (
     kelas VARCHAR(50),
     grha VARCHAR(50),
     nama_event VARCHAR(255) NOT NULL,
-    tingkat ENUM('sekolah', 'kecamatan', 'kabupaten', 'provinsi', 'nasional', 'internasional') NOT NULL,
+    tingkat VARCHAR(100) NOT NULL COMMENT 'Driven by ipc_config event.field1',
     foto VARCHAR(255),
     point INT NOT NULL,
     status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
@@ -140,7 +213,7 @@ CREATE TABLE pelanggaran (
     grha VARCHAR(50),
     keterangan TEXT NOT NULL,
     foto VARCHAR(255),
-    jenis_pelanggaran ENUM('ringan', 'sedang', 'berat') NOT NULL,
+    jenis_pelanggaran VARCHAR(100) NOT NULL,
     point_dikurangi INT NOT NULL,
     status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
     rejection_reason TEXT,
@@ -204,7 +277,8 @@ CREATE TABLE wali_kelas_assignment (
     tahun_ajaran VARCHAR(20) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (guru_id) REFERENCES users(id) ON DELETE CASCADE,
-    UNIQUE KEY unique_guru_kelas (guru_id, kelas, tahun_ajaran)
+    UNIQUE KEY unique_guru_kelas (guru_id, kelas, tahun_ajaran),
+    UNIQUE KEY unique_kelas_tahun_ajaran (kelas, tahun_ajaran)
 );
 
 -- ==================== APPROVAL TABLES ====================
@@ -322,7 +396,6 @@ CREATE TABLE siswa_approvals (
     user_id INT NOT NULL,
     nama VARCHAR(255) NOT NULL,
     nis VARCHAR(50) NOT NULL,
-    nisn VARCHAR(50) NOT NULL,
     kelas VARCHAR(50),
     grha VARCHAR(50),
     password_hash VARCHAR(255),
@@ -344,14 +417,12 @@ CREATE TABLE biodata_update_approvals (
     user_id INT NOT NULL,
     nama_baru VARCHAR(100),
     nis_baru VARCHAR(20),
-    nisn_baru VARCHAR(20),
     kelas_baru VARCHAR(50),
     jurusan_baru VARCHAR(50) DEFAULT NULL COMMENT 'New jurusan value',
     tahun_pelajaran_baru VARCHAR(9) DEFAULT NULL COMMENT 'New tahun_pelajaran value',
     grha_baru VARCHAR(50),
     nama_lama VARCHAR(100),
     nis_lama VARCHAR(20),
-    nisn_lama VARCHAR(20),
     kelas_lama VARCHAR(50),
     jurusan_lama VARCHAR(50) DEFAULT NULL COMMENT 'Old jurusan value',
     tahun_pelajaran_lama VARCHAR(9) DEFAULT NULL COMMENT 'Old tahun_pelajaran value',
@@ -374,7 +445,6 @@ CREATE TABLE student_creation_approvals (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nama VARCHAR(100) NOT NULL,
     nis VARCHAR(20) NOT NULL,
-    nisn VARCHAR(20) NOT NULL,
     kelas VARCHAR(50) NOT NULL,
     grha VARCHAR(50),
     jurusan VARCHAR(50) DEFAULT NULL COMMENT 'Student program/stream (e.g., TKJ 1, TO 2)',
@@ -407,6 +477,21 @@ CREATE TABLE notifications (
 
 -- ==================== DRIVE LINKS TABLE ====================
 -- REMOVED: Google Drive integration replaced with local server storage
+
+-- ==================== SCHOOL CONFIGURATION TABLE ====================
+
+-- School Configuration Table
+DROP TABLE IF EXISTS school_config;
+CREATE TABLE school_config (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    school_name VARCHAR(255) DEFAULT 'SMK Negeri Bali Mandara',
+    school_description VARCHAR(255) DEFAULT 'Sistem Individual Point Card (IPC) • Panel Admin',
+    principal_name VARCHAR(255) DEFAULT 'Nama Kepala Sekolah',
+    principal_nip VARCHAR(50) DEFAULT '',
+    logo_url VARCHAR(255) DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
 
 -- ==================== INPUT ACCESS CONTROL TABLES ====================
 
@@ -480,6 +565,173 @@ INSERT INTO input_access_control (control_type, role_target, jenis_input, is_ena
 ('global', 'all', 'event', TRUE, 1),
 ('global', 'all', 'pelanggaran', TRUE, 1),
 ('global', 'all', 'perilaku', TRUE, 1);
+
+-- ==================== DEFAULT IPC POINT CONFIGURATION ====================
+-- Matches KonfigurasiIPC reset-defaults / ipc_config_schema.sql
+
+INSERT INTO ipc_pelanggaran_level (name, point_value, description, is_active) VALUES
+('ringan', -1, 'Point untuk pelanggaran ringan', TRUE),
+('sedang', -5, 'Point untuk pelanggaran sedang', TRUE),
+('berat', -25, 'Point untuk pelanggaran berat', TRUE);
+
+INSERT INTO ipc_config (category, field1, field2, field3, point_value, description) VALUES
+-- PRESTASI (field1=tingkat, field2=juara)
+('prestasi', 'sekolah', 'juara_i', NULL, 5, 'Juara I tingkat sekolah'),
+('prestasi', 'sekolah', 'juara_ii', NULL, 4, 'Juara II tingkat sekolah'),
+('prestasi', 'sekolah', 'juara_iii', NULL, 3, 'Juara III tingkat sekolah'),
+('prestasi', 'sekolah', 'harapan_i', NULL, 2, 'Harapan I tingkat sekolah'),
+('prestasi', 'sekolah', 'harapan_ii', NULL, 2, 'Harapan II tingkat sekolah'),
+('prestasi', 'sekolah', 'harapan_iii', NULL, 1, 'Harapan III tingkat sekolah'),
+('prestasi', 'sekolah', 'finalis', NULL, 1, 'Finalis tingkat sekolah'),
+('prestasi', 'sekolah', 'peserta', NULL, 1, 'Peserta tingkat sekolah'),
+('prestasi', 'kecamatan', 'juara_i', NULL, 8, 'Juara I tingkat kecamatan'),
+('prestasi', 'kecamatan', 'juara_ii', NULL, 7, 'Juara II tingkat kecamatan'),
+('prestasi', 'kecamatan', 'juara_iii', NULL, 6, 'Juara III tingkat kecamatan'),
+('prestasi', 'kecamatan', 'harapan_i', NULL, 5, 'Harapan I tingkat kecamatan'),
+('prestasi', 'kecamatan', 'harapan_ii', NULL, 4, 'Harapan II tingkat kecamatan'),
+('prestasi', 'kecamatan', 'harapan_iii', NULL, 3, 'Harapan III tingkat kecamatan'),
+('prestasi', 'kecamatan', 'finalis', NULL, 2, 'Finalis tingkat kecamatan'),
+('prestasi', 'kecamatan', 'peserta', NULL, 1, 'Peserta tingkat kecamatan'),
+('prestasi', 'kabupaten', 'juara_i', NULL, 12, 'Juara I tingkat kabupaten'),
+('prestasi', 'kabupaten', 'juara_ii', NULL, 10, 'Juara II tingkat kabupaten'),
+('prestasi', 'kabupaten', 'juara_iii', NULL, 8, 'Juara III tingkat kabupaten'),
+('prestasi', 'kabupaten', 'harapan_i', NULL, 7, 'Harapan I tingkat kabupaten'),
+('prestasi', 'kabupaten', 'harapan_ii', NULL, 6, 'Harapan II tingkat kabupaten'),
+('prestasi', 'kabupaten', 'harapan_iii', NULL, 5, 'Harapan III tingkat kabupaten'),
+('prestasi', 'kabupaten', 'finalis', NULL, 4, 'Finalis tingkat kabupaten'),
+('prestasi', 'kabupaten', 'peserta', NULL, 3, 'Peserta tingkat kabupaten'),
+('prestasi', 'provinsi', 'juara_i', NULL, 30, 'Juara I tingkat provinsi'),
+('prestasi', 'provinsi', 'juara_ii', NULL, 25, 'Juara II tingkat provinsi'),
+('prestasi', 'provinsi', 'juara_iii', NULL, 20, 'Juara III tingkat provinsi'),
+('prestasi', 'provinsi', 'harapan_i', NULL, 15, 'Harapan I tingkat provinsi'),
+('prestasi', 'provinsi', 'harapan_ii', NULL, 12, 'Harapan II tingkat provinsi'),
+('prestasi', 'provinsi', 'harapan_iii', NULL, 10, 'Harapan III tingkat provinsi'),
+('prestasi', 'provinsi', 'finalis', NULL, 8, 'Finalis tingkat provinsi'),
+('prestasi', 'provinsi', 'peserta', NULL, 5, 'Peserta tingkat provinsi'),
+('prestasi', 'nasional', 'juara_i', NULL, 40, 'Juara I tingkat nasional'),
+('prestasi', 'nasional', 'juara_ii', NULL, 35, 'Juara II tingkat nasional'),
+('prestasi', 'nasional', 'juara_iii', NULL, 30, 'Juara III tingkat nasional'),
+('prestasi', 'nasional', 'harapan_i', NULL, 25, 'Harapan I tingkat nasional'),
+('prestasi', 'nasional', 'harapan_ii', NULL, 20, 'Harapan II tingkat nasional'),
+('prestasi', 'nasional', 'harapan_iii', NULL, 15, 'Harapan III tingkat nasional'),
+('prestasi', 'nasional', 'finalis', NULL, 15, 'Finalis tingkat nasional'),
+('prestasi', 'nasional', 'peserta', NULL, 10, 'Peserta tingkat nasional'),
+('prestasi', 'internasional', 'juara_i', NULL, 50, 'Juara I tingkat internasional'),
+('prestasi', 'internasional', 'juara_ii', NULL, 45, 'Juara II tingkat internasional'),
+('prestasi', 'internasional', 'juara_iii', NULL, 40, 'Juara III tingkat internasional'),
+('prestasi', 'internasional', 'harapan_i', NULL, 35, 'Harapan I tingkat internasional'),
+('prestasi', 'internasional', 'harapan_ii', NULL, 30, 'Harapan II tingkat internasional'),
+('prestasi', 'internasional', 'harapan_iii', NULL, 25, 'Harapan III tingkat internasional'),
+('prestasi', 'internasional', 'finalis', NULL, 20, 'Finalis tingkat internasional'),
+('prestasi', 'internasional', 'peserta', NULL, 15, 'Peserta tingkat internasional'),
+-- PERILAKU
+('perilaku', 'tanggung_jawab', 'sangat baik', NULL, 4, 'Karakter tanggung jawab sangat baik'),
+('perilaku', 'tanggung_jawab', 'baik', NULL, 3, 'Karakter tanggung jawab baik'),
+('perilaku', 'tanggung_jawab', 'cukup baik', NULL, 2, 'Karakter tanggung jawab cukup baik'),
+('perilaku', 'tanggung_jawab', 'kurang baik', NULL, 1, 'Karakter tanggung jawab kurang baik'),
+('perilaku', 'disiplin', 'sangat baik', NULL, 4, 'Karakter disiplin sangat baik'),
+('perilaku', 'disiplin', 'baik', NULL, 3, 'Karakter disiplin baik'),
+('perilaku', 'disiplin', 'cukup baik', NULL, 2, 'Karakter disiplin cukup baik'),
+('perilaku', 'disiplin', 'kurang baik', NULL, 1, 'Karakter disiplin kurang baik'),
+('perilaku', 'kepedulian', 'sangat baik', NULL, 4, 'Karakter kepedulian sangat baik'),
+('perilaku', 'kepedulian', 'baik', NULL, 3, 'Karakter kepedulian baik'),
+('perilaku', 'kepedulian', 'cukup baik', NULL, 2, 'Karakter kepedulian cukup baik'),
+('perilaku', 'kepedulian', 'kurang baik', NULL, 1, 'Karakter kepedulian kurang baik'),
+('perilaku', 'kemandirian', 'sangat baik', NULL, 4, 'Karakter kemandirian sangat baik'),
+('perilaku', 'kemandirian', 'baik', NULL, 3, 'Karakter kemandirian baik'),
+('perilaku', 'kemandirian', 'cukup baik', NULL, 2, 'Karakter kemandirian cukup baik'),
+('perilaku', 'kemandirian', 'kurang baik', NULL, 1, 'Karakter kemandirian kurang baik'),
+('perilaku', 'spiritual', 'sangat baik', NULL, 4, 'Karakter spiritual sangat baik'),
+('perilaku', 'spiritual', 'baik', NULL, 3, 'Karakter spiritual baik'),
+('perilaku', 'spiritual', 'cukup baik', NULL, 2, 'Karakter spiritual cukup baik'),
+('perilaku', 'spiritual', 'kurang baik', NULL, 1, 'Karakter spiritual kurang baik'),
+('perilaku', 'kejujuran', 'sangat baik', NULL, 4, 'Karakter kejujuran sangat baik'),
+('perilaku', 'kejujuran', 'baik', NULL, 3, 'Karakter kejujuran baik'),
+('perilaku', 'kejujuran', 'cukup baik', NULL, 2, 'Karakter kejujuran cukup baik'),
+('perilaku', 'kejujuran', 'kurang baik', NULL, 1, 'Karakter kejujuran kurang baik'),
+('perilaku', 'kepercayaan_diri', 'sangat baik', NULL, 4, 'Karakter kepercayaan diri sangat baik'),
+('perilaku', 'kepercayaan_diri', 'baik', NULL, 3, 'Karakter kepercayaan diri baik'),
+('perilaku', 'kepercayaan_diri', 'cukup baik', NULL, 2, 'Karakter kepercayaan diri cukup baik'),
+('perilaku', 'kepercayaan_diri', 'kurang baik', NULL, 1, 'Karakter kepercayaan diri kurang baik'),
+-- KEPANITIAAN
+('kepanitiaan', 'ketua', NULL, NULL, 5, 'Ketua kepanitiaan'),
+('kepanitiaan', 'wakil ketua', NULL, NULL, 4, 'Wakil ketua kepanitiaan'),
+('kepanitiaan', 'sekretaris', NULL, NULL, 4, 'Sekretaris kepanitiaan'),
+('kepanitiaan', 'bendahara', NULL, NULL, 3, 'Bendahara kepanitiaan'),
+('kepanitiaan', 'koordinator', NULL, NULL, 2, 'Koordinator kepanitiaan'),
+('kepanitiaan', 'anggota', NULL, NULL, 1, 'Anggota kepanitiaan'),
+-- ORGANISASI
+('organisasi', 'OSIS', 'ketua', NULL, 5, 'Ketua OSIS'),
+('organisasi', 'OSIS', 'wakil ketua', NULL, 4, 'Wakil ketua OSIS'),
+('organisasi', 'OSIS', 'sekretaris', NULL, 4, 'Sekretaris OSIS'),
+('organisasi', 'OSIS', 'bendahara', NULL, 3, 'Bendahara OSIS'),
+('organisasi', 'OSIS', 'koordinator', NULL, 2, 'Koordinator OSIS'),
+('organisasi', 'OSIS', 'anggota', NULL, 1, 'Anggota OSIS'),
+('organisasi', 'KY', 'ketua', NULL, 5, 'Ketua KY'),
+('organisasi', 'KY', 'wakil ketua', NULL, 4, 'Wakil ketua KY'),
+('organisasi', 'KY', 'sekretaris', NULL, 4, 'Sekretaris KY'),
+('organisasi', 'KY', 'bendahara', NULL, 3, 'Bendahara KY'),
+('organisasi', 'KY', 'koordinator', NULL, 2, 'Koordinator KY'),
+('organisasi', 'KY', 'anggota', NULL, 1, 'Anggota KY'),
+('organisasi', 'MPK', 'ketua', NULL, 5, 'Ketua MPK'),
+('organisasi', 'MPK', 'wakil ketua', NULL, 4, 'Wakil ketua MPK'),
+('organisasi', 'MPK', 'sekretaris', NULL, 4, 'Sekretaris MPK'),
+('organisasi', 'MPK', 'bendahara', NULL, 3, 'Bendahara MPK'),
+('organisasi', 'MPK', 'koordinator', NULL, 2, 'Koordinator MPK'),
+('organisasi', 'MPK', 'anggota', NULL, 1, 'Anggota MPK'),
+('organisasi', 'PRAMUKA', 'ketua', NULL, 5, 'Ketua PRAMUKA'),
+('organisasi', 'PRAMUKA', 'wakil ketua', NULL, 4, 'Wakil ketua PRAMUKA'),
+('organisasi', 'PRAMUKA', 'sekretaris', NULL, 4, 'Sekretaris PRAMUKA'),
+('organisasi', 'PRAMUKA', 'bendahara', NULL, 3, 'Bendahara PRAMUKA'),
+('organisasi', 'PRAMUKA', 'koordinator', NULL, 2, 'Koordinator PRAMUKA'),
+('organisasi', 'PRAMUKA', 'anggota', NULL, 1, 'Anggota PRAMUKA'),
+('organisasi', 'PKS', 'ketua', NULL, 5, 'Ketua PKS'),
+('organisasi', 'PKS', 'wakil ketua', NULL, 4, 'Wakil ketua PKS'),
+('organisasi', 'PKS', 'sekretaris', NULL, 4, 'Sekretaris PKS'),
+('organisasi', 'PKS', 'bendahara', NULL, 3, 'Bendahara PKS'),
+('organisasi', 'PKS', 'koordinator', NULL, 2, 'Koordinator PKS'),
+('organisasi', 'PKS', 'anggota', NULL, 1, 'Anggota PKS'),
+('organisasi', 'PMR', 'ketua', NULL, 5, 'Ketua PMR'),
+('organisasi', 'PMR', 'wakil ketua', NULL, 4, 'Wakil ketua PMR'),
+('organisasi', 'PMR', 'sekretaris', NULL, 4, 'Sekretaris PMR'),
+('organisasi', 'PMR', 'bendahara', NULL, 3, 'Bendahara PMR'),
+('organisasi', 'PMR', 'koordinator', NULL, 2, 'Koordinator PMR'),
+('organisasi', 'PMR', 'anggota', NULL, 1, 'Anggota PMR'),
+('organisasi', 'PASKIBRA', 'ketua', NULL, 5, 'Ketua PASKIBRA'),
+('organisasi', 'PASKIBRA', 'wakil ketua', NULL, 4, 'Wakil ketua PASKIBRA'),
+('organisasi', 'PASKIBRA', 'sekretaris', NULL, 4, 'Sekretaris PASKIBRA'),
+('organisasi', 'PASKIBRA', 'bendahara', NULL, 3, 'Bendahara PASKIBRA'),
+('organisasi', 'PASKIBRA', 'koordinator', NULL, 2, 'Koordinator PASKIBRA'),
+('organisasi', 'PASKIBRA', 'anggota', NULL, 1, 'Anggota PASKIBRA'),
+('organisasi', 'SLT', 'ketua', NULL, 5, 'Ketua SLT'),
+('organisasi', 'SLT', 'wakil ketua', NULL, 4, 'Wakil ketua SLT'),
+('organisasi', 'SLT', 'sekretaris', NULL, 4, 'Sekretaris SLT'),
+('organisasi', 'SLT', 'bendahara', NULL, 3, 'Bendahara SLT'),
+('organisasi', 'SLT', 'koordinator', NULL, 2, 'Koordinator SLT'),
+('organisasi', 'SLT', 'anggota', NULL, 1, 'Anggota SLT'),
+-- EVENT
+('event', 'sekolah', NULL, NULL, 2, 'Event tingkat sekolah'),
+('event', 'kecamatan', NULL, NULL, 4, 'Event tingkat kecamatan'),
+('event', 'kabupaten', NULL, NULL, 6, 'Event tingkat kabupaten'),
+('event', 'provinsi', NULL, NULL, 8, 'Event tingkat provinsi'),
+('event', 'nasional', NULL, NULL, 10, 'Event tingkat nasional'),
+('event', 'internasional', NULL, NULL, 12, 'Event tingkat internasional');
+
+INSERT IGNORE INTO ipc_organisasi (name)
+SELECT DISTINCT field1 FROM ipc_config
+WHERE category = 'organisasi' AND field1 IS NOT NULL;
+
+INSERT IGNORE INTO ipc_perilaku_karakter (name)
+SELECT DISTINCT field1 FROM ipc_config
+WHERE category = 'perilaku' AND field1 IS NOT NULL;
+
+INSERT IGNORE INTO ipc_perilaku_tingkat (name) VALUES
+('sangat baik'), ('baik'), ('cukup baik'), ('kurang baik');
+
+CREATE INDEX idx_ipc_config_category ON ipc_config(category);
+CREATE INDEX idx_ipc_config_field1 ON ipc_config(field1);
+CREATE INDEX idx_ipc_config_field2 ON ipc_config(field2);
+CREATE INDEX idx_ipc_config_active ON ipc_config(is_active);
 
 -- Re-enable foreign key checks
 SET FOREIGN_KEY_CHECKS=1;

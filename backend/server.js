@@ -112,6 +112,7 @@ app.use('/api/file-viewer', require('./routes/file-viewer'));
 app.use('/api/academic-year', require('./routes/academicYear'));
 app.use('/api/sync', require('./routes/sync'));
 app.use('/api/ipc-config', require('./routes/ipcConfig'));
+app.use('/api/school-config', require('./routes/school-config'));
 
 // Global error handler - Security: Don't expose internal details
 app.use(errorHandler);

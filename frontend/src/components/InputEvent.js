@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import Select from 'react-select';
 import EditModal from './EditModal';
 import useEditModal from '../hooks/useEditModal';
 import API_BASE_URL from '../config';
@@ -11,7 +12,7 @@ function InputEvent() {
     kelas: '',
     grha: '',
     nama_event: '',
-    tingkat: 'sekolah'
+    tingkat: 'kecamatan'
   });
   const [foto, setFoto] = useState(null);
   const [message, setMessage] = useState('');
@@ -21,36 +22,51 @@ function InputEvent() {
   const [hasAccess, setHasAccess] = useState(true);
   const [checkingAccess, setCheckingAccess] = useState(true);
   const [accessMessage, setAccessMessage] = useState('');
-  const [isAutoFilled, setIsAutoFilled] = useState(false);
-  const [nisLoading, setNisLoading] = useState(false);
+  const [, setIsAutoFilled] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [allEvent, setAllEvent] = useState([]);
   const [loadingIndex, setLoadingIndex] = useState(false);
   const editModal = useEditModal();
+  const [ipcConfig, setIpcConfig] = useState([]);
+  const [calculatedPoint, setCalculatedPoint] = useState(0);
+  const [students, setStudents] = useState([]);
 
   const grhaOptions = [
     'Airsanya', 'Daksina', 'Genya', 'Madhya', 'Nairiti', 'Pascima', 'Purwa', 'Uttara', 'Wayabhya'
   ];
 
-  const tingkatOptions = [
-    { value: 'sekolah', label: 'Sekolah (2 point)' },
-    { value: 'kecamatan', label: 'Kecamatan (4 point)' },
-    { value: 'kabupaten', label: 'Kabupaten (6 point)' },
-    { value: 'provinsi', label: 'Provinsi (8 point)' },
-    { value: 'nasional', label: 'Nasional (10 point)' },
-    { value: 'internasional', label: 'Internasional (12 point)' }
+  const FIXED_TINGKAT_OPTIONS = [
+    'sekolah',
+    'kecamatan',
+    'kabupaten',
+    'provinsi',
+    'nasional',
+    'internasional'
   ];
 
-  // useEffect(() => {
-  //   checkPermission();
-  // }, []);
+  const formatDisplayText = (text) => {
+    return text
+      .replace(/_/g, ' ')
+      .replace(/\b\w+\b/g, word => {
+        // Check if word is Roman numeral (I, II, III, etc.)
+        if (/^[ivx]+$/.test(word.toLowerCase())) {
+          return word.toUpperCase();
+        }
+        return word.charAt(0).toUpperCase() + word.slice(1);
+      });
+  };
 
   useEffect(() => {
     fetchUserSubmissions();
     checkAccess();
+    fetchIpcConfig();
     // Get user role from localStorage
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     setUserRole(user.role || '');
+    fetchUserSubmissions();
+    fetchIpcConfig();
+    fetchStudents();
+    checkAccess();
     if (user.role === 'superadmin') {
       fetchAllEvent();
     }
@@ -113,41 +129,97 @@ function InputEvent() {
     }
   };
 
-  // const checkPermission = async () => {
-  //   const user = JSON.parse(localStorage.getItem('user'));
-  //   if (user?.role === 'superadmin') {
-  //     setHasPermission(true);
-  //     setCheckingPermission(false);
-  //     return;
-  //   }
+  const fetchIpcConfig = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get('/ipc-config/active', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setIpcConfig(response.data);
+      const firstTingkat = response.data.event?.[0]?.field1;
+      if (firstTingkat) {
+        setFormData(prev => {
+          if (prev.tingkat) return prev;
+          return { ...prev, tingkat: firstTingkat };
+        });
+        setCalculatedPoint(response.data.event[0].point_value || 0);
+      }
+    } catch (error) {
+      console.error('Error fetching IPC config:', error);
+    }
+  };
 
-  //   try {
-  //     const token = localStorage.getItem('token');
-  //     const response = await axios.get('/permissions/' + user.id, {
-  //       headers: { Authorization: `Bearer ${token}` }
-  //     });
-  //     setHasPermission(response.data.can_input_event === true);
-  //   } catch (error) {
-  //     console.error('Error checking permission:', error);
-  //     setHasPermission(false);
-  //   } finally {
-  //     setCheckingPermission(false);
-  //   }
-  // };
+  const fetchStudents = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get('/users', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const studentList = response.data.filter(user => user.role === 'siswa');
+      setStudents(studentList);
+    } catch (error) {
+      console.error('Error fetching students:', error);
+    }
+  };
+
+  const calculatePoint = (tingkat) => {
+    const eventConfigs = ipcConfig['event'] || [];
+    const config = eventConfigs.find(
+      c => c.field1 === tingkat
+    );
+    return config ? config.point_value : 0;
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
 
+    // Reset auto-fill flag if user clears the field
+    if ((name === 'nis' || name === 'nama') && value === '') {
+      setIsAutoFilled(false);
+    }
+
     // Auto-fill student data when NIS is entered
     if (name === 'nis' && value.length >= 1) {
       fetchStudentData(value);
+    }
+
+    // Auto-fill student data when nama is entered
+    if (name === 'nama' && value.length >= 1) {
+      fetchStudentDataByName(value);
+    }
+
+    // Calculate point when tingkat changes
+    if (name === 'tingkat') {
+      const point = calculatePoint(value);
+      setCalculatedPoint(point);
+    }
+  };
+
+  const handleStudentSelect = (selectedOption) => {
+    if (selectedOption) {
+      setFormData(prev => ({
+        ...prev,
+        nama: selectedOption.nama,
+        nis: selectedOption.nis,
+        kelas: selectedOption.kelas || '',
+        grha: selectedOption.grha || ''
+      }));
+      setIsAutoFilled(true);
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        nama: '',
+        nis: '',
+        kelas: '',
+        grha: ''
+      }));
+      setIsAutoFilled(false);
     }
   };
 
   const fetchStudentData = async (nis) => {
     try {
-      setNisLoading(true);
       const token = localStorage.getItem('token');
       const response = await axios.get(`/users/nis/${nis}`, {
         headers: { Authorization: `Bearer ${token}` }
@@ -165,8 +237,28 @@ function InputEvent() {
     } catch (error) {
       // Student not found or error, don't auto-fill
       console.log('Student not found or error fetching data');
-    } finally {
-      setNisLoading(false);
+    }
+  };
+
+  const fetchStudentDataByName = async (nama) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`/users/nama/${nama}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (response.data) {
+        setFormData(prev => ({
+          ...prev,
+          nis: response.data.nis || '',
+          kelas: response.data.kelas || '',
+          grha: response.data.grha || ''
+        }));
+        setIsAutoFilled(true);
+      }
+    } catch (error) {
+      // Student not found or error, don't auto-fill
+      console.log('Student not found or error fetching data');
     }
   };
 
@@ -210,7 +302,7 @@ function InputEvent() {
         kelas: '',
         grha: '',
         nama_event: '',
-        tingkat: 'sekolah'
+        tingkat: 'kecamatan'
       });
       setFoto(null);
       setIsAutoFilled(false);
@@ -305,20 +397,6 @@ function InputEvent() {
       </span>
     );
   };
-
-  // Permission checking disabled for now
-  // if (checkingPermission) {
-  //   return <div className="loading"><div className="spinner"></div></div>;
-  // }
-
-  // if (!hasPermission) {
-  //   return (
-  //     <div className="card">
-  //       <h2>Akses Ditolak</h2>
-  //       <p>Anda tidak memiliki izin untuk mengakses halaman ini. Silakan hubungi SuperAdmin.</p>
-  //     </div>
-  //   );
-  // }
 
   if (checkingAccess) {
     return <div className="loading"><div className="spinner"></div></div>;
@@ -417,30 +495,37 @@ function InputEvent() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <div className="form-group">
             <label>Nama <span className="required">*</span></label>
-            <input
-              type="text"
-              name="nama"
-              value={formData.nama}
-              onChange={handleChange}
-              placeholder="Nama siswa"
-              required
-              disabled={isAutoFilled}
-              style={{ backgroundColor: isAutoFilled ? '#f0f0f0' : '' }}
+            <Select
+              value={students.find(s => s.nama === formData.nama && s.nis === formData.nis) ? { value: formData.nama, label: formData.nama, nama: formData.nama, nis: formData.nis, kelas: formData.kelas, grha: formData.grha } : null}
+              onChange={(selected) => handleStudentSelect(selected)}
+              options={students.map(student => ({ value: student.nama, label: `${student.nama} (${student.nis})`, nama: student.nama, nis: student.nis, kelas: student.kelas, grha: student.grha }))}
+              placeholder="Cari nama siswa..."
+              isSearchable
+              isClearable
+              styles={{
+                control: (provided) => ({
+                  ...provided,
+                  minHeight: '40px'
+                })
+              }}
             />
-            {isAutoFilled && <p className="form-helper-text">Data diisi otomatis dari NIS</p>}
           </div>
           <div className="form-group">
             <label>NIS <span className="required">*</span></label>
-            <input
-              type="text"
-              name="nis"
-              value={formData.nis}
-              onChange={handleChange}
-              placeholder="Masukkan NIS siswa"
-              required
-              className={nisLoading ? 'auto-fill-loading' : (isAutoFilled ? 'auto-fill-success' : 'nis-input-highlight')}
+            <Select
+              value={students.find(s => s.nis === formData.nis) ? { value: formData.nis, label: formData.nis, nama: formData.nama, nis: formData.nis, kelas: formData.kelas, grha: formData.grha } : null}
+              onChange={(selected) => handleStudentSelect(selected)}
+              options={students.map(student => ({ value: student.nis, label: `${student.nis} - ${student.nama}`, nama: student.nama, nis: student.nis, kelas: student.kelas, grha: student.grha }))}
+              placeholder="Cari NIS siswa..."
+              isSearchable
+              isClearable
+              styles={{
+                control: (provided) => ({
+                  ...provided,
+                  minHeight: '40px'
+                })
+              }}
             />
-            <p className="form-helper-text">Masukkan NIS untuk mengisi data siswa secara otomatis</p>
           </div>
         </div>
 
@@ -452,16 +537,14 @@ function InputEvent() {
               name="kelas" 
               value={formData.kelas} 
               onChange={handleChange} 
-              disabled 
-              style={{ backgroundColor: '#f0f0f0', cursor: 'not-allowed' }}
-              placeholder="Auto-filled from student data"
+              placeholder="Data diisi otomatis"
+              disabled
               required
             />
-            <small style={{ color: '#666', fontSize: '12px' }}>Auto-filled from student data</small>
           </div>
           <div className="form-group">
             <label>Grha</label>
-            <select name="grha" value={formData.grha} onChange={handleChange} disabled={isAutoFilled} style={{ backgroundColor: isAutoFilled ? '#f0f0f0' : '' }}>
+            <select name="grha" value={formData.grha} disabled required onChange={handleChange}>
               <option value="">Pilih Grha</option>
               {grhaOptions.map(grha => (
                 <option key={grha} value={grha}>{grha}</option>
@@ -485,10 +568,28 @@ function InputEvent() {
         <div className="form-group">
           <label>Tingkat Event</label>
           <select name="tingkat" value={formData.tingkat} onChange={handleChange}>
-            {tingkatOptions.map(tingkat => (
-              <option key={tingkat.value} value={tingkat.value}>{tingkat.label}</option>
+            {FIXED_TINGKAT_OPTIONS.map(tingkat => (
+              <option key={tingkat} value={tingkat}>{formatDisplayText(tingkat)} {formData.tingkat === tingkat && calculatedPoint ? `(${calculatedPoint} point)` : ''}</option>
             ))}
           </select>
+        </div>
+
+        <div className="form-group" style={{ 
+          padding: '12px', 
+          background: '#EAFBF3',
+          borderRadius: '4px',
+          marginTop: '12px'
+        }}>
+          <label style={{ fontWeight: '600', marginBottom: '4px', display: 'block' }}>
+            Point IPC yang akan didapatkan:
+          </label>
+          <span style={{ 
+            fontSize: '18px', 
+            fontWeight: '700',
+            color: '#0F7A55'
+          }}>
+            +{calculatedPoint}
+          </span>
         </div>
 
         <div className="form-group">
@@ -548,9 +649,10 @@ function InputEvent() {
               value={editModal.editFormData.kelas || ''} 
               onChange={(e) => editModal.setEditFormData({ ...editModal.editFormData, kelas: e.target.value })}
               disabled
+              placeholder="Data diisi otomatis"
+              required
               style={{ backgroundColor: '#f0f0f0', cursor: 'not-allowed' }}
             />
-            <small style={{ color: '#666', fontSize: '12px' }}>Auto-filled from student data</small>
           </div>
         </div>
 
@@ -558,9 +660,10 @@ function InputEvent() {
           <label>Grha</label>
           <select 
             value={editModal.editFormData.grha || ''} 
+            disabled required
             onChange={(e) => editModal.setEditFormData({ ...editModal.editFormData, grha: e.target.value })}
           >
-            <option value="">Pilih Grha</option>
+            <option value="">Data diisi otomatis</option>
             {grhaOptions.map(grha => (
               <option key={grha} value={grha}>{grha}</option>
             ))}
@@ -583,8 +686,8 @@ function InputEvent() {
               value={editModal.editFormData.tingkat || ''} 
               onChange={(e) => editModal.setEditFormData({ ...editModal.editFormData, tingkat: e.target.value })}
             >
-              {tingkatOptions.map(tingkat => (
-                <option key={tingkat.value} value={tingkat.value}>{tingkat.label}</option>
+              {FIXED_TINGKAT_OPTIONS.map(tingkat => (
+                <option key={tingkat} value={tingkat}>{formatDisplayText(tingkat)}</option>
               ))}
             </select>
           </div>

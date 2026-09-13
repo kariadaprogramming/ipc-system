@@ -1,9 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import StudentDetail from './StudentDetail';
-import { KELAS_OPTIONS } from '../utils/kelasJurusan';
 import { GRHA_OPTIONS, getRowField, normalizeGrha } from '../utils/excelImport';
+
+const JABATAN_OPTIONS = ['Guru', 'Pegawai', 'Staff'];
+
+const KELAS_OPTIONS = [
+  'X TKJ 1', 'X TKJ 2', 'X TKR 1', 'X TKR 2',
+  'X DPIB 1', 'X DPIB 2',
+  'XI TKJ 1', 'XI TKJ 2', 'XI TKR 1', 'XI TKR 2',
+  'XI DPIB 1', 'XI DPIB 2',
+  'XII TKJ 1', 'XII TKJ 2', 'XII TKR 1', 'XII TKR 2',
+  'XII DPIB 1', 'XII DPIB 2'
+];
 
 function KelolaAkun() {
   const [users, setUsers] = useState([]);
@@ -187,19 +198,16 @@ function KelolaAkun() {
       return;
     }
 
-    const roles = [...new Set(selectable.map((u) => u.role))];
-    if (roles.length > 1) {
-      setMessage('Filter menampilkan siswa dan guru. Filter per role dulu sebelum pilih semua.');
-      return;
-    }
-
-    setSelectionRole(roles[0]);
+    // Allow selecting all regardless of role mixing
     setSelectedIds(selectable.map((u) => u.id));
+    setSelectionRole(null); // Reset selection role to allow mixed selection
   };
 
   const isUserSelectable = (user) => user.role !== 'superadmin';
   const isUserDisabled = (user) => {
     if (!isUserSelectable(user)) return true;
+    // Only disable if selectionRole is set and user role doesn't match
+    // If selectionRole is null, allow mixed selection
     if (!selectionRole) return false;
     return user.role !== selectionRole;
   };
@@ -210,7 +218,6 @@ function KelolaAkun() {
       setFormData({
         nama: user.nama,
         nis: user.nis,
-        nisn: user.nisn,
         jurusan: user.jurusan,
         grha: user.grha,
         tahun_pelajaran: user.tahun_pelajaran
@@ -219,7 +226,7 @@ function KelolaAkun() {
       setFormData({
         nama: user.nama,
         nip: user.nip,
-        detail: user.detail,
+        jabatan: user.jabatan || user.detail || '',
         no_hp: user.no_hp
       });
     }
@@ -348,7 +355,6 @@ function KelolaAkun() {
             const studentData = {
               nama: nama,
               nis: getRowField(row, 'nis', 'NIS'),
-              nisn: getRowField(row, 'nisn', 'NISN'),
               jurusan,
               grha: normalizeGrha(getRowField(row, 'grha', 'Grha', 'Gra', 'GRHA')) || 'Airsanya',
               tahun_pelajaran: tahunPelajaran,
@@ -371,10 +377,19 @@ function KelolaAkun() {
             const teacherData = {
               nama: getRowField(row, 'nama', 'Nama'),
               nip: getRowField(row, 'nip', 'NIP'),
-              detail: getRowField(row, 'detail', 'Detail'),
+              jabatan: getRowField(row, 'jabatan', 'Jabatan', 'detail', 'Detail'),
               no_hp: getRowField(row, 'no_hp', 'NoHP', 'No HP', 'no hp'),
               password: getRowField(row, 'password', 'Password') || '123456'
             };
+
+            if (!JABATAN_OPTIONS.includes(teacherData.jabatan)) {
+              results.push({
+                status: 'error',
+                name: teacherData.nama,
+                error: `Jabatan tidak valid. Gunakan: ${JABATAN_OPTIONS.join(', ')}`
+              });
+              continue;
+            }
 
             await axios.post('/users/create-teacher', teacherData, {
               headers: { Authorization: `Bearer ${token}` }
@@ -401,7 +416,7 @@ function KelolaAkun() {
     }
   };
 
-  const downloadTemplate = (type) => {
+  const downloadTemplate = async (type) => {
     const currentYear = new Date().getFullYear();
     const currentMonth = new Date().getMonth();
     const currentAcademicYear = currentMonth >= 6 
@@ -409,7 +424,7 @@ function KelolaAkun() {
       : `${currentYear - 1}-${currentYear}`;
     
     if (type === 'siswa') {
-      // Create 30 sample students with TKJ 1 and tahun pelajaran 2024-2025
+      // Create 30 sample students with TKJ 1 and the current academic year
       const templateData = [];
       const grhaOptions = ['Airsanya', 'Daksina', 'Genya', 'Madhya', 'Pascima', 'Uttara'];
       
@@ -417,41 +432,102 @@ function KelolaAkun() {
         templateData.push({
           Nama: `Siswa TKJ 1 ${i}`,
           NIS: `2024${String(i).padStart(3, '0')}`,
-          NISN: `123456789${String(i).padStart(2, '0')}`,
           Jurusan: 'TKJ 1',
           Grha: grhaOptions[i % grhaOptions.length],
-          TahunPelajaran: '2024-2025',
-          Password: '123456',
-          Keterangan: `Contoh data siswa ke-${i} untuk import`
+          TahunPelajaran: currentAcademicYear,
+          Password: '123456'
         });
       }
 
-      const ws = XLSX.utils.json_to_sheet(templateData);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Template');
-      
-      // Set column widths
-      ws['!cols'] = [
-        { wch: 25 }, // Nama
-        { wch: 10 }, // NIS
-        { wch: 15 }, // NISN
-        { wch: 10 }, // Jurusan
-        { wch: 12 }, // Grha
-        { wch: 15 }, // TahunPelajaran
-        { wch: 12 }, // Password
-        { wch: 60 }  // Keterangan
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Template');
+
+      worksheet.columns = [
+        { header: 'Nama', key: 'Nama', width: 25 },
+        { header: 'NIS', key: 'NIS', width: 10 },
+        { header: 'Jurusan', key: 'Jurusan', width: 10 },
+        { header: 'Grha', key: 'Grha', width: 12 },
+        { header: 'TahunPelajaran', key: 'TahunPelajaran', width: 15 },
+        { header: 'Password', key: 'Password', width: 12 }
       ];
-      
-      XLSX.writeFile(wb, 'template_siswa.xlsx');
+      templateData.forEach(row => worksheet.addRow(row));
+
+      const validJurusanOptions = ['TKJ 1', 'TKJ 2', 'DPIB 1', 'DPIB 2', 'TKR 1', 'TKR 2'];
+      const academicYearOptions = [];
+      for (let year = currentYear - 3; year <= currentYear + 3; year += 1) {
+        academicYearOptions.push(`${year}-${year + 1}`);
+      }
+
+      const validationFor = (formulae, errorTitle, error) => ({
+        type: 'list',
+        allowBlank: false,
+        formulae: [`"${formulae.join(',')}"`],
+        showErrorMessage: true,
+        errorTitle,
+        error
+      });
+
+      for (let rowNumber = 2; rowNumber <= 1000; rowNumber += 1) {
+        worksheet.getCell(`C${rowNumber}`).dataValidation = validationFor(
+          validJurusanOptions,
+          'Jurusan tidak valid',
+          `Pilih salah satu: ${validJurusanOptions.join(', ')}`
+        );
+        worksheet.getCell(`D${rowNumber}`).dataValidation = validationFor(
+          GRHA_OPTIONS,
+          'Grha tidak valid',
+          `Pilih salah satu: ${GRHA_OPTIONS.join(', ')}`
+        );
+        worksheet.getCell(`E${rowNumber}`).dataValidation = validationFor(
+          academicYearOptions,
+          'Tahun Pelajaran tidak valid',
+          'Pilih TahunPelajaran dari daftar yang tersedia'
+        );
+      }
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blobUrl = URL.createObjectURL(new Blob([buffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      }));
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = 'template_siswa.xlsx';
+      link.click();
+      URL.revokeObjectURL(blobUrl);
     } else {
       const templateData = [
-        { Nama: '', NIP: '', Detail: '', NoHP: '', Password: '123456' }
+        { Nama: '', NIP: '', Jabatan: 'Guru', NoHP: '', Password: '123456' }
       ];
 
-      const ws = XLSX.utils.json_to_sheet(templateData);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Template');
-      XLSX.writeFile(wb, 'template_guru.xlsx');
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Template');
+      worksheet.columns = [
+        { header: 'Nama', key: 'Nama', width: 25 },
+        { header: 'NIP', key: 'NIP', width: 18 },
+        { header: 'Jabatan', key: 'Jabatan', width: 14 },
+        { header: 'NoHP', key: 'NoHP', width: 15 },
+        { header: 'Password', key: 'Password', width: 12 }
+      ];
+      templateData.forEach(row => worksheet.addRow(row));
+
+      worksheet.dataValidations.add('C2:C1000', {
+        type: 'list',
+        allowBlank: false,
+        formulae: [`"${JABATAN_OPTIONS.join(',')}"`],
+        showErrorMessage: true,
+        errorTitle: 'Jabatan tidak valid',
+        error: `Pilih salah satu: ${JABATAN_OPTIONS.join(', ')}`
+      });
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blobUrl = URL.createObjectURL(new Blob([buffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      }));
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = 'template_guru.xlsx';
+      link.click();
+      URL.revokeObjectURL(blobUrl);
     }
   };
 
@@ -508,225 +584,283 @@ function KelolaAkun() {
   }
 
   return (
-    <div>
-      <h2>Kelola Akun</h2>
-      {message && <div className="alert alert-success">{message}</div>}
-      
-      <div style={{ marginBottom: '20px' }}>
-        {/* Debug: show current role */}
-        <small style={{ color: '#666', display: 'block', marginBottom: '10px' }}>
-          Role: {userRole || 'loading...'}
-        </small>
-        
-        {/* Buat Akun Siswa - available for superadmin and guru */}
-        {(userRole === 'superadmin' || userRole === 'guru') && (
-          <button className="btn btn-primary" onClick={() => { setShowCreateModal(true); setCreateModalType('student'); setFormData({}); }} style={{ marginRight: '10px' }}>
-            + Buat Akun Siswa
-          </button>
-        )}
-        
-        {/* Buat Akun Guru - only for superadmin */}
-        {userRole === 'superadmin' && (
-          <button className="btn btn-success" onClick={() => { setShowCreateModal(true); setCreateModalType('teacher'); setFormData({}); }} style={{ marginRight: '10px' }}>
-            + Buat Akun Guru
-          </button>
-        )}
+    <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif', background: '#f5f5f5', padding: '20px', color: '#333', minHeight: '100vh' }}>
+      <div style={{ maxWidth: '1200px', margin: '0 auto', background: 'white', borderRadius: '8px', padding: '24px', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)' }}>
+        <div style={{ marginBottom: '24px' }}>
+          <h1 style={{ fontSize: '24px', fontWeight: '600', color: '#1a1a1a', marginBottom: '8px', margin: 0 }}>Kelola Akun</h1>
+          <p style={{ fontSize: '13px', color: '#666', margin: 0 }}>Role: {userRole || 'loading...'}</p>
+        </div>
 
-        {/* Import from Excel - only for superadmin */}
-        {userRole === 'superadmin' && (
-          <>
-            <button className="btn btn-warning" onClick={handleValidateClasses} disabled={validatingClasses} style={{ marginRight: '10px' }}>
-              {validatingClasses ? 'Memvalidasi...' : 'Validasi Kelas'}
-            </button>
-            <button className="btn btn-info" onClick={() => { setShowImportModal(true); setImportModalType('siswa'); setExcelFile(null); setImportResults([]); }} style={{ marginRight: '10px' }}>
-              📥 Import Siswa
-            </button>
-            <button className="btn btn-info" onClick={() => { setShowImportModal(true); setImportModalType('guru'); setExcelFile(null); setImportResults([]); }} style={{ marginRight: '10px' }}>
-              📥 Import Guru
-            </button>
-          </>
-        )}
-      </div>
+        {message && <div style={{ padding: '12px 16px', background: '#d4edda', border: '1px solid #c3e6cb', borderRadius: '4px', color: '#155724', marginBottom: '20px' }}>{message}</div>}
 
-
-      {/* Filters */}
-      <div className="card" style={{ marginBottom: '20px', padding: '15px' }}>
-        <h4>Filter</h4>
-        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
-          {userRole === 'superadmin' && (
-            <div style={{ flex: '1', minWidth: '150px' }}>
-              <label>Role</label>
-              <select
-                value={filters.role}
-                onChange={(e) => handleFilterChange('role', e.target.value)}
-                className="form-control"
-              >
-                <option value="">Semua Role</option>
-                <option value="superadmin">Superadmin</option>
-                <option value="guru">Guru</option>
-                <option value="siswa">Siswa</option>
-              </select>
-            </div>
+        <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
+          {(userRole === 'superadmin' || userRole === 'guru') && (
+            <button 
+              onClick={() => { setShowCreateModal(true); setCreateModalType('student'); setFormData({}); }}
+              style={{ 
+                padding: '10px 16px', border: 'none', borderRadius: '4px', fontSize: '14px', fontWeight: '500', cursor: 'pointer',
+                background: '#1e88e5', color: 'white', display: 'inline-flex', alignItems: 'center', gap: '6px',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseOver={(e) => { e.target.style.background = '#1565c0'; e.target.style.transform = 'translateY(-2px)'; e.target.style.boxShadow = '0 4px 8px rgba(30, 136, 229, 0.3)'; }}
+              onMouseOut={(e) => { e.target.style.background = '#1e88e5'; e.target.style.transform = 'translateY(0)'; e.target.style.boxShadow = 'none'; }}
+            >
+              <i className="fas fa-plus"></i> Buat Akun Siswa
+            </button>
           )}
-          <div style={{ flex: '1', minWidth: '150px' }}>
-            <label>Kelas</label>
-            <select
-              value={filters.kelas}
-              onChange={(e) => handleFilterChange('kelas', e.target.value)}
-              className="form-control"
+          
+          {userRole === 'superadmin' && (
+            <button 
+              onClick={() => { setShowCreateModal(true); setCreateModalType('teacher'); setFormData({}); }}
+              style={{ 
+                padding: '10px 16px', border: 'none', borderRadius: '4px', fontSize: '14px', fontWeight: '500', cursor: 'pointer',
+                background: '#43a047', color: 'white', display: 'inline-flex', alignItems: 'center', gap: '6px',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseOver={(e) => { e.target.style.background = '#388e3c'; e.target.style.transform = 'translateY(-2px)'; e.target.style.boxShadow = '0 4px 8px rgba(67, 160, 71, 0.3)'; }}
+              onMouseOut={(e) => { e.target.style.background = '#43a047'; e.target.style.transform = 'translateY(0)'; e.target.style.boxShadow = 'none'; }}
             >
-              <option value="">Semua Kelas</option>
-              {KELAS_OPTIONS.map(k => <option key={k} value={k}>{k}</option>)}
-            </select>
-          </div>
-          <div style={{ flex: '1', minWidth: '150px' }}>
-            <label>Grha</label>
-            <select
-              value={filters.grha}
-              onChange={(e) => handleFilterChange('grha', e.target.value)}
-              className="form-control"
-            >
-              <option value="">Semua Grha</option>
-              {grhaOptions.map(grha => <option key={grha} value={grha}>{grha}</option>)}
-            </select>
-          </div>
+              <i className="fas fa-plus"></i> Buat Akun Guru
+            </button>
+          )}
+
           {userRole === 'superadmin' && (
             <>
-              <div style={{ flex: '1', minWidth: '150px' }}>
-                <label>Jurusan</label>
-                <select
-                  value={filters.jurusan}
-                  onChange={(e) => handleFilterChange('jurusan', e.target.value)}
-                  className="form-control"
-                >
-                  <option value="">Semua Jurusan</option>
-                  <option value="TKJ 1">TKJ 1</option>
-                  <option value="TKJ 2">TKJ 2</option>
-                  <option value="DPIB 1">DPIB 1</option>
-                  <option value="DPIB 2">DPIB 2</option>
-                  <option value="TKR 1">TKR 1</option>
-                  <option value="TKR 2">TKR 2</option>
-                </select>
-              </div>
-              <div style={{ flex: '1', minWidth: '150px' }}>
-                <label>Tahun Pelajaran</label>
-                <select
-                  value={filters.tahun_pelajaran}
-                  onChange={(e) => handleFilterChange('tahun_pelajaran', e.target.value)}
-                  className="form-control"
-                >
-                  <option value="">Semua Tahun</option>
-                  {(() => {
-                    // Opsi tahun pelajaran dari 2024-2025 sampai 2030-2031
-                    const options = [];
-                    for (let year = 2024; year <= 2030; year++) {
-                      options.push(`${year}-${year + 1}`);
-                    }
-                    return options.map(year => (
-                      <option key={year} value={year}>{year}</option>
-                    ));
-                  })()}
-                </select>
-              </div>
+              <button 
+                onClick={handleValidateClasses} 
+                disabled={validatingClasses}
+                style={{ 
+                  padding: '10px 16px', border: 'none', borderRadius: '4px', fontSize: '14px', fontWeight: '500', cursor: validatingClasses ? 'not-allowed' : 'pointer',
+                  background: '#ffa726', color: 'white', display: 'inline-flex', alignItems: 'center', gap: '6px',
+                  transition: 'all 0.3s ease', opacity: validatingClasses ? 0.6 : 1
+                }}
+                onMouseOver={(e) => { if (!validatingClasses) { e.target.style.background = '#fb8c00'; e.target.style.transform = 'translateY(-2px)'; e.target.style.boxShadow = '0 4px 8px rgba(255, 167, 38, 0.3)'; } }}
+                onMouseOut={(e) => { e.target.style.background = '#ffa726'; e.target.style.transform = 'translateY(0)'; e.target.style.boxShadow = 'none'; }}
+              >
+                {validatingClasses ? 'Memvalidasi...' : 'Validasi Kelas'}
+              </button>
+              <button 
+                onClick={() => { setShowImportModal(true); setImportModalType('siswa'); setExcelFile(null); setImportResults([]); }}
+                style={{ 
+                  padding: '10px 16px', border: 'none', borderRadius: '4px', fontSize: '14px', fontWeight: '500', cursor: 'pointer',
+                  background: '#1e88e5', color: 'white', display: 'inline-flex', alignItems: 'center', gap: '6px',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseOver={(e) => { e.target.style.background = '#1565c0'; e.target.style.transform = 'translateY(-2px)'; e.target.style.boxShadow = '0 4px 8px rgba(30, 136, 229, 0.3)'; }}
+                onMouseOut={(e) => { e.target.style.background = '#1e88e5'; e.target.style.transform = 'translateY(0)'; e.target.style.boxShadow = 'none'; }}
+              >
+                <i className="fas fa-download"></i> Import Siswa
+              </button>
+              <button 
+                onClick={() => { setShowImportModal(true); setImportModalType('guru'); setExcelFile(null); setImportResults([]); }}
+                style={{ 
+                  padding: '10px 16px', border: 'none', borderRadius: '4px', fontSize: '14px', fontWeight: '500', cursor: 'pointer',
+                  background: '#1e88e5', color: 'white', display: 'inline-flex', alignItems: 'center', gap: '6px',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseOver={(e) => { e.target.style.background = '#1565c0'; e.target.style.transform = 'translateY(-2px)'; e.target.style.boxShadow = '0 4px 8px rgba(30, 136, 229, 0.3)'; }}
+                onMouseOut={(e) => { e.target.style.background = '#1e88e5'; e.target.style.transform = 'translateY(0)'; e.target.style.boxShadow = 'none'; }}
+              >
+                <i className="fas fa-download"></i> Import Guru
+              </button>
             </>
           )}
-          <button className="btn btn-secondary" onClick={resetFilters}>Reset</button>
         </div>
-      </div>
 
-
-
-      <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 10 }}>
-          <h3 style={{ margin: 0 }}>{userRole === 'guru' ? 'Daftar Siswa' : 'Daftar Pengguna'}</h3>
-          {userRole === 'superadmin' && (
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button type="button" className="btn btn-secondary" onClick={selectAllFiltered} style={{ fontSize: 13 }}>
-                Pilih Semua (filter)
-              </button>
-              {selectedIds.length > 0 && (
-                <>
-                  <button type="button" className="btn btn-danger" onClick={handleBulkDelete} style={{ fontSize: 13 }}>
-                    Hapus ({selectedIds.length})
-                  </button>
-                  <button type="button" className="btn btn-secondary" onClick={clearSelection} style={{ fontSize: 13 }}>
-                    Batal Pilih
-                  </button>
-                </>
-              )}
+        {/* Filters */}
+        <div style={{ background: '#f9f9f9', border: '1px solid #e0e0e0', borderRadius: '4px', padding: '16px', marginBottom: '24px' }}>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            {userRole === 'superadmin' && (
+              <div style={{ flex: '1', minWidth: '160px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#666', marginBottom: '6px' }}>Role</label>
+                <select
+                  value={filters.role}
+                  onChange={(e) => handleFilterChange('role', e.target.value)}
+                  style={{ 
+                    width: '100%', padding: '8px 12px', border: '1px solid #d0d0d0', borderRadius: '4px', 
+                    fontSize: '13px', background: 'white', color: '#333', transition: 'all 0.3s ease'
+                  }}
+                  onFocus={(e) => { e.target.style.borderColor = '#1e88e5'; e.target.style.boxShadow = '0 0 0 2px rgba(30, 136, 229, 0.1)'; }}
+                  onBlur={(e) => { e.target.style.borderColor = '#d0d0d0'; e.target.style.boxShadow = 'none'; }}
+                >
+                  <option value="">Semua Role</option>
+                  <option value="superadmin">Superadmin</option>
+                  <option value="guru">Guru</option>
+                  <option value="siswa">Siswa</option>
+                </select>
+              </div>
+            )}
+            <div style={{ flex: '1', minWidth: '160px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#666', marginBottom: '6px' }}>Kelas</label>
+              <select
+                value={filters.kelas}
+                onChange={(e) => handleFilterChange('kelas', e.target.value)}
+                style={{ 
+                  width: '100%', padding: '8px 12px', border: '1px solid #d0d0d0', borderRadius: '4px', 
+                  fontSize: '13px', background: 'white', color: '#333', transition: 'all 0.3s ease'
+                }}
+                onFocus={(e) => { e.target.style.borderColor = '#1e88e5'; e.target.style.boxShadow = '0 0 0 2px rgba(30, 136, 229, 0.1)'; }}
+                onBlur={(e) => { e.target.style.borderColor = '#d0d0d0'; e.target.style.boxShadow = 'none'; }}
+              >
+                <option value="">Semua Kelas</option>
+                {KELAS_OPTIONS.map(k => <option key={k} value={k}>{k}</option>)}
+              </select>
             </div>
-          )}
+            <div style={{ flex: '1', minWidth: '160px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#666', marginBottom: '6px' }}>Grha</label>
+              <select
+                value={filters.grha}
+                onChange={(e) => handleFilterChange('grha', e.target.value)}
+                style={{ 
+                  width: '100%', padding: '8px 12px', border: '1px solid #d0d0d0', borderRadius: '4px', 
+                  fontSize: '13px', background: 'white', color: '#333', transition: 'all 0.3s ease'
+                }}
+                onFocus={(e) => { e.target.style.borderColor = '#1e88e5'; e.target.style.boxShadow = '0 0 0 2px rgba(30, 136, 229, 0.1)'; }}
+                onBlur={(e) => { e.target.style.borderColor = '#d0d0d0'; e.target.style.boxShadow = 'none'; }}
+              >
+                <option value="">Semua Grha</option>
+                {grhaOptions.map(grha => <option key={grha} value={grha}>{grha}</option>)}
+              </select>
+            </div>
+            {userRole === 'superadmin' && (
+              <>
+                <div style={{ flex: '1', minWidth: '160px' }}>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#666', marginBottom: '6px' }}>Jurusan</label>
+                  <select
+                    value={filters.jurusan}
+                    onChange={(e) => handleFilterChange('jurusan', e.target.value)}
+                    style={{ 
+                      width: '100%', padding: '8px 12px', border: '1px solid #d0d0d0', borderRadius: '4px', 
+                      fontSize: '13px', background: 'white', color: '#333', transition: 'all 0.3s ease'
+                    }}
+                    onFocus={(e) => { e.target.style.borderColor = '#1e88e5'; e.target.style.boxShadow = '0 0 0 2px rgba(30, 136, 229, 0.1)'; }}
+                    onBlur={(e) => { e.target.style.borderColor = '#d0d0d0'; e.target.style.boxShadow = 'none'; }}
+                  >
+                    <option value="">Semua Jurusan</option>
+                    <option value="TKJ 1">TKJ 1</option>
+                    <option value="TKJ 2">TKJ 2</option>
+                    <option value="DPIB 1">DPIB 1</option>
+                    <option value="DPIB 2">DPIB 2</option>
+                    <option value="TKR 1">TKR 1</option>
+                    <option value="TKR 2">TKR 2</option>
+                  </select>
+                </div>
+                <div style={{ flex: '1', minWidth: '160px' }}>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#666', marginBottom: '6px' }}>Tahun Pelajaran</label>
+                  <select
+                    value={filters.tahun_pelajaran}
+                    onChange={(e) => handleFilterChange('tahun_pelajaran', e.target.value)}
+                    style={{ 
+                      width: '100%', padding: '8px 12px', border: '1px solid #d0d0d0', borderRadius: '4px', 
+                      fontSize: '13px', background: 'white', color: '#333', transition: 'all 0.3s ease'
+                    }}
+                    onFocus={(e) => { e.target.style.borderColor = '#1e88e5'; e.target.style.boxShadow = '0 0 0 2px rgba(30, 136, 229, 0.1)'; }}
+                    onBlur={(e) => { e.target.style.borderColor = '#d0d0d0'; e.target.style.boxShadow = 'none'; }}
+                  >
+                    <option value="">Semua Tahun</option>
+                    {(() => {
+                      const options = [];
+                      for (let year = 2024; year <= 2030; year++) {
+                        options.push(`${year}-${year + 1}`);
+                      }
+                      return options.map(year => (
+                        <option key={year} value={year}>{year}</option>
+                      ));
+                    })()}
+                  </select>
+                </div>
+              </>
+            )}
+            <button 
+              onClick={resetFilters}
+              style={{ 
+                padding: '8px 14px', background: '#f5f5f5', border: '1px solid #d0d0d0', borderRadius: '4px', 
+                fontSize: '13px', cursor: 'pointer', color: '#666', transition: 'all 0.3s ease'
+              }}
+              onMouseOver={(e) => { e.target.style.background = '#efefef'; e.target.style.borderColor = '#bbb'; }}
+              onMouseOut={(e) => { e.target.style.background = '#f5f5f5'; e.target.style.borderColor = '#d0d0d0'; }}
+            >
+              Reset
+            </button>
+          </div>
         </div>
-        {userRole === 'superadmin' && selectionRole && (
-          <p style={{ fontSize: 13, color: '#666', marginBottom: 12 }}>
-            Mode pilihan: <strong>{selectionRole === 'siswa' ? 'Siswa' : 'Guru'}</strong> — hanya role yang sama yang bisa dipilih.
-          </p>
-        )}
-        <div style={{ overflowX: 'auto' }}>
-          <table className="table">
-            <thead>
+
+        {/* Table */}
+        <div style={{ overflowX: 'auto', marginBottom: '24px', border: '1px solid #d0d0d0', borderRadius: '4px' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+            <thead style={{ background: '#f9f9f9', borderBottom: '1px solid #d0d0d0' }}>
               <tr>
-                {userRole === 'superadmin' && <th style={{ width: 40 }}></th>}
-                <th>Nama</th>
-                <th>{userRole === 'guru' ? 'NIS' : 'NIS/NIP'}</th>
-                {userRole !== 'guru' && <th>NISN</th>}
-                <th>Role</th>
-                <th>Kelas</th>
+                {userRole === 'superadmin' && <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: '#333', borderRight: '1px solid #e0e0e0', width: '30px' }}></th>}
+                <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: '#333', borderRight: '1px solid #e0e0e0' }}>Nama</th>
+                <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: '#333', borderRight: '1px solid #e0e0e0', width: '90px' }}>{userRole === 'guru' ? 'NIS' : 'NIS/NIP'}</th>
+                {userRole !== 'guru' && <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: '#333', borderRight: '1px solid #e0e0e0', width: '80px' }}>NISN</th>}
+                <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: '#333', borderRight: '1px solid #e0e0e0', width: '80px' }}>Role</th>
+                <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: '#333', borderRight: '1px solid #e0e0e0', width: '100px' }}>Kelas</th>
                 {userRole === 'superadmin' && (
                   <>
-                    <th>Jurusan</th>
-                    <th>Tahun Pelajaran</th>
+                    <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: '#333', borderRight: '1px solid #e0e0e0', width: '100px' }}>Jurusan</th>
+                    <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: '#333', borderRight: '1px solid #e0e0e0', width: '100px' }}>Tahun Pelajaran</th>
                   </>
                 )}
-                <th>IPC Total</th>
-                <th>Aksi</th>
+                <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: '#333', borderRight: '1px solid #e0e0e0', width: '90px' }}>IPC Total</th>
+                <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: '#333', width: '80px' }}>Aksi</th>
               </tr>
             </thead>
             <tbody>
               {filteredUsers.map(user => (
-                <tr key={user.id} style={isUserDisabled(user) && selectionRole ? { opacity: 0.45 } : undefined}>
+                <tr 
+                  key={user.id} 
+                  style={{ 
+                    transition: 'all 0.2s ease',
+                    ...(isUserDisabled(user) && selectionRole ? { opacity: 0.45 } : {})
+                  }}
+                  onMouseOver={(e) => { if (!isUserDisabled(user) || !selectionRole) e.currentTarget.style.background = '#f0f7ff'; }}
+                  onMouseOut={(e) => { e.currentTarget.style.background = ''; }}
+                >
                   {userRole === 'superadmin' && (
-                    <td>
+                    <td style={{ padding: '10px 12px', borderRight: '1px solid #e0e0e0', borderBottom: '1px solid #e0e0e0' }}>
                       {isUserSelectable(user) && (
                         <input
                           type="checkbox"
                           checked={selectedIds.includes(user.id)}
                           disabled={isUserDisabled(user)}
                           onChange={() => toggleUserSelection(user)}
+                          style={{ cursor: 'pointer' }}
                         />
                       )}
                     </td>
                   )}
-                  <td>{user.nama}</td>
-                  <td>{user.nis || user.nip || '-'}</td>
-                  {userRole !== 'guru' && <td>{user.nisn || '-'}</td>}
-                  <td><span className={`badge badge-${user.role === 'superadmin' ? 'danger' : user.role === 'guru' ? 'warning' : 'info'}`}>{user.role}</span></td>
-                  <td>
-                    <>
-                      {user.is_graduated ? (
-                        <span style={{ color: '#999', fontStyle: 'italic' }}>{user.kelas || '-'}</span>
-                      ) : (
-                        user.kelas || '-'
-                      )}
-                      { /* user.is_graduated && <span className="badge badge-secondary" style={{ marginLeft: '5px' }}>Lulus</span> */}
-                    </>
+                  <td style={{ padding: '10px 12px', color: '#333', borderRight: '1px solid #e0e0e0', borderBottom: '1px solid #e0e0e0' }}>{user.nama}</td>
+                  <td style={{ padding: '10px 12px', color: '#333', borderRight: '1px solid #e0e0e0', borderBottom: '1px solid #e0e0e0' }}>{user.nis || user.nip || '-'}</td>
+                  {userRole !== 'guru' && <td style={{ padding: '10px 12px', color: '#333', borderRight: '1px solid #e0e0e0', borderBottom: '1px solid #e0e0e0' }}>{user.nisn || '-'}</td>}
+                  <td style={{ padding: '10px 12px', borderRight: '1px solid #e0e0e0', borderBottom: '1px solid #e0e0e0' }}>
+                    <span style={{ 
+                      display: 'inline-block', padding: '4px 8px', borderRadius: '3px', fontSize: '11px', fontWeight: '500', textAlign: 'center', minWidth: '50px',
+                      background: user.role === 'superadmin' ? '#ef5350' : user.role === 'guru' ? '#ffc107' : '#b3e5fc',
+                      color: user.role === 'superadmin' ? 'white' : user.role === 'guru' ? 'white' : '#01579b'
+                    }}>
+                      {user.role.toUpperCase()}
+                    </span>
+                  </td>
+                  <td style={{ padding: '10px 12px', borderRight: '1px solid #e0e0e0', borderBottom: '1px solid #e0e0e0' }}>
+                    {user.is_graduated ? (
+                      <span style={{ color: '#999', fontStyle: 'italic' }}>{user.kelas || '-'}</span>
+                    ) : (
+                      user.kelas || '-'
+                    )}
                   </td>
                   {userRole === 'superadmin' && (
                     <>
-                      <td>
+                      <td style={{ padding: '10px 12px', borderRight: '1px solid #e0e0e0', borderBottom: '1px solid #e0e0e0' }}>
                         {user.jurusan ? (
                           <span style={{ 
-                            fontSize: '11px',
-                            backgroundColor: '#fff3e0',
-                            color: '#e65100',
-                            padding: '2px 6px',
-                            borderRadius: '4px'
+                            fontSize: '11px', backgroundColor: '#fff3e0', color: '#e65100', padding: '2px 6px', borderRadius: '4px'
                           }}>
                             {user.jurusan}
                           </span>
                         ) : '-'}
                       </td>
-                      <td>
+                      <td style={{ padding: '10px 12px', borderRight: '1px solid #e0e0e0', borderBottom: '1px solid #e0e0e0' }}>
                         {user.tahun_pelajaran ? (
                           <span style={{ 
                             fontSize: '11px',
@@ -741,7 +875,7 @@ function KelolaAkun() {
                       </td>
                     </>
                   )}
-                  <td>
+                  <td style={{ padding: '10px 12px', borderRight: '1px solid #e0e0e0', borderBottom: '1px solid #e0e0e0' }}>
                     <span style={{ 
                       color: (user.ipc_total ?? 0) < 0 ? '#dc2626' : 'inherit',
                       fontWeight: (user.ipc_total ?? 0) < 0 ? 'bold' : 'normal'
@@ -749,21 +883,76 @@ function KelolaAkun() {
                       {(user.ipc_total ?? 0) < 0 ? `${user.ipc_total ?? 0} (MINUS)` : (user.ipc_total ?? 0)}
                     </span>
                   </td>
-                  <td>
+                  <td style={{ padding: '10px 12px', borderBottom: '1px solid #e0e0e0' }}>
                     {userRole === 'superadmin' && user.role !== 'superadmin' && (
-                      <>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                         {user.role === 'siswa' && (
-                          <button className="btn btn-primary" onClick={() => setDetailStudent(user)} style={{ padding: '5px 10px', marginRight: '5px' }}>Detail</button>
+                          <button 
+                            onClick={() => setDetailStudent(user)}
+                            style={{ 
+                              padding: '6px 10px', border: 'none', borderRadius: '3px', 
+                              fontSize: '11px', fontWeight: '600', cursor: 'pointer', color: 'white',
+                              background: '#1e88e5', transition: 'all 0.2s ease', width: '100%', textAlign: 'center'
+                            }}
+                            onMouseOver={(e) => { e.target.style.background = '#1565c0'; e.target.style.transform = 'translateY(-1px)'; e.target.style.boxShadow = '0 2px 4px rgba(30, 136, 229, 0.3)'; }}
+                            onMouseOut={(e) => { e.target.style.background = '#1e88e5'; e.target.style.transform = 'translateY(0)'; e.target.style.boxShadow = 'none'; }}
+                          >
+                            Detail
+                          </button>
                         )}
-                        <button className="btn btn-info" onClick={() => { handleEditUser(user); setShowEditBiodataModal(true); }} style={{ padding: '5px 10px', marginRight: '5px' }}>Edit Biodata</button>
-                        <button className="btn btn-danger" onClick={() => handleDeleteUser(user.id)} style={{ padding: '5px 10px' }}>Hapus</button>
-                      </>
+                        <button 
+                          onClick={() => { handleEditUser(user); setShowEditBiodataModal(true); }}
+                          style={{ 
+                            padding: '6px 10px', border: 'none', borderRadius: '3px', 
+                            fontSize: '11px', fontWeight: '600', cursor: 'pointer', color: 'white',
+                            background: '#00bcd4', transition: 'all 0.2s ease', width: '100%', textAlign: 'center'
+                          }}
+                          onMouseOver={(e) => { e.target.style.background = '#00acc1'; e.target.style.transform = 'translateY(-1px)'; e.target.style.boxShadow = '0 2px 4px rgba(0, 188, 212, 0.3)'; }}
+                          onMouseOut={(e) => { e.target.style.background = '#00bcd4'; e.target.style.transform = 'translateY(0)'; e.target.style.boxShadow = 'none'; }}
+                        >
+                          Edit
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteUser(user.id)}
+                          style={{ 
+                            padding: '6px 10px', border: 'none', borderRadius: '3px', 
+                            fontSize: '11px', fontWeight: '600', cursor: 'pointer', color: 'white',
+                            background: '#ef5350', transition: 'all 0.2s ease', width: '100%', textAlign: 'center'
+                          }}
+                          onMouseOver={(e) => { e.target.style.background = '#e53935'; e.target.style.transform = 'translateY(-1px)'; e.target.style.boxShadow = '0 2px 4px rgba(239, 83, 80, 0.3)'; }}
+                          onMouseOut={(e) => { e.target.style.background = '#ef5350'; e.target.style.transform = 'translateY(0)'; e.target.style.boxShadow = 'none'; }}
+                        >
+                          Hapus
+                        </button>
+                      </div>
                     )}
                     {userRole === 'guru' && user.role === 'siswa' && (
-                      <>
-                        <button className="btn btn-primary" onClick={() => setDetailStudent(user)} style={{ padding: '5px 10px', marginRight: '5px' }}>Detail</button>
-                        <button className="btn btn-info" onClick={() => { handleEditUser(user); setShowEditBiodataModal(true); }} style={{ padding: '5px 10px' }}>Edit Biodata</button>
-                      </>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <button 
+                          onClick={() => setDetailStudent(user)}
+                          style={{ 
+                            padding: '6px 10px', border: 'none', borderRadius: '3px', 
+                            fontSize: '11px', fontWeight: '600', cursor: 'pointer', color: 'white',
+                            background: '#1e88e5', transition: 'all 0.2s ease', width: '100%', textAlign: 'center'
+                          }}
+                          onMouseOver={(e) => { e.target.style.background = '#1565c0'; e.target.style.transform = 'translateY(-1px)'; e.target.style.boxShadow = '0 2px 4px rgba(30, 136, 229, 0.3)'; }}
+                          onMouseOut={(e) => { e.target.style.background = '#1e88e5'; e.target.style.transform = 'translateY(0)'; e.target.style.boxShadow = 'none'; }}
+                        >
+                          Detail
+                        </button>
+                        <button 
+                          onClick={() => { handleEditUser(user); setShowEditBiodataModal(true); }}
+                          style={{ 
+                            padding: '6px 10px', border: 'none', borderRadius: '3px', 
+                            fontSize: '11px', fontWeight: '600', cursor: 'pointer', color: 'white',
+                            background: '#00bcd4', transition: 'all 0.2s ease', width: '100%', textAlign: 'center'
+                          }}
+                          onMouseOver={(e) => { e.target.style.background = '#00acc1'; e.target.style.transform = 'translateY(-1px)'; e.target.style.boxShadow = '0 2px 4px rgba(0, 188, 212, 0.3)'; }}
+                          onMouseOut={(e) => { e.target.style.background = '#00bcd4'; e.target.style.transform = 'translateY(0)'; e.target.style.boxShadow = 'none'; }}
+                        >
+                          Edit
+                        </button>
+                      </div>
                     )}
                   </td>
                 </tr>
@@ -771,6 +960,59 @@ function KelolaAkun() {
             </tbody>
           </table>
         </div>
+
+        {/* Bulk Actions */}
+        {userRole === 'superadmin' && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '16px', borderTop: '1px solid #e0e0e0' }}>
+            <div style={{ fontSize: '12px', color: '#999' }}>
+              Menampilkan {filteredUsers.length} pengguna
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button 
+                onClick={selectAllFiltered}
+                style={{ 
+                  padding: '6px 12px', border: '1px solid #d0d0d0', background: 'white', borderRadius: '3px', 
+                  fontSize: '12px', cursor: 'pointer', color: '#333'
+                }}
+                onMouseOver={(e) => { e.target.style.background = '#f5f5f5'; e.target.style.borderColor = '#bbb'; }}
+                onMouseOut={(e) => { e.target.style.background = 'white'; e.target.style.borderColor = '#d0d0d0'; }}
+              >
+                Pilih Semua
+              </button>
+              {selectedIds.length > 0 && (
+                <>
+                  <button 
+                    onClick={handleBulkDelete}
+                    style={{ 
+                      padding: '6px 12px', border: '1px solid #d0d0d0', background: '#dc3545', borderRadius: '3px', 
+                      fontSize: '12px', cursor: 'pointer', color: 'white'
+                    }}
+                    onMouseOver={(e) => { e.target.style.background = '#c82333'; }}
+                    onMouseOut={(e) => { e.target.style.background = '#dc3545'; }}
+                  >
+                    Hapus ({selectedIds.length})
+                  </button>
+                  <button 
+                    onClick={clearSelection}
+                    style={{ 
+                      padding: '6px 12px', border: '1px solid #d0d0d0', background: 'white', borderRadius: '3px', 
+                      fontSize: '12px', cursor: 'pointer', color: '#333'
+                    }}
+                    onMouseOver={(e) => { e.target.style.background = '#f5f5f5'; e.target.style.borderColor = '#bbb'; }}
+                    onMouseOut={(e) => { e.target.style.background = 'white'; e.target.style.borderColor = '#d0d0d0'; }}
+                  >
+                    Batal
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+        {userRole === 'superadmin' && selectionRole && (
+          <p style={{ fontSize: '13px', color: '#666', marginTop: '12px' }}>
+            Mode pilihan: <strong>{selectionRole === 'siswa' ? 'Siswa' : 'Guru'}</strong> — hanya role yang sama yang bisa dipilih.
+          </p>
+        )}
       </div>
 
       {detailStudent && (
@@ -804,10 +1046,6 @@ function KelolaAkun() {
                 <div className="form-group">
                   <label>NIS</label>
                   <input type="text" value={formData.nis || ''} onChange={(e) => setFormData({...formData, nis: e.target.value})} required />
-                </div>
-                <div className="form-group">
-                  <label>NISN</label>
-                  <input type="text" value={formData.nisn || ''} onChange={(e) => setFormData({...formData, nisn: e.target.value})} required />
                 </div>
                 <div className="form-group">
                   <label>Kelas</label>
@@ -948,8 +1186,13 @@ function KelolaAkun() {
                   <input type="text" value={formData.nip || ''} onChange={(e) => setFormData({...formData, nip: e.target.value})} required />
                 </div>
                 <div className="form-group">
-                  <label>Detail</label>
-                  <input type="text" value={formData.detail || ''} onChange={(e) => setFormData({...formData, detail: e.target.value})} />
+                  <label>Jabatan</label>
+                  <select value={formData.jabatan || ''} onChange={(e) => setFormData({...formData, jabatan: e.target.value})} required>
+                    <option value="">Pilih Jabatan</option>
+                    {JABATAN_OPTIONS.map((jabatan) => (
+                      <option key={jabatan} value={jabatan}>{jabatan}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="form-group">
                   <label>No HP</label>
@@ -1000,7 +1243,7 @@ function KelolaAkun() {
               <div style={{ fontSize: '12px', color: '#666', marginBottom: '10px' }}>
                 {importModalType === 'siswa' ? (
                   <div>
-                    <strong>Format Siswa:</strong> nama, nis, nisn, jurusan, grha, tahun_pelajaran, password
+                    <strong>Format Siswa:</strong> nama, nis, jurusan, grha, tahun_pelajaran, password
                     <br />
                     <small style={{ color: '#1976d2' }}>
                       💡 Kelas akan dihitung otomatis berdasarkan tahun_pelajaran dan jurusan. 
@@ -1009,7 +1252,7 @@ function KelolaAkun() {
                   </div>
                 ) : (
                   <div>
-                    <strong>Format Guru:</strong> nama, nip, detail, no_hp, password
+                    <strong>Format Guru:</strong> nama, nip, jabatan (Guru/Pegawai/Staff), no_hp, password
                   </div>
                 )}
               </div>
@@ -1194,8 +1437,6 @@ function KelolaAkun() {
                     <input type="text" value={formData.nis || ''} onChange={(e) => setFormData({...formData, nis: e.target.value})} required />
                   </div>
                   <div className="form-group">
-                    <label>NISN</label>
-                    <input type="text" value={formData.nisn || ''} onChange={(e) => setFormData({...formData, nisn: e.target.value})} required />
                   </div>
                   <div className="form-group">
                     <label>Kelas</label>
@@ -1240,14 +1481,19 @@ function KelolaAkun() {
                   </div>
                 </>
               ) : (
-                <>
+                <> 
                   <div className="form-group">
                     <label>NIP</label>
                     <input type="text" value={formData.nip || ''} onChange={(e) => setFormData({...formData, nip: e.target.value})} required />
                   </div>
                   <div className="form-group">
-                    <label>Detail</label>
-                    <input type="text" value={formData.detail || ''} onChange={(e) => setFormData({...formData, detail: e.target.value})} />
+                    <label>Jabatan</label>
+                    <select value={formData.jabatan || ''} onChange={(e) => setFormData({...formData, jabatan: e.target.value})} required>
+                      <option value="">Pilih Jabatan</option>
+                      {JABATAN_OPTIONS.map((jabatan) => (
+                        <option key={jabatan} value={jabatan}>{jabatan}</option>
+                      ))}
+                    </select>
                   </div>
                   <div className="form-group">
                     <label>No HP</label>

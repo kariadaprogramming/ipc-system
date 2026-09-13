@@ -1,5 +1,8 @@
 const db = require('../config/database');
-const { calculatePerilakuPoints, PERILAKU_POINTS } = require('../constants/points');
+const {
+    PERILAKU_POINTS,
+    lookupPerilakuPoint
+} = require('../constants/points');
 
 const TRAIT_FIELD_MAP = {
     'tanggung jawab': 'tanggung_jawab',
@@ -28,11 +31,12 @@ function createEmptyPoints(ipcAwal = 80) {
         event: 0,
         pelanggaran_ringan: 0,
         pelanggaran_sedang: 0,
-        pelanggaran_berat: 0
+        pelanggaran_berat: 0,
+        pelanggaran_lainnya: 0
     };
 }
 
-function addPerilakuPoints(points, karakterSiswa) {
+async function addPerilakuPoints(points, karakterSiswa) {
     if (!karakterSiswa) {
         return;
     }
@@ -43,18 +47,22 @@ function addPerilakuPoints(points, karakterSiswa) {
     }
 
     if (text.includes(':')) {
-        text.split(',').forEach((part) => {
+        const parts = text.split(',');
+        for (const part of parts) {
             const [label, value] = part.split(':').map((s) => s.trim());
             const field = TRAIT_FIELD_MAP[label?.toLowerCase()];
             if (!field || !value) {
-                return;
+                continue;
             }
-            points[field] += PERILAKU_POINTS[value.toLowerCase()] || 0;
-        });
+            const point = await lookupPerilakuPoint(field, value);
+            points[field] += point || PERILAKU_POINTS[value.toLowerCase()] || 0;
+        }
         return;
     }
 
-    points.tanggung_jawab += calculatePerilakuPoints(text);
+    // Legacy single-rating string — apply to tanggung_jawab as before
+    const point = await lookupPerilakuPoint('tanggung_jawab', text);
+    points.tanggung_jawab += point || PERILAKU_POINTS[text.toLowerCase()] || 0;
 }
 
 function calculateBreakdownTotal(points) {
@@ -74,12 +82,13 @@ function calculateBreakdownTotal(points) {
     total -= points.pelanggaran_ringan || 0;
     total -= points.pelanggaran_sedang || 0;
     total -= points.pelanggaran_berat || 0;
+    total -= points.pelanggaran_lainnya || 0;
     return total;
 }
 
 async function buildIpcCardBreakdown(userId) {
     const [students] = await db.query(
-        `SELECT id, nama, nis, nisn, kelas, grha, ipc_total, ipc_awal
+        `SELECT id, nama, nis, kelas, grha, ipc_total, ipc_awal
          FROM users
          WHERE id = ? AND role = 'siswa'`,
         [userId]
@@ -134,6 +143,8 @@ async function buildIpcCardBreakdown(userId) {
             points.pelanggaran_sedang += row.point_dikurangi || 0;
         } else if (jenis === 'berat') {
             points.pelanggaran_berat += row.point_dikurangi || 0;
+        } else {
+            points.pelanggaran_lainnya += row.point_dikurangi || 0;
         }
     });
 
@@ -144,7 +155,7 @@ async function buildIpcCardBreakdown(userId) {
         [userId]
     );
     if (perilaku.length > 0) {
-        addPerilakuPoints(points, perilaku[0].karakter_siswa);
+        await addPerilakuPoints(points, perilaku[0].karakter_siswa);
     }
 
     const breakdownTotal = calculateBreakdownTotal(points);
@@ -152,7 +163,7 @@ async function buildIpcCardBreakdown(userId) {
     return {
         student,
         points,
-        ipc_total: breakdownTotal, // Always use calculated breakdown total for consistency
+        ipc_total: breakdownTotal,
         breakdown_total: breakdownTotal
     };
 }

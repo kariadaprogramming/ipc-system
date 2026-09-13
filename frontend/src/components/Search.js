@@ -13,7 +13,7 @@ function Search() {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get(`/search/students?query=${query}`, {
+       const response = await axios.get(`/search/students?query=${encodeURIComponent(query)}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setResults(response.data);

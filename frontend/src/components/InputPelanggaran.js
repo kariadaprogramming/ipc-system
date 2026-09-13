@@ -3,6 +3,7 @@ import axios from 'axios';
 import EditModal from './EditModal';
 import useEditModal from '../hooks/useEditModal';
 import API_BASE_URL from '../config';
+import Select from 'react-select';
 
 function InputPelanggaran() {
   const [formData, setFormData] = useState({
@@ -11,35 +12,42 @@ function InputPelanggaran() {
     kelas: '',
     grha: '',
     keterangan: '',
-    jenis_pelanggaran: 'ringan'
+    jenis_pelanggaran: ''
   });
   const [foto, setFoto] = useState(null);
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
-  const [isAutoFilled, setIsAutoFilled] = useState(false);
-  const [nisLoading, setNisLoading] = useState(false);
+  const [, setIsAutoFilled] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [allPelanggaran, setAllPelanggaran] = useState([]);
   const [loadingIndex, setLoadingIndex] = useState(false);
   const [userRole, setUserRole] = useState('');
   const editModal = useEditModal();
+  const [ipcConfig, setIpcConfig] = useState([]);
+  const [calculatedPoint, setCalculatedPoint] = useState(0);
+  const [students, setStudents] = useState([]);
+  const jenisOptions = (ipcConfig['pelanggaran'] || [])
+    .filter(config => config.field2)
+    .map(config => {
+      const level = (ipcConfig['pelanggaran'] || []).find(
+        candidate => !candidate.field2 && candidate.field1 === config.field2
+      );
+      return { value: config.field1, label: config.field1, point: level?.point_value || 0 };
+    });
 
   const grhaOptions = [
     'Airsanya', 'Daksina', 'Genya', 'Madhya', 'Nairiti', 'Pascima', 'Purwa', 'Uttara', 'Wayabhya'
   ];
 
-  const jenisOptions = [
-    { value: 'ringan', label: 'Ringan (-1 point)' },
-    { value: 'sedang', label: 'Sedang (-5 point)' },
-    { value: 'berat', label: 'Berat (-25 point)' }
-  ];
-
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     setUserRole(user.role || '');
+    fetchIpcConfig();
     if (user.role === 'superadmin') {
       fetchAllPelanggaran();
     }
+    fetchStudents();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchAllPelanggaran = async () => {
@@ -57,45 +65,115 @@ function InputPelanggaran() {
     }
   };
 
-  // useEffect(() => {
-  //   checkPermission();
-  // }, []);
+  const fetchIpcConfig = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get('/ipc-config/active', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setIpcConfig(response.data);
+      const firstDetail = (response.data.pelanggaran || []).find(config => config.field2);
+      if (firstDetail) {
+        setFormData(prev => ({ ...prev, jenis_pelanggaran: firstDetail.field1 }));
+        setCalculatedPoint(calculatePoint(firstDetail.field1, response.data));
+      }
+    } catch (error) {
+      console.error('Error fetching IPC config:', error);
+    }
+  };
 
-  // const checkPermission = async () => {
-  //   const user = JSON.parse(localStorage.getItem('user'));
-  //   if (user?.role === 'superadmin') {
-  //     setHasPermission(true);
-  //     setCheckingPermission(false);
-  //     return;
-  //   }
+  const fetchStudents = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get('/users', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const studentList = response.data.filter(user => user.role === 'siswa');
+      setStudents(studentList);
+    } catch (error) {
+      console.error('Error fetching students:', error);
+    }
+  };
 
-  //   try {
-  //     const token = localStorage.getItem('token');
-  //     const response = await axios.get('/permissions/' + user.id, {
-  //       headers: { Authorization: `Bearer ${token}` }
-  //     });
-  //     setHasPermission(response.data.can_input_pelanggaran === true);
-  //   } catch (error) {
-  //     console.error('Error checking permission:', error);
-  //     setHasPermission(false);
-  //   } finally {
-  //     setCheckingPermission(false);
-  //   }
-  // };
+  const calculatePoint = (jenis, configData = ipcConfig) => {
+    const pelanggaranConfigs = configData.pelanggaran || [];
+    const config = pelanggaranConfigs.find(
+      c => c.field1 === jenis
+    );
+    if (!config) return 0;
+    if (config.field2) {
+      const level = pelanggaranConfigs.find(
+        candidate => !candidate.field2 && candidate.field1 === config.field2
+      );
+      return level?.point_value || 0;
+    }
+    return config.point_value;
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
 
+    // Reset auto-fill flag if user clears the field
+    if ((name === 'nis' || name === 'nama') && value === '') {
+      setIsAutoFilled(false);
+    }
+
     // Auto-fill student data when NIS is entered
     if (name === 'nis' && value.length >= 1) {
       fetchStudentData(value);
+    }
+
+    // Auto-fill student data when nama is entered
+    if (name === 'nama' && value.length >= 1) {
+      fetchStudentDataByName(value);
+    }
+
+
+  };
+
+  const handleStudentSelect = (selectedOption) => {
+    if (selectedOption) {
+      setFormData(prev => ({
+        ...prev,
+        nama: selectedOption.nama,
+        nis: selectedOption.nis,
+        kelas: selectedOption.kelas || '',
+        grha: selectedOption.grha || ''
+      }));
+      setIsAutoFilled(true);
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        nama: '',
+        nis: '',
+        kelas: '',
+        grha: ''
+      }));
+      setIsAutoFilled(false);
+    }
+  };
+
+  const handleJenisSelect = (selectedOption) => {
+    if (selectedOption) {
+      setFormData(prev => ({ ...prev, jenis_pelanggaran: selectedOption.value }));
+      setCalculatedPoint(calculatePoint(selectedOption.value));
+    } else {
+      setFormData(prev => ({ ...prev, jenis_pelanggaran: '' }));
+      setCalculatedPoint(0);
+    }
+  };
+
+  const handleEditJenisSelect = (selectedOption) => {
+    if (selectedOption) {
+      editModal.setEditFormData({ ...editModal.editFormData, jenis_pelanggaran: selectedOption.value });
+    } else {
+      editModal.setEditFormData({ ...editModal.editFormData, jenis_pelanggaran: '' });
     }
   };
 
   const fetchStudentData = async (nis) => {
     try {
-      setNisLoading(true);
       const token = localStorage.getItem('token');
       const response = await axios.get(`/users/nis/${nis}`, {
         headers: { Authorization: `Bearer ${token}` }
@@ -113,8 +191,28 @@ function InputPelanggaran() {
     } catch (error) {
       // Student not found or error, don't auto-fill
       console.log('Student not found or error fetching data');
-    } finally {
-      setNisLoading(false);
+    }
+  };
+
+  const fetchStudentDataByName = async (nama) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`/users/nama/${nama}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (response.data) {
+        setFormData(prev => ({
+          ...prev,
+          nis: response.data.nis || '',
+          kelas: response.data.kelas || '',
+          grha: response.data.grha || ''
+        }));
+        setIsAutoFilled(true);
+      }
+    } catch (error) {
+      // Student not found or error, don't auto-fill
+      console.log('Student not found or error fetching data');
     }
   };
 
@@ -158,7 +256,7 @@ function InputPelanggaran() {
         kelas: '',
         grha: '',
         keterangan: '',
-        jenis_pelanggaran: 'ringan'
+        jenis_pelanggaran: ''
       });
       setFoto(null);
       setIsAutoFilled(false);
@@ -228,20 +326,6 @@ function InputPelanggaran() {
       editModal.setIsLoading(false);
     }
   };
-
-  // Permission checking disabled for now
-  // if (checkingPermission) {
-  //   return <div className="loading"><div className="spinner"></div></div>;
-  // }
-
-  // if (!hasPermission) {
-  //   return (
-  //     <div className="card">
-  //       <h2>Akses Ditolak</h2>
-  //       <p>Anda tidak memiliki izin untuk mengakses halaman ini. Silakan hubungi SuperAdmin.</p>
-  //     </div>
-  //   );
-  // }
 
   return (
     <div className="card">
@@ -323,30 +407,37 @@ function InputPelanggaran() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <div className="form-group">
             <label>Nama <span className="required">*</span></label>
-            <input
-              type="text"
-              name="nama"
-              value={formData.nama}
-              onChange={handleChange}
-              placeholder="Nama siswa"
-              required
-              disabled={isAutoFilled}
-              style={{ backgroundColor: isAutoFilled ? '#f0f0f0' : '' }}
+            <Select
+              value={students.find(s => s.nama === formData.nama && s.nis === formData.nis) ? { value: formData.nama, label: formData.nama, nama: formData.nama, nis: formData.nis, kelas: formData.kelas, grha: formData.grha } : null}
+              onChange={(selected) => handleStudentSelect(selected)}
+              options={students.map(student => ({ value: student.nama, label: `${student.nama} (${student.nis})`, nama: student.nama, nis: student.nis, kelas: student.kelas, grha: student.grha }))}
+              placeholder="Cari nama siswa..."
+              isSearchable
+              isClearable
+              styles={{
+                control: (provided) => ({
+                  ...provided,
+                  minHeight: '40px'
+                })
+              }}
             />
-            {isAutoFilled && <p className="form-helper-text">Data diisi otomatis dari NIS</p>}
           </div>
           <div className="form-group">
             <label>NIS <span className="required">*</span></label>
-            <input
-              type="text"
-              name="nis"
-              value={formData.nis}
-              onChange={handleChange}
-              placeholder="Masukkan NIS siswa"
-              required
-              className={nisLoading ? 'auto-fill-loading' : (isAutoFilled ? 'auto-fill-success' : 'nis-input-highlight')}
+            <Select
+              value={students.find(s => s.nis === formData.nis) ? { value: formData.nis, label: formData.nis, nama: formData.nama, nis: formData.nis, kelas: formData.kelas, grha: formData.grha } : null}
+              onChange={(selected) => handleStudentSelect(selected)}
+              options={students.map(student => ({ value: student.nis, label: `${student.nis} - ${student.nama}`, nama: student.nama, nis: student.nis, kelas: student.kelas, grha: student.grha }))}
+              placeholder="Cari NIS siswa..."
+              isSearchable
+              isClearable
+              styles={{
+                control: (provided) => ({
+                  ...provided,
+                  minHeight: '40px'
+                })
+              }}
             />
-            <p className="form-helper-text">Masukkan NIS untuk mengisi data siswa secara otomatis</p>
           </div>
         </div>
 
@@ -358,17 +449,15 @@ function InputPelanggaran() {
               name="kelas" 
               value={formData.kelas} 
               onChange={handleChange} 
-              disabled 
-              style={{ backgroundColor: '#f0f0f0', cursor: 'not-allowed' }}
-              placeholder="Auto-filled from student data"
+              placeholder="Data diisi otomatis"
+              disabled
               required
             />
-            <small style={{ color: '#666', fontSize: '12px' }}>Auto-filled from student data</small>
           </div>
           <div className="form-group">
             <label>Grha</label>
-            <select name="grha" value={formData.grha} onChange={handleChange} disabled={isAutoFilled} style={{ backgroundColor: isAutoFilled ? '#f0f0f0' : '' }}>
-              <option value="">Pilih Grha</option>
+            <select name="grha" value={formData.grha} disabled required onChange={handleChange}>
+              <option value="">Data diisi otomatis</option>
               {grhaOptions.map(grha => (
                 <option key={grha} value={grha}>{grha}</option>
               ))}
@@ -389,12 +478,42 @@ function InputPelanggaran() {
         </div>
 
         <div className="form-group">
-          <label>Jenis Pelanggaran</label>
-          <select name="jenis_pelanggaran" value={formData.jenis_pelanggaran} onChange={handleChange}>
-            {jenisOptions.map(jenis => (
-              <option key={jenis.value} value={jenis.value}>{jenis.label}</option>
-            ))}
-          </select>
+          <label>Detail Pelanggaran</label>
+          <Select
+            value={jenisOptions.find(jenis => jenis.value === formData.jenis_pelanggaran) || null}
+            onChange={handleJenisSelect}
+            options={jenisOptions.map(jenis => ({
+              value: jenis.value,
+              label: jenis.point > 0 ? `${jenis.label} (${jenis.point} point)` : jenis.label
+            }))}
+            placeholder="Pilih Detail Pelanggaran"
+            isSearchable
+            isClearable
+            styles={{
+              control: (provided) => ({
+                ...provided,
+                minHeight: '40px'
+              })
+            }}
+          />
+        </div>
+
+        <div className="form-group" style={{ 
+          padding: '12px', 
+          background: '#FEE2E2',
+          borderRadius: '4px',
+          marginTop: '12px'
+        }}>
+          <label style={{ fontWeight: '600', marginBottom: '4px', display: 'block' }}>
+            Point IPC yang akan dikurangi:
+          </label>
+          <span style={{ 
+            fontSize: '18px', 
+            fontWeight: '700',
+            color: '#DC2626'
+          }}>
+            {calculatedPoint}
+          </span>
         </div>
 
         <div className="form-group">
@@ -474,15 +593,24 @@ function InputPelanggaran() {
             </select>
           </div>
           <div className="form-group">
-            <label>Jenis Pelanggaran</label>
-            <select 
-              value={editModal.editFormData.jenis_pelanggaran || ''} 
-              onChange={(e) => editModal.setEditFormData({ ...editModal.editFormData, jenis_pelanggaran: e.target.value })}
-            >
-              {jenisOptions.map(jenis => (
-                <option key={jenis.value} value={jenis.value}>{jenis.label}</option>
-              ))}
-            </select>
+            <label>Detail Pelanggaran</label>
+            <Select
+              value={jenisOptions.find(jenis => jenis.value === editModal.editFormData.jenis_pelanggaran) || null}
+              onChange={handleEditJenisSelect}
+              options={jenisOptions.map(jenis => ({
+                value: jenis.value,
+                label: jenis.point > 0 ? `${jenis.label} (${jenis.point} point)` : jenis.label
+              }))}
+              placeholder="Pilih Detail Pelanggaran"
+              isSearchable
+              isClearable
+              styles={{
+                control: (provided) => ({
+                  ...provided,
+                  minHeight: '40px'
+                })
+              }}
+            />
           </div>
         </div>
 

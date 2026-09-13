@@ -7,6 +7,7 @@ yarn.lock
 .env
 .env.local
 .env.production
+.kilo/
 test.html
 
 # Uploads
@@ -32,4 +33,4 @@ Thumbs.db
 build/
 
 # User
-#*.pdf
+**/*.pdf

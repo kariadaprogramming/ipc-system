@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import API_BASE_URL from '../config';
 
 function Login() {
   const [activeTab, setActiveTab] = useState('siswa');
@@ -10,7 +11,21 @@ function Login() {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [schoolConfig, setSchoolConfig] = useState(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchSchoolConfig = async () => {
+      try {
+        const response = await axios.get('/school-config/public');
+        setSchoolConfig(response.data);
+      } catch (error) {
+        console.error('Error fetching school config:', error);
+      }
+    };
+
+    fetchSchoolConfig();
+  }, []);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -23,17 +38,12 @@ function Login() {
 
     try {
       const response = await axios.post('/auth/login', formData);
-      console.log('Login response:', response.data);
       
       localStorage.setItem('token', response.data.token);
       localStorage.setItem('user', JSON.stringify(response.data.user));
       
-      console.log('User data stored:', localStorage.getItem('user'));
-      console.log('Token stored:', localStorage.getItem('token'));
-      
       navigate('/dashboard');
     } catch (error) {
-      console.error('Login error:', error);
       setError(error.response?.data?.message || 'Login failed');
     } finally {
       setLoading(false);
@@ -58,7 +68,23 @@ function Login() {
           width: '100%',
           maxWidth: '400px'
         }}>
-          <div className="login-logo" style={{ color: '#667eea', fontSize: '48px', fontWeight: 'bold', textAlign: 'center', marginBottom: '10px' }}>IPC</div>
+          <div className="login-logo" style={{ textAlign: 'center', marginBottom: '10px', height: '72px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {schoolConfig?.logo_url ? (
+              <img
+                src={`${API_BASE_URL.replace('/api', '')}${schoolConfig.logo_url}`}
+                alt="Logo Sekolah"
+                style={{
+                  maxWidth: '150px',
+                  maxHeight: '72px',
+                  width: 'auto',
+                  height: 'auto',
+                  objectFit: 'contain'
+                }}
+              />
+            ) : (
+              <span style={{ color: '#667eea', fontSize: '48px', fontWeight: 'bold' }}>IPC</span>
+            )}
+          </div>
           <h2 style={{ color: '#333', textAlign: 'center', marginBottom: '5px' }}>School System</h2>
           <p className="login-subtitle" style={{ color: '#666', textAlign: 'center', marginBottom: '25px' }}>Individual Point Card</p>
           <div className="login-divider" style={{ color: '#ccc', textAlign: 'center', marginBottom: '25px' }}><span style={{ background: 'white', color: '#666', padding: '0 10px' }}>Pilih Tipe Akun</span></div>
@@ -125,7 +151,7 @@ function Login() {
           {activeTab === 'siswa' && (
             <>
               <div className="form-group">
-                <label>NIS / NISN</label>
+                <label>NIS</label>
                 <input
                   type="text"
                   name="username"

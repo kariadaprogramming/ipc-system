@@ -37,8 +37,8 @@ const speedLimiter = slowDown({
 
 // SQL Injection prevention middleware
 const sqlInjectionPrevention = (req, res, next) => {
-  const sqlPattern = /(\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|EXECUTE|UNION|SCRIPT|TABLE|FROM|WHERE|AND|OR|NOT|NULL|TRUE|FALSE)\b)|(--|#|\/\*|\*\/|;|'|"|\|\|)/gi;
-  
+  const sqlPattern = /(\b(UNION\s+SELECT|SELECT\s+.*\s+FROM|INSERT\s+INTO|DROP\s+TABLE|DELETE\s+FROM|UPDATE\s+.*\s+SET|OR\s+\d+\s*=\s*\d+|AND\s+\d+\s*=\s*\d+|--|;\s*\w+\b)\b)/gi;
+
   const checkValue = (value) => {
     if (typeof value === 'string') {
       return sqlPattern.test(value);

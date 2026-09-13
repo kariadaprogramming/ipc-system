@@ -23,10 +23,20 @@ import DriveViewer from './components/DriveViewer';
 import Notifications from './components/Notifications';
 import LaporanCetak from './components/LaporanCetak';
 import KonfigurasiIPC from './components/KonfigurasiIPC';
+import SchoolConfig from './components/SchoolConfig';
 import axios from 'axios';
 import API_BASE_URL from './config';
 
 axios.defaults.baseURL = API_BASE_URL;
+
+// Axios interceptor to add Authorization header automatically
+axios.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
 
 function ProtectedRoute({ children, allowedRoles }) {
   const [loading, setLoading] = useState(true);
@@ -62,9 +72,7 @@ function ProtectedRoute({ children, allowedRoles }) {
     // Fetch fresh user data from server to get latest wali_kelas status (background)
     const fetchFreshUserData = async () => {
       try {
-        const response = await axios.get('/profile', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        const response = await axios.get('/profile');
         
         // Merge fresh data with existing user data
         const freshUser = { ...parsedUser, ...response.data };
@@ -203,6 +211,11 @@ function App() {
         <Route path="/konfigurasi-ipc" element={
           <ProtectedRoute allowedRoles={['superadmin']}>
             {(user) => <MainLayout user={user}><KonfigurasiIPC /></MainLayout>}
+          </ProtectedRoute>
+        } />
+        <Route path="/school-config" element={
+          <ProtectedRoute allowedRoles={['superadmin']}>
+            {(user) => <MainLayout user={user}><SchoolConfig /></MainLayout>}
           </ProtectedRoute>
         } />
       </Routes>
