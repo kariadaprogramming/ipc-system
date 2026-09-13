@@ -22,8 +22,6 @@ function Dashboard() {
   const TEXT = '#1b2033';
   const MUTED = '#727a8c';
   const BLUE = '#2f5fe8';
-  const PURPLE = '#7c6fd6';
-  const GREEN = '#16a875';
   const AMBER = '#f5a524';
   const RED = '#e34848';
   const TEAL = '#23b5b5';
@@ -86,14 +84,13 @@ function Dashboard() {
       const response = await axios.get('/school-config', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      console.log('School config response:', response.data);
       setSchoolConfig(response.data);
     } catch (error) {
       console.error('Error fetching school config:', error);
       // Use default values if fetch fails
       setSchoolConfig({
         school_name: 'SMK Negeri Bali Mandara',
-        school_description: 'Sistem Index Prestasi Citra (IPC) • Panel Admin',
+        school_description: 'Sistem Individual Point Card (IPC) • Panel Admin',
         principal_name: 'Nama Kepala Sekolah',
         principal_nip: '',
         logo_url: null
@@ -193,8 +190,7 @@ function Dashboard() {
                     padding: '4px'
                   }}
                   onError={(e) => {
-                    console.error('Logo image failed to load:', e);
-                    console.error('Image URL:', `${API_BASE_URL.replace('/api', '')}${schoolConfig.logo_url}`);
+                    e.currentTarget.style.display = 'none';
                   }}
                 />
               ) : (
@@ -215,7 +211,7 @@ function Dashboard() {
                 fontSize: '12.5px',
                 color: 'rgba(255,255,255,.68)',
                 marginTop: '2px'
-              }}>{schoolConfig?.school_description || 'Sistem Index Prestasi Citra (IPC) · Panel Admin'}</div>
+              }}>{schoolConfig?.school_description || 'Sistem Individual Point Card (IPC) · Panel Admin'}</div>
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
@@ -295,7 +291,7 @@ function Dashboard() {
             letterSpacing: '.01em',
             paddingRight: '56px'
           }}>
-            <span>Selamat datang di Website IPC — Sistem Index Prestasi Citra SMK Negeri Bali Mandara</span>
+            <span>Selamat datang di Website IPC — Sistem Individual Point Card SMK Negeri Bali Mandara</span>
             <span style={{
               display: 'inline-block',
               width: '5px',
@@ -316,7 +312,7 @@ function Dashboard() {
             letterSpacing: '.01em',
             paddingRight: '56px'
           }}>
-            <span>Selamat datang di Website IPC — Sistem Index Prestasi Citra SMK Negeri Bali Mandara</span>
+            <span>Selamat datang di Website IPC — Sistem Individual Point Card SMK Negeri Bali Mandara</span>
             <span style={{
               display: 'inline-block',
               width: '5px',
@@ -757,23 +753,6 @@ function Dashboard() {
           marginTop: '-4px'
         }}>&ldquo;</div>
         <div>
-          <h2 style={{
-            fontSize: '15px',
-            margin: '0 0 6px',
-            fontWeight: '700',
-            color: TEXT
-          }}>Sambutan Kepala Sekolah</h2>
-          <p style={{
-            margin: '0',
-            fontSize: '13.5px',
-            lineHeight: '1.6',
-            color: MUTED,
-            maxHeight: noteExpanded ? '220px' : '44px',
-            overflow: 'hidden',
-            transition: 'max-height 0.35s ease'
-          }}>
-            {schoolConfig?.school_description || 'Selamat datang di sistem Index Prestasi Citra SMK Negeri Bali Mandara. IPC hadir untuk mencatat dan mengapresiasi setiap pencapaian siswa secara transparan — dari prestasi akademik dan non-akademik, keterlibatan organisasi, hingga kepanitiaan. Semoga sistem ini mendorong seluruh siswa untuk terus berprestasi dan berkontribusi bagi sekolah.'}
-          </p>
           <button 
             onClick={() => setNoteExpanded(!noteExpanded)}
             style={{

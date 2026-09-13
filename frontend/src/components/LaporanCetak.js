@@ -219,21 +219,16 @@ function LaporanCetak({ user }) {
   }, []);
 
   const checkWaliKelasStatus = async () => {
-    console.log('LaporanCetak - Checking wali kelas status, user:', user);
     if (user?.role === 'guru') {
       try {
         const token = localStorage.getItem('token');
-        console.log('LaporanCetak - Calling /wali-kelas/my-class');
         const response = await axios.get('/wali-kelas/my-class', {
           headers: { Authorization: `Bearer ${token}` }
         });
-        console.log('LaporanCetak - Wali kelas response:', response.data);
         setIsWaliKelas(true);
         setWaliKelasInfo(response.data);
-        setSelectedClass(response.data.kelas); // Auto-select their class
-        console.log('LaporanCetak - Set selectedClass to:', response.data.kelas);
+        setSelectedClass(response.data.kelas);
       } catch (error) {
-        console.log('LaporanCetak - Teacher is not a wali kelas:', error);
         setIsWaliKelas(false);
       }
     }
@@ -320,8 +315,8 @@ function LaporanCetak({ user }) {
       // Use default values if fetch fails
       setSchoolConfig({
         school_name: 'SMK Negeri Bali Mandara',
-        school_description: 'Sistem Index Prestasi Citra (IPC) • Panel Admin',
-        principal_name: '',
+        school_description: 'Sistem Individual Point Card (IPC) • Panel Admin',
+        principal_name: 'Nama Kepala Sekolah',
         principal_nip: '',
         logo_url: null
       });
@@ -346,11 +341,8 @@ function LaporanCetak({ user }) {
         const response = await axios.get(`/wali-kelas/class/${selectedClass}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        if (response.data && response.data.nama) {
+         if (response.data && response.data.nama) {
           waliKelasData = response.data;
-          console.log('Wali kelas data fetched:', waliKelasData);
-        } else {
-          console.log('Wali kelas data response invalid:', response.data);
         }
       } catch (error) {
         console.error('Could not fetch wali kelas data:', error);
@@ -398,9 +390,7 @@ function LaporanCetak({ user }) {
         // Calculate total to ensure consistency
         const calculatedTotal = pointAwalNum + prestasiTotal + karakterTotal + keaktifanTotal - pelanggaranTotal;
 
-        // Debug log for troubleshooting
-        console.log('DEBUG PDF points untuk', student.nama, ':', points, 'total:', calculatedTotal);
-
+        
         // Use object first to ensure correct order, then convert to array
         // Order MUST match COLUMN_DEFS exactly for proper column mapping
         const row = {
@@ -657,7 +647,6 @@ function LaporanCetak({ user }) {
         // Prepare student data in the format expected by the Excel generator
         const formattedStudents = classStudents.map((student, index) => {
           const points = student.points || {};
-          console.log('DEBUG Excel generation untuk', student.nama, ':', points);
           return {
             no: index + 1,
             nama: student.nama || '-',

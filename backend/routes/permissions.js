@@ -30,6 +30,7 @@ router.get('/user/:userId', auth, async (req, res) => {
             return res.json({
                 can_input_prestasi: false,
                 can_input_organisasi: false,
+                can_input_kepanitiaan: false,
                 can_input_event: false,
                 can_input_pelanggaran: false,
                 can_input_perilaku: false,
@@ -48,11 +49,11 @@ router.get('/user/:userId', auth, async (req, res) => {
 router.put('/user/:userId', auth, superAdminOnly, async (req, res) => {
     try {
         const userId = req.params.userId;
-        const { can_input_prestasi, can_input_organisasi, can_input_event, can_input_pelanggaran, can_input_perilaku, can_view_all_data } = req.body;
+        const { can_input_prestasi, can_input_organisasi, can_input_kepanitiaan, can_input_event, can_input_pelanggaran, can_input_perilaku, can_view_all_data } = req.body;
 
         await db.query(
-            'UPDATE permissions SET can_input_prestasi = ?, can_input_organisasi = ?, can_input_event = ?, can_input_pelanggaran = ?, can_input_perilaku = ?, can_view_all_data = ? WHERE user_id = ?',
-            [can_input_prestasi, can_input_organisasi, can_input_event, can_input_pelanggaran, can_input_perilaku, can_view_all_data, userId]
+            'UPDATE permissions SET can_input_prestasi = ?, can_input_organisasi = ?, can_input_kepanitiaan = ?, can_input_event = ?, can_input_pelanggaran = ?, can_input_perilaku = ?, can_view_all_data = ? WHERE user_id = ?',
+            [can_input_prestasi, can_input_organisasi, can_input_kepanitiaan, can_input_event, can_input_pelanggaran, can_input_perilaku, can_view_all_data, userId]
         );
 
         // Log activity
@@ -71,18 +72,19 @@ router.put('/user/:userId', auth, superAdminOnly, async (req, res) => {
 // Set permissions for all students (bulk)
 router.post('/bulk-students', auth, superAdminOnly, async (req, res) => {
     try {
-        const { can_input_prestasi, can_input_organisasi, can_input_event, can_input_pelanggaran, can_input_perilaku } = req.body;
+        const { can_input_prestasi, can_input_organisasi, can_input_kepanitiaan, can_input_event, can_input_pelanggaran, can_input_perilaku } = req.body;
 
         await db.query(
             `UPDATE permissions p 
              JOIN users u ON p.user_id = u.id 
              SET p.can_input_prestasi = ?, 
                  p.can_input_organisasi = ?, 
-                 p.can_input_event = ?, 
-                 p.can_input_pelanggaran = ?, 
+                 p.can_input_kepanitiaan = ?, 
+                 p.can_input_event = ?,
+                 p.can_input_pelanggaran = ?,
                  p.can_input_perilaku = ? 
              WHERE u.role = 'siswa'`,
-            [can_input_prestasi, can_input_organisasi, can_input_event, can_input_pelanggaran, can_input_perilaku]
+            [can_input_prestasi, can_input_organisasi, can_input_kepanitiaan, can_input_event, can_input_pelanggaran, can_input_perilaku]
         );
 
         // Log activity

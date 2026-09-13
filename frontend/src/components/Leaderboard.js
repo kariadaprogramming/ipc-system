@@ -3,7 +3,6 @@ import axios from 'axios';
 import API_BASE_URL from '../config';
 
 const PAGE_BG = "#f8fafc";
-const LINE = "#e2e8f0";
 const INK = "#0f172a";
 const SLATE = "#64748b";
 

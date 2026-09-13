@@ -33,7 +33,7 @@ router.get('/public', async (req, res) => {
     if (rows.length === 0) {
       return res.json({
         school_name: 'SMK Negeri Bali Mandara',
-        school_description: 'Sistem Index Prestasi Citra (IPC) • Panel Admin',
+        school_description: 'Sistem Individual Point Card (IPC) • Panel Admin',
         logo_url: null
       });
     }
@@ -56,12 +56,11 @@ router.get('/', async (req, res) => {
     );
 
     if (rows.length === 0) {
-      // Return default config if none exists
-      console.log('No school config found, returning default');
+        console.log('No school config found, returning default');
       return res.json({
         id: null,
         school_name: 'SMK Negeri Bali Mandara',
-        school_description: 'Sistem Index Prestasi Citra (IPC) • Panel Admin',
+        school_description: 'Sistem Individual Card (IPC) • Panel Admin',
         principal_name: 'Nama Kepala Sekolah',
         principal_nip: '',
         logo_url: null,
@@ -70,7 +69,6 @@ router.get('/', async (req, res) => {
       });
     }
 
-    console.log('School config fetched:', rows[0]);
     res.json(rows[0]);
   } catch (error) {
     console.error('Error fetching school config:', error);

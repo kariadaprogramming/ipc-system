@@ -22,7 +22,7 @@ function InputEvent() {
   const [hasAccess, setHasAccess] = useState(true);
   const [checkingAccess, setCheckingAccess] = useState(true);
   const [accessMessage, setAccessMessage] = useState('');
-  const [isAutoFilled, setIsAutoFilled] = useState(false);
+  const [, setIsAutoFilled] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [allEvent, setAllEvent] = useState([]);
   const [loadingIndex, setLoadingIndex] = useState(false);
@@ -55,11 +55,6 @@ function InputEvent() {
         return word.charAt(0).toUpperCase() + word.slice(1);
       });
   };
-
-  const tingkatOptions = FIXED_TINGKAT_OPTIONS.map(tingkat => ({
-    value: tingkat,
-    label: tingkat.charAt(0).toUpperCase() + tingkat.slice(1)
-  }));
 
   useEffect(() => {
     fetchUserSubmissions();

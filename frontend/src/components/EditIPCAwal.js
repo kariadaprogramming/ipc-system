@@ -298,19 +298,19 @@ function EditIPCAwal() {
           className={`tab ${activeTab === '10' ? 'active' : ''}`}
           onClick={() => setActiveTab('10')}
         >
-          Kelas 10 <span className="count">({grade10Students.length} siswa)</span>
+          Kelas X <span className="count">({grade10Students.length} siswa)</span>
         </button>
         <button 
           className={`tab ${activeTab === '11' ? 'active' : ''}`}
           onClick={() => setActiveTab('11')}
         >
-          Kelas 11 <span className="count">({grade11Students.length} siswa)</span>
+          Kelas XI <span className="count">({grade11Students.length} siswa)</span>
         </button>
         <button 
           className={`tab ${activeTab === '12' ? 'active' : ''}`}
           onClick={() => setActiveTab('12')}
         >
-          Kelas 12 <span className="count">({grade12Students.length} siswa)</span>
+          Kelas XII <span className="count">({grade12Students.length} siswa)</span>
         </button>
       </div>
 

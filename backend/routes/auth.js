@@ -8,33 +8,29 @@ const db = require('../config/database');
 router.post('/login', async (req, res) => {
     try {
         const { username, password } = req.body;
-        
-        console.log('Login attempt for:', username);
-        
-        // Check if username is NIS or NIP
+
         const [users] = await db.query(
             'SELECT * FROM users WHERE nis = ? OR nip = ?',
             [username, username]
         );
 
         if (users.length === 0) {
-            console.log('User not found:', username);
             return res.status(400).json({ message: 'User not found. Pastikan database sudah di-setup dengan benar.' });
         }
 
-        const user = users[0];
-        console.log('User found:', user.nama, user.role);
+const user = users[0];
 
-        // For superadmin with ADMIN001, check plain password for initial setup
         if (user.nis === 'ADMIN001' && user.password === '$2a$10$YourHashedPasswordHere') {
-            if (password === 'admin123') {
-                // Update with hashed password
+            const setupPassword = process.env.SUPERADMIN_SETUP_PASSWORD;
+            if (!setupPassword) {
+                return res.status(503).json({ message: 'Superadmin belum di-initialize. Set SUPERADMIN_SETUP_PASSWORD di file .env.' });
+            }
+            if (password === setupPassword) {
                 const hashedPassword = bcrypt.hashSync(password, 10);
                 await db.query('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, user.id]);
                 user.password = hashedPassword;
-                console.log('Password updated for ADMIN001');
             } else {
-                return res.status(400).json({ message: 'Invalid password. Gunakan password: admin123' });
+                return res.status(400).json({ message: 'Invalid setup password' });
             }
         } else {
             const isMatch = bcrypt.compareSync(password, user.password);

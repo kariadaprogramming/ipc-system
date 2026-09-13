@@ -38,17 +38,12 @@ function Login() {
 
     try {
       const response = await axios.post('/auth/login', formData);
-      console.log('Login response:', response.data);
       
       localStorage.setItem('token', response.data.token);
       localStorage.setItem('user', JSON.stringify(response.data.user));
       
-      console.log('User data stored:', localStorage.getItem('user'));
-      console.log('Token stored:', localStorage.getItem('token'));
-      
       navigate('/dashboard');
     } catch (error) {
-      console.error('Login error:', error);
       setError(error.response?.data?.message || 'Login failed');
     } finally {
       setLoading(false);

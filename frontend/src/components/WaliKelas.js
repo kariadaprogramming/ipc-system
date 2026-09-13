@@ -136,7 +136,7 @@ function WaliKelas() {
     setLoading(true);
     fetchTeachers();
     fetchClassStatistics();
-  }, [selectedAcademicYear]);
+  }, [selectedAcademicYear]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleCreate = async (e) => {
     e.preventDefault();

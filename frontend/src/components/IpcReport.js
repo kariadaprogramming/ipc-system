@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import './IpcReport.css';
 
@@ -21,7 +21,6 @@ function IpcReport({ studentId, onClose }) {
   const [ipcData, setIpcData] = useState(null);
   const [schoolConfig, setSchoolConfig] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [printDate, setPrintDate] = useState(formatPrintDate());
 
   useEffect(() => {
     fetchReportData();
@@ -59,7 +58,11 @@ function IpcReport({ studentId, onClose }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [studentId]);
+
+  useEffect(() => {
+    fetchReportData();
+  }, [fetchReportData]);
 
   const fetchSchoolConfig = async () => {
     try {

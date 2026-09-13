@@ -485,7 +485,7 @@ DROP TABLE IF EXISTS school_config;
 CREATE TABLE school_config (
     id INT AUTO_INCREMENT PRIMARY KEY,
     school_name VARCHAR(255) DEFAULT 'SMK Negeri Bali Mandara',
-    school_description VARCHAR(255) DEFAULT 'Sistem Index Prestasi Citra (IPC) • Panel Admin',
+    school_description VARCHAR(255) DEFAULT 'Sistem Individual Point Card (IPC) • Panel Admin',
     principal_name VARCHAR(255) DEFAULT 'Nama Kepala Sekolah',
     principal_nip VARCHAR(50) DEFAULT '',
     logo_url VARCHAR(255) DEFAULT NULL,

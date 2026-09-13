@@ -25,7 +25,7 @@ function InputPrestasi() {
   const [hasAccess, setHasAccess] = useState(true);
   const [checkingAccess, setCheckingAccess] = useState(true);
   const [accessMessage, setAccessMessage] = useState('');
-  const [isAutoFilled, setIsAutoFilled] = useState(false);
+  const [, setIsAutoFilled] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [allPrestasi, setAllPrestasi] = useState([]);
   const [loadingIndex, setLoadingIndex] = useState(false);
@@ -33,7 +33,6 @@ function InputPrestasi() {
   const editModal = useEditModal();
   const [ipcConfig, setIpcConfig] = useState([]);
   const [calculatedPoint, setCalculatedPoint] = useState(0);
-  const prestasiConfigs = ipcConfig.prestasi || [];
   const FIXED_TINGKAT_OPTIONS = [
     'kecamatan',
     'kabupaten',
@@ -163,8 +162,6 @@ function InputPrestasi() {
       const response = await axios.get('/input-access/status/my-access', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
-      console.log('[Access Check] Response:', response.data);
       
       const canInputPrestasi = response.data.prestasi;
       setHasAccess(canInputPrestasi);
@@ -325,13 +322,10 @@ function InputPrestasi() {
 
   const fetchStudentData = async (nis) => {
     try {
-      console.log('Fetching student data for NIS:', nis);
       const token = localStorage.getItem('token');
       const response = await axios.get(`/users/nis/${nis}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
-      console.log('Student data response:', response.data);
       
       if (response.data) {
         setFormData(prev => ({
@@ -341,24 +335,18 @@ function InputPrestasi() {
           grha: response.data.grha || ''
         }));
         setIsAutoFilled(true);
-        console.log('Form data updated:', { nama: response.data.nama, kelas: response.data.kelas, grha: response.data.grha });
       }
     } catch (error) {
       // Student not found or error, don't show error to user and don't auto-fill
-      console.log('Student not found or error fetching data:', error.message);
-      // Don't update form data if student not found
     }
   };
 
   const fetchStudentDataByName = async (nama) => {
     try {
-      console.log('Fetching student data for name:', nama);
       const token = localStorage.getItem('token');
       const response = await axios.get(`/users/nama/${nama}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
-      console.log('Student data response:', response.data);
       
       if (response.data) {
         setFormData(prev => ({
@@ -368,12 +356,9 @@ function InputPrestasi() {
           grha: response.data.grha || ''
         }));
         setIsAutoFilled(true);
-        console.log('Form data updated:', { nis: response.data.nis, kelas: response.data.kelas, grha: response.data.grha });
       }
     } catch (error) {
       // Student not found or error, don't show error to user and don't auto-fill
-      console.log('Student not found or error fetching data:', error.message);
-      // Don't update form data if student not found
     }
   };
 

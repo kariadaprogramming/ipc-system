@@ -20,7 +20,7 @@ function InputPerilaku() {
   });
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
-  const [isAutoFilled, setIsAutoFilled] = useState(false);
+  const [, setIsAutoFilled] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [allPerilaku, setAllPerilaku] = useState([]);
   const [loadingIndex, setLoadingIndex] = useState(false);
@@ -32,16 +32,6 @@ function InputPerilaku() {
 
   const grhaOptions = [
     'Airsanya', 'Daksina', 'Genya', 'Madhya', 'Nairiti', 'Pascima', 'Purwa', 'Uttara', 'Wayabhya'
-  ];
-
-  const FIXED_KARAKTER_FIELDS = [
-    'tanggung_jawab',
-    'disiplin',
-    'kepedulian',
-    'kemandirian',
-    'spiritual',
-    'kejujuran',
-    'kepercayaan_diri'
   ];
 
   const [perilakuRatings, setPerilakuRatings] = useState([]);

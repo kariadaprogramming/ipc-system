@@ -22,7 +22,7 @@ function InputKepanitiaan() {
   const [hasAccess, setHasAccess] = useState(true);
   const [checkingAccess, setCheckingAccess] = useState(true);
   const [accessMessage, setAccessMessage] = useState('');
-  const [isAutoFilled, setIsAutoFilled] = useState(false);
+  const [, setIsAutoFilled] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [allKepanitiaan, setAllKepanitiaan] = useState([]);
   const [loadingIndex, setLoadingIndex] = useState(false);
