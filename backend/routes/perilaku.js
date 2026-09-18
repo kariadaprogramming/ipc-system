@@ -30,7 +30,7 @@ router.get('/all', auth, async (req, res) => {
 router.get('/user/:userId', auth, async (req, res) => {
     try {
         const [perilaku] = await db.query(
-            'SELECT * FROM perilaku WHERE user_id = ? AND status = ? ORDER BY created_at DESC',
+            'SELECT id, user_id, nama, nis, kelas, grha, karakter_siswa, point, status, rejection_reason, created_at FROM perilaku WHERE user_id = ? AND status = ? ORDER BY created_at DESC',
             [req.params.userId, 'approved']
         );
         res.json(perilaku);
@@ -138,7 +138,7 @@ router.put('/:id/approve', auth, superAdminOnly, async (req, res) => {
         const perilakuId = req.params.id;
         
         const [perilaku] = await db.query(
-            'SELECT * FROM perilaku WHERE id = ? AND status = ?',
+            'SELECT id, user_id, nama, nis, kelas, grha, karakter_siswa, point, status, rejection_reason, created_at FROM perilaku WHERE id = ? AND status = ?',
             [perilakuId, 'pending']
         );
         if (perilaku.length === 0) {
@@ -203,7 +203,7 @@ router.put('/:id', auth, async (req, res) => {
         const perilakuId = req.params.id;
         const { nama, nis, kelas, grha, karakter_siswa, tanggung_jawab, disiplin, kepedulian, kemandirian, spiritual, kejujuran, kepercayaan_diri } = req.body;
         
-        const [perilaku] = await db.query('SELECT * FROM perilaku WHERE id = ?', [perilakuId]);
+        const [perilaku] = await db.query('SELECT id, user_id, nama, nis, kelas, grha, karakter_siswa, point, status, rejection_reason, created_at FROM perilaku WHERE id = ?', [perilakuId]);
         if (perilaku.length === 0) {
             return res.status(404).json({ message: 'Perilaku not found' });
         }
@@ -269,7 +269,7 @@ router.delete('/:id', auth, superAdminOnly, async (req, res) => {
     try {
         const perilakuId = req.params.id;
         
-        const [perilaku] = await db.query('SELECT * FROM perilaku WHERE id = ?', [perilakuId]);
+        const [perilaku] = await db.query('SELECT id, user_id, nama, nis, kelas, grha, karakter_siswa, point, status, rejection_reason, created_at FROM perilaku WHERE id = ?', [perilakuId]);
         if (perilaku.length === 0) {
             return res.status(404).json({ message: 'Perilaku not found' });
         }

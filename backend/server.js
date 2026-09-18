@@ -11,7 +11,7 @@ const {
   sanitizeInput, 
   errorHandler,
   securityLogger,
-  loginLimiter 
+  loginLimiter
 } = require('./middleware/security');
 
 dotenv.config();

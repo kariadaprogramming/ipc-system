@@ -3,7 +3,13 @@ const db = require('../config/database');
 
 const auth = (req, res, next) => {
     try {
-        const token = req.header('Authorization')?.replace('Bearer ', '');
+        // First try to get token from HTTP-only cookie
+        let token = req.cookies.token;
+        
+        // Fallback to Authorization header for backward compatibility during transition
+        if (!token) {
+            token = req.header('Authorization')?.replace('Bearer ', '');
+        }
         
         if (!token) {
             return res.status(401).json({ message: 'No token, authorization denied' });

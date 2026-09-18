@@ -2,16 +2,27 @@ const rateLimit = require('express-rate-limit');
 const slowDown = require('express-slow-down');
 const helmet = require('helmet');
 
-// Rate limiting for login attempts
+// Rate limiting for login attempts - stricter for security
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 15, // limit each IP to 5 login attempts per windowMs
+  max: 5, // limit each IP to 5 login attempts per windowMs (reduced from 15)
   message: {
     message: 'Too many login attempts, please try again after 15 minutes'
   },
   standardHeaders: true,
   legacyHeaders: false,
   skipSuccessfulRequests: true // Don't count successful logins
+});
+
+// Rate limiting for logout attempts
+const logoutLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // limit each IP to 10 logout attempts per windowMs
+  message: {
+    message: 'Too many logout attempts, please try again later'
+  },
+  standardHeaders: true,
+  legacyHeaders: false
 });
 
 // General API rate limiting
@@ -145,6 +156,9 @@ const securityHeaders = helmet({
       objectSrc: ["'none'"],
       mediaSrc: ["'self'"],
       frameSrc: ["'none'"],
+      frameAncestors: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
     },
   },
   crossOriginEmbedderPolicy: false,
@@ -152,7 +166,10 @@ const securityHeaders = helmet({
     maxAge: 31536000,
     includeSubDomains: true,
     preload: true
-  }
+  },
+  noSniff: true,
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  xssFilter: true
 });
 
 // Error handler that doesn't expose internal details
@@ -193,6 +210,7 @@ const securityLogger = (req, res, next) => {
 
 module.exports = {
   loginLimiter,
+  logoutLimiter,
   apiLimiter,
   speedLimiter,
   sqlInjectionPrevention,

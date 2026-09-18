@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../utils/api';
 import API_BASE_URL from '../config';
 
 function Login() {
@@ -37,9 +37,9 @@ function Login() {
     setLoading(true);
 
     try {
-      const response = await axios.post('/auth/login', formData);
+      const response = await api.post('/auth/login', formData);
       
-      localStorage.setItem('token', response.data.token);
+      // Store user data in localStorage (not token - token is now in HTTP-only cookie)
       localStorage.setItem('user', JSON.stringify(response.data.user));
       
       navigate('/dashboard');

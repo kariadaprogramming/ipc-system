@@ -40,7 +40,7 @@ router.get('/all', auth, async (req, res) => {
 router.get('/user/:userId', auth, async (req, res) => {
     try {
         const [organisasi] = await db.query(
-            'SELECT * FROM organisasi WHERE user_id = ? AND status = ? ORDER BY created_at DESC',
+            'SELECT id, user_id, nama, nis, kelas, grha, jabatan_organisasi, foto, kategori_organisasi, point, status, rejection_reason, created_at FROM organisasi WHERE user_id = ? AND status = ? ORDER BY created_at DESC',
             [req.params.userId, 'approved']
         );
         res.json(organisasi);
@@ -88,12 +88,12 @@ router.post('/', auth, upload.single('foto'), async (req, res) => {
     }
 });
 
-// Approve organisasi
-router.put('/:id/approve', auth, async (req, res) => {
+// Approve organisasi (superadmin only)
+router.put('/:id/approve', auth, superAdminOnly, async (req, res) => {
     try {
         const organisasiId = req.params.id;
         
-        const [organisasi] = await db.query('SELECT * FROM organisasi WHERE id = ?', [organisasiId]);
+        const [organisasi] = await db.query('SELECT id, user_id, nama, nis, kelas, grha, jabatan_organisasi, foto, kategori_organisasi, point, status, rejection_reason, created_at FROM organisasi WHERE id = ?', [organisasiId]);
         if (organisasi.length === 0) {
             return res.status(404).json({ message: 'Organisasi not found' });
         }
@@ -136,8 +136,8 @@ router.put('/:id/approve', auth, async (req, res) => {
     }
 });
 
-// Reject organisasi
-router.put('/:id/reject', auth, async (req, res) => {
+// Reject organisasi (superadmin only)
+router.put('/:id/reject', auth, superAdminOnly, async (req, res) => {
     try {
         const { rejection_reason } = req.body;
         const organisasiId = req.params.id;
@@ -162,7 +162,7 @@ router.put('/:id', auth, upload.single('foto'), async (req, res) => {
         const organisasiId = req.params.id;
         const { nama, nis, kelas, grha, jabatan_organisasi, kategori_organisasi } = req.body;
         
-        const [organisasi] = await db.query('SELECT * FROM organisasi WHERE id = ?', [organisasiId]);
+        const [organisasi] = await db.query('SELECT id, user_id, nama, nis, kelas, grha, jabatan_organisasi, foto, kategori_organisasi, point, status, rejection_reason, created_at FROM organisasi WHERE id = ?', [organisasiId]);
         if (organisasi.length === 0) {
             return res.status(404).json({ message: 'Organisasi not found' });
         }
@@ -230,7 +230,7 @@ router.delete('/:id', auth, superAdminOnly, async (req, res) => {
     try {
         const organisasiId = req.params.id;
         
-        const [organisasi] = await db.query('SELECT * FROM organisasi WHERE id = ?', [organisasiId]);
+        const [organisasi] = await db.query('SELECT id, user_id, nama, nis, kelas, grha, jabatan_organisasi, foto, kategori_organisasi, point, status, rejection_reason, created_at FROM organisasi WHERE id = ?', [organisasiId]);
         if (organisasi.length === 0) {
             return res.status(404).json({ message: 'Organisasi not found' });
         }

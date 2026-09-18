@@ -447,34 +447,38 @@ router.put('/superadmin/:type/:id', auth, superAdminOnly, async (req, res) => {
             return handleLegacyApproval(type, id, status, notes, req.user.id, res);
         }
 
-        let table, pointField, pointType;
+        let table, pointField, pointType, allowedColumns;
         switch(type) {
             case 'prestasi':
                 table = 'prestasi_approvals';
                 pointField = 'juara';
                 pointType = 'Prestasi';
+                allowedColumns = ['id', 'user_id', 'nama', 'nis', 'jenis', 'nama_lomba', 'foto', 'kelas', 'pembina', 'grha', 'juara', 'kategori', 'point', 'status', 'rejection_reason', 'created_at'];
                 break;
             case 'event':
                 table = 'event_approvals';
                 pointField = 'tingkat';
                 pointType = 'Event';
+                allowedColumns = ['id', 'user_id', 'nama', 'nis', 'kelas', 'grha', 'pembina', 'nama_event', 'tingkat', 'foto', 'point', 'status', 'rejection_reason', 'created_at'];
                 break;
             case 'organisasi':
                 table = 'organisasi_approvals';
                 pointField = 'jabatan_organisasi';
                 pointType = 'Organisasi';
+                allowedColumns = ['id', 'user_id', 'nama', 'nis', 'kelas', 'grha', 'jabatan_organisasi', 'foto', 'kategori_organisasi', 'point', 'status', 'rejection_reason', 'created_at'];
                 break;
             case 'kepanitiaan':
                 table = 'kepanitiaan_approvals';
                 pointField = 'jabatan_kepanitiaan';
                 pointType = 'Kepanitiaan';
+                allowedColumns = ['id', 'user_id', 'nama', 'nis', 'kelas', 'grha', 'jabatan_kepanitiaan', 'foto', 'point', 'status', 'rejection_reason', 'created_at'];
                 break;
             default:
                 return res.status(400).json({ message: 'Invalid type' });
         }
 
-        // Get submission data
-        const [submission] = await db.query(`SELECT * FROM ${table} WHERE id = ?`, [id]);
+        // Get submission data - use explicit column list instead of SELECT *
+        const [submission] = await db.query(`SELECT ${allowedColumns.join(', ')} FROM ${table} WHERE id = ?`, [id]);
         if (submission.length === 0) {
             return res.status(404).json({ message: 'Submission not found' });
         }
@@ -563,7 +567,18 @@ router.put('/superadmin/:type/:id', auth, superAdminOnly, async (req, res) => {
 async function handleLegacyApproval(type, id, status, notes, approverId, res) {
     const table = type;
     try {
-        const [rows] = await db.query(`SELECT * FROM ${table} WHERE id = ?`, [id]);
+        // Define allowed columns for each table type
+        const tableColumns = {
+            'prestasi': ['id', 'user_id', 'nama', 'nis', 'jenis', 'nama_lomba', 'foto', 'kelas', 'pembina', 'grha', 'juara', 'kategori', 'point', 'status', 'rejection_reason', 'created_at'],
+            'event': ['id', 'user_id', 'nama', 'nis', 'kelas', 'grha', 'pembina', 'nama_event', 'tingkat', 'foto', 'point', 'status', 'rejection_reason', 'created_at'],
+            'organisasi': ['id', 'user_id', 'nama', 'nis', 'kelas', 'grha', 'jabatan_organisasi', 'foto', 'kategori_organisasi', 'point', 'status', 'rejection_reason', 'created_at'],
+            'kepanitiaan': ['id', 'user_id', 'nama', 'nis', 'kelas', 'grha', 'jabatan_kepanitiaan', 'foto', 'point', 'status', 'rejection_reason', 'created_at'],
+            'pelanggaran': ['id', 'user_id', 'nama', 'nis', 'kelas', 'grha', 'keterangan', 'foto', 'jenis_pelanggaran', 'point_dikurangi', 'status', 'rejection_reason', 'created_at'],
+            'perilaku': ['id', 'user_id', 'nama', 'nis', 'kelas', 'grha', 'karakter_siswa', 'point', 'status', 'rejection_reason', 'created_at']
+        };
+
+        const allowedColumns = tableColumns[table] || ['id', 'user_id', 'nama', 'status', 'created_at'];
+        const [rows] = await db.query(`SELECT ${allowedColumns.join(', ')} FROM ${table} WHERE id = ?`, [id]);
         if (rows.length === 0) {
             return res.status(404).json({ message: 'Submission not found' });
         }
@@ -676,19 +691,19 @@ router.get('/user-submissions', auth, async (req, res) => {
         const userId = req.user.id;
         
         const [prestasi] = await db.query(`
-            SELECT *, 'prestasi' as type FROM prestasi_approvals WHERE user_id = ? ORDER BY created_at DESC
+            SELECT id, user_id, nama, nis, jenis, nama_lomba, foto, kelas, pembina, grha, juara, kategori, point, status, rejection_reason, created_at, 'prestasi' as type FROM prestasi_approvals WHERE user_id = ? ORDER BY created_at DESC
         `, [userId]);
         
         const [event] = await db.query(`
-            SELECT *, 'event' as type FROM event_approvals WHERE user_id = ? ORDER BY created_at DESC
+            SELECT id, user_id, nama, nis, kelas, grha, pembina, nama_event, tingkat, foto, point, status, rejection_reason, created_at, 'event' as type FROM event_approvals WHERE user_id = ? ORDER BY created_at DESC
         `, [userId]);
         
         const [organisasi] = await db.query(`
-            SELECT *, 'organisasi' as type FROM organisasi_approvals WHERE user_id = ? ORDER BY created_at DESC
+            SELECT id, user_id, nama, nis, kelas, grha, jabatan_organisasi, foto, kategori_organisasi, point, status, rejection_reason, created_at, 'organisasi' as type FROM organisasi_approvals WHERE user_id = ? ORDER BY created_at DESC
         `, [userId]);
         
         const [kepanitiaan] = await db.query(`
-            SELECT *, 'kepanitiaan' as type FROM kepanitiaan_approvals WHERE user_id = ? ORDER BY created_at DESC
+            SELECT id, user_id, nama, nis, kelas, grha, jabatan_kepanitiaan, foto, point, status, rejection_reason, created_at, 'kepanitiaan' as type FROM kepanitiaan_approvals WHERE user_id = ? ORDER BY created_at DESC
         `, [userId]);
         
         res.json({

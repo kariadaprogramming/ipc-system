@@ -276,7 +276,7 @@ router.get('/:id/ipc-history', auth, teacherOrSuperAdmin, async (req, res) => {
         }
 
         const [history] = await db.query(
-            'SELECT * FROM ipc_history WHERE user_id = ? ORDER BY created_at DESC',
+            'SELECT id, user_id, jenis_perubahan, point_change, ipc_sebelum, ipc_sesudah, keterangan, created_at FROM ipc_history WHERE user_id = ? ORDER BY created_at DESC',
             [userId]
         );
         res.json(history);
@@ -286,12 +286,24 @@ router.get('/:id/ipc-history', auth, teacherOrSuperAdmin, async (req, res) => {
     }
 });
 
-// Get user by ID
+// Get user by ID - IDOR protection: users can only access their own data unless they are admin/teacher
 router.get('/:id', auth, async (req, res) => {
     try {
+        const requestedUserId = parseInt(req.params.id);
+        const currentUserId = req.user.id;
+        const currentUserRole = req.user.role;
+
+        // IDOR protection: Only allow access if:
+        // 1. User is requesting their own data, OR
+        // 2. User is a superadmin, OR
+        // 3. User is a teacher
+        if (requestedUserId !== currentUserId && currentUserRole !== 'superadmin' && currentUserRole !== 'guru') {
+            return res.status(403).json({ message: 'Access denied. You can only view your own profile.' });
+        }
+
         const [users] = await db.query(
             'SELECT id, nama, nis, nip, role, kelas, grha, wali_kelas, ipc_total, alamat, no_hp, detail, detail AS jabatan, created_at FROM users WHERE id = ?',
-            [req.params.id]
+            [requestedUserId]
         );
         
         if (users.length === 0) {
@@ -705,7 +717,7 @@ router.put('/biodata-approvals/:id', auth, superAdminOnly, async (req, res) => {
         
         // Get approval data
         const [approval] = await db.query(
-            'SELECT * FROM biodata_update_approvals WHERE id = ?',
+            'SELECT id, user_id, nama_baru, nis_baru, kelas_baru, jurusan_baru, tahun_pelajaran_baru, grha_baru, nama_lama, nis_lama, kelas_lama, jurusan_lama, tahun_pelajaran_lama, grha_lama, requested_by, superadmin_status, created_at FROM biodata_update_approvals WHERE id = ?',
             [approvalId]
         );
         
@@ -819,7 +831,7 @@ router.put('/student-creation-approvals/:id', auth, superAdminOnly, async (req, 
         
         // Get approval data
         const [approval] = await db.query(
-            'SELECT * FROM student_creation_approvals WHERE id = ?',
+            'SELECT id, nama, nis, kelas, grha, jurusan, password, tahun_pelajaran, requested_by, superadmin_status, created_at FROM student_creation_approvals WHERE id = ?',
             [approvalId]
         );
         

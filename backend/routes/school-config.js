@@ -52,7 +52,7 @@ router.use(auth);
 router.get('/', async (req, res) => {
   try {
     const [rows] = await db.query(
-      'SELECT * FROM school_config LIMIT 1'
+      'SELECT id, school_name, school_description, principal_name, principal_nip, logo_url, created_at, updated_at FROM school_config LIMIT 1'
     );
 
     if (rows.length === 0) {

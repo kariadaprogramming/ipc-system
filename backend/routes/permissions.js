@@ -22,7 +22,7 @@ router.get('/', auth, superAdminOnly, async (req, res) => {
 router.get('/user/:userId', auth, async (req, res) => {
     try {
         const [permissions] = await db.query(
-            'SELECT * FROM permissions WHERE user_id = ?',
+            'SELECT id, user_id, can_input_prestasi, can_input_organisasi, can_input_kepanitiaan, can_input_event, can_input_pelanggaran, can_input_perilaku FROM permissions WHERE user_id = ?',
             [req.params.userId]
         );
         

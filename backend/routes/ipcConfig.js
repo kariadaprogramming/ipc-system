@@ -354,7 +354,7 @@ router.post('/', auth, superAdminOnly, async (req, res) => {
         `, [category, field1, field2 || null, point_value, description || null, is_active !== undefined ? is_active : true, userId]);
         
         clearConfigCache();
-        const [newConfig] = await db.query('SELECT * FROM ipc_config WHERE id = ?', [result.insertId]);
+        const [newConfig] = await db.query('SELECT id, category, field1, field2, field3, point_value, description, is_active, created_at, updated_at, updated_by FROM ipc_config WHERE id = ?', [result.insertId]);
         res.status(201).json(newConfig[0]);
     } catch (error) {
         console.error('Error creating IPC configuration:', error);
@@ -386,7 +386,7 @@ router.put('/:id', auth, superAdminOnly, async (req, res) => {
         }
         
         // Check if configuration exists
-        const [existing] = await db.query('SELECT * FROM ipc_config WHERE id = ?', [id]);
+        const [existing] = await db.query('SELECT id, category, field1, field2, field3, point_value, description, is_active, created_at, updated_at, updated_by FROM ipc_config WHERE id = ?', [id]);
         if (existing.length === 0) {
             return res.status(404).json({ message: 'Configuration not found' });
         }
@@ -407,7 +407,7 @@ router.put('/:id', auth, superAdminOnly, async (req, res) => {
         ]);
         
         clearConfigCache();
-        const [updatedConfig] = await db.query('SELECT * FROM ipc_config WHERE id = ?', [id]);
+        const [updatedConfig] = await db.query('SELECT id, category, field1, field2, field3, point_value, description, is_active, created_at, updated_at, updated_by FROM ipc_config WHERE id = ?', [id]);
         res.json(updatedConfig[0]);
     } catch (error) {
         console.error('Error updating IPC configuration:', error);

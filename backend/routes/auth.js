@@ -3,6 +3,19 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('../config/database');
+const { logoutLimiter } = require('../middleware/security');
+
+// Helper function to set secure HTTP-only cookie
+const setAuthCookie = (res, token) => {
+    const isProduction = process.env.NODE_ENV === 'production';
+    res.cookie('token', token, {
+        httpOnly: true,
+        secure: isProduction, // true in production, false in development
+        sameSite: 'lax',
+        maxAge: 24 * 60 * 60 * 1000, // 24 hours
+        path: '/'
+    });
+};
 
 // Login
 router.post('/login', async (req, res) => {
@@ -10,7 +23,7 @@ router.post('/login', async (req, res) => {
         const { username, password } = req.body;
 
         const [users] = await db.query(
-            'SELECT * FROM users WHERE nis = ? OR nip = ?',
+            'SELECT id, nama, nis, nip, password, role, kelas, grha, wali_kelas, ipc_total, ipc_awal, alamat, no_hp, detail, foto, tahun_pelajaran, is_graduated, jurusan FROM users WHERE nis = ? OR nip = ?',
             [username, username]
         );
 
@@ -45,6 +58,9 @@ const user = users[0];
             { expiresIn: '24h' }
         );
 
+        // Set token in HTTP-only cookie
+        setAuthCookie(res, token);
+
         // Log activity (try-catch to prevent login failure if logs table doesn't exist)
         try {
             await db.query(
@@ -56,7 +72,7 @@ const user = users[0];
         }
 
         res.json({
-            token,
+            message: 'Login successful',
             user: {
                 id: user.id,
                 nama: user.nama,
@@ -72,6 +88,32 @@ const user = users[0];
     } catch (error) {
         console.error('Login error:', error);
         res.status(500).json({ message: 'Server error: ' + error.message + '. Pastikan database sudah di-setup dengan benar.' });
+    }
+});
+
+// Logout - clear the HTTP-only cookie
+router.post('/logout', logoutLimiter, (req, res) => {
+    res.clearCookie('token', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/'
+    });
+    res.json({ message: 'Logout successful' });
+});
+
+// Verify token endpoint (for frontend to check authentication status)
+router.get('/verify', (req, res) => {
+    const token = req.cookies.token;
+    if (!token) {
+        return res.status(401).json({ message: 'No token provided' });
+    }
+
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        res.json({ valid: true, user: decoded });
+    } catch (error) {
+        res.status(401).json({ valid: false, message: 'Invalid token' });
     }
 });
 

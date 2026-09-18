@@ -40,7 +40,7 @@ router.get('/all', auth, async (req, res) => {
 router.get('/user/:userId', auth, async (req, res) => {
     try {
         const [events] = await db.query(
-            'SELECT * FROM event WHERE user_id = ? AND status = ? ORDER BY created_at DESC',
+            'SELECT id, user_id, nama, nis, kelas, grha, pembina, nama_event, tingkat, foto, point, status, rejection_reason, created_at FROM event WHERE user_id = ? AND status = ? ORDER BY created_at DESC',
             [req.params.userId, 'approved']
         );
         res.json(events);
@@ -87,12 +87,12 @@ router.post('/', auth, upload.single('foto'), async (req, res) => {
     }
 });
 
-// Approve event
-router.put('/:id/approve', auth, async (req, res) => {
+// Approve event (superadmin only)
+router.put('/:id/approve', auth, superAdminOnly, async (req, res) => {
     try {
         const eventId = req.params.id;
         
-        const [event] = await db.query('SELECT * FROM event WHERE id = ?', [eventId]);
+        const [event] = await db.query('SELECT id, user_id, nama, nis, kelas, grha, pembina, nama_event, tingkat, foto, point, status, rejection_reason, created_at FROM event WHERE id = ?', [eventId]);
         if (event.length === 0) {
             return res.status(404).json({ message: 'Event not found' });
         }
@@ -135,8 +135,8 @@ router.put('/:id/approve', auth, async (req, res) => {
     }
 });
 
-// Reject event
-router.put('/:id/reject', auth, async (req, res) => {
+// Reject event (superadmin only)
+router.put('/:id/reject', auth, superAdminOnly, async (req, res) => {
     try {
         const { rejection_reason } = req.body;
         const eventId = req.params.id;
@@ -161,7 +161,7 @@ router.put('/:id', auth, upload.single('foto'), async (req, res) => {
         const eventId = req.params.id;
         const { nama, nis, kelas, grha, nama_event, tingkat } = req.body;
         
-        const [event] = await db.query('SELECT * FROM event WHERE id = ?', [eventId]);
+        const [event] = await db.query('SELECT id, user_id, nama, nis, kelas, grha, pembina, nama_event, tingkat, foto, point, status, rejection_reason, created_at FROM event WHERE id = ?', [eventId]);
         if (event.length === 0) {
             return res.status(404).json({ message: 'Event not found' });
         }
@@ -229,7 +229,7 @@ router.delete('/:id', auth, superAdminOnly, async (req, res) => {
     try {
         const eventId = req.params.id;
         
-        const [event] = await db.query('SELECT * FROM event WHERE id = ?', [eventId]);
+        const [event] = await db.query('SELECT id, user_id, nama, nis, kelas, grha, pembina, nama_event, tingkat, foto, point, status, rejection_reason, created_at FROM event WHERE id = ?', [eventId]);
         if (event.length === 0) {
             return res.status(404).json({ message: 'Event not found' });
         }
