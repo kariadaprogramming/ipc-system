@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
+const fs = require('fs');
 const { 
   securityHeaders, 
   apiLimiter, 
@@ -89,6 +90,16 @@ app.use('/uploads', (req, res, next) => {
   next();
 }, express.static(path.join(__dirname, 'uploads')));
 
+// Serve React frontend static files (consolidated deployment)
+const frontendBuildPath = path.join(__dirname, '../frontend/build');
+if (fs.existsSync(frontendBuildPath)) {
+  app.use(express.static(frontendBuildPath));
+  console.log('Serving React frontend from:', frontendBuildPath);
+} else {
+  console.warn('Frontend build directory not found at:', frontendBuildPath);
+  console.warn('Please run "npm run build" in the frontend directory first');
+}
+
 // Routes - Auth with login rate limiting
 app.use('/api/auth', loginLimiter, require('./routes/auth'));
 app.use('/api/users', require('./routes/users'));
@@ -113,6 +124,28 @@ app.use('/api/academic-year', require('./routes/academicYear'));
 app.use('/api/sync', require('./routes/sync'));
 app.use('/api/ipc-config', require('./routes/ipcConfig'));
 app.use('/api/school-config', require('./routes/school-config'));
+
+// Catch-all route for React SPA client-side routing (must be after API routes)
+app.get('*', (req, res) => {
+  // Skip API routes and static file routes
+  if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) {
+    return res.status(404).json({ message: 'Not found' });
+  }
+  
+  // Skip favicon requests
+  if (req.path === '/favicon.ico') {
+    return res.status(404).end();
+  }
+  
+  const frontendBuildPath = path.join(__dirname, '../frontend/build');
+  const indexPath = path.join(frontendBuildPath, 'index.html');
+  
+  if (fs.existsSync(indexPath)) {
+    res.sendFile(indexPath);
+  } else {
+    res.status(404).json({ message: 'Frontend build not found. Please run "npm run build" in the frontend directory.' });
+  }
+});
 
 // Global error handler - Security: Don't expose internal details
 app.use(errorHandler);

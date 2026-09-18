@@ -12,11 +12,12 @@ export function getRecordPhotoUrl(path, type) {
         return null;
     }
 
+    // Handle absolute URLs (http:// or https://)
     if (path.startsWith('http://') || path.startsWith('https://')) {
         return path;
     }
 
-    const base = API_BASE_URL.replace('/api', '');
+    // For relative paths in consolidated deployment, use relative URLs
     let cleanPath = path;
 
     if (path.includes('\\') || /^[A-Za-z]:/.test(path)) {
@@ -34,5 +35,5 @@ export function getRecordPhotoUrl(path, type) {
         cleanPath = `/uploads/${folder}/${path}`;
     }
 
-    return `${base}${cleanPath}`;
+    return cleanPath;
 }

@@ -1,4 +1,20 @@
 {
+  "name": "ipc-system",
+  "version": "1.0.0",
+  "description": "Consolidated IPC School System - Single Node.js/Express instance serving React frontend and API",
+  "main": "backend/server.js",
+  "scripts": {
+    "build-frontend": "cd frontend && npm run build",
+    "start": "node backend/server.js",
+    "dev": "npm run build-frontend && node backend/server.js",
+    "dev-backend": "cd backend && npm run dev",
+    "dev-frontend": "cd frontend && npm start",
+    "install-deps": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "pm2:start": "pm2 start ecosystem.config.js",
+    "pm2:stop": "pm2 stop ecosystem.config.js",
+    "pm2:restart": "pm2 restart ecosystem.config.js",
+    "pm2:delete": "pm2 delete ecosystem.config.js"
+  },
   "dependencies": {
     "@react-pdf/renderer": "^4.5.1",
     "express-fileupload": "^1.5.2",
@@ -9,5 +25,9 @@
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.7",
     "xlsx": "^0.18.5"
+  },
+  "engines": {
+    "node": ">=14.0.0",
+    "npm": ">=6.0.0"
   }
 }
