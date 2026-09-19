@@ -4,15 +4,17 @@ import axios from 'axios';
 function Approvals() {
   const [approvals, setApprovals] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [pendingCount, setPendingCount] = useState(0);
 
   useEffect(() => {
     fetchApprovals();
+    fetchPendingCount();
   }, []);
 
   const fetchApprovals = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('/approvals/pending', {
+      const response = await axios.get('/approvals-v2/all', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setApprovals(response.data);
@@ -23,37 +25,53 @@ function Approvals() {
     }
   };
 
+  const fetchPendingCount = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get('/approvals-v2/pending-count', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setPendingCount(response.data.total || 0);
+    } catch (error) {
+      console.error('Error fetching pending count:', error);
+    }
+  };
+
   const handleApprove = async (item) => {
     try {
       const token = localStorage.getItem('token');
       let endpoint = '';
-      
+
       switch(item.type) {
         case 'prestasi':
-          endpoint = `/prestasi/${item.id}/approve`;
+          endpoint = `/approvals-v2/superadmin/prestasi/${item.id}`;
           break;
         case 'organisasi':
-          endpoint = `/organisasi/${item.id}/approve`;
+          endpoint = `/approvals-v2/superadmin/organisasi/${item.id}`;
           break;
         case 'event':
-          endpoint = `/event/${item.id}/approve`;
+          endpoint = `/approvals-v2/superadmin/event/${item.id}`;
+          break;
+        case 'kepanitiaan':
+          endpoint = `/approvals-v2/superadmin/kepanitiaan/${item.id}`;
           break;
         case 'pelanggaran':
-          endpoint = `/pelanggaran/${item.id}/approve`;
+          endpoint = `/approvals-v2/superadmin/pelanggaran/${item.id}`;
           break;
         case 'perilaku':
-          endpoint = `/perilaku/${item.id}/approve`;
+          endpoint = `/approvals-v2/superadmin/perilaku/${item.id}`;
           break;
         default:
           return;
       }
-      
-      await axios.put(endpoint, {}, {
+
+      await axios.put(endpoint, { status: 'approved' }, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
+
       alert('Berhasil diapprove!');
       fetchApprovals();
+      fetchPendingCount();
     } catch (error) {
       alert(error.response?.data?.message || 'Gagal approve');
     }
@@ -62,37 +80,41 @@ function Approvals() {
   const handleReject = async (item) => {
     const reason = prompt('Masukkan alasan penolakan:');
     if (!reason) return;
-    
+
     try {
       const token = localStorage.getItem('token');
       let endpoint = '';
-      
+
       switch(item.type) {
         case 'prestasi':
-          endpoint = `/prestasi/${item.id}/reject`;
+          endpoint = `/approvals-v2/superadmin/prestasi/${item.id}`;
           break;
         case 'organisasi':
-          endpoint = `/organisasi/${item.id}/reject`;
+          endpoint = `/approvals-v2/superadmin/organisasi/${item.id}`;
           break;
         case 'event':
-          endpoint = `/event/${item.id}/reject`;
+          endpoint = `/approvals-v2/superadmin/event/${item.id}`;
+          break;
+        case 'kepanitiaan':
+          endpoint = `/approvals-v2/superadmin/kepanitiaan/${item.id}`;
           break;
         case 'pelanggaran':
-          endpoint = `/pelanggaran/${item.id}/reject`;
+          endpoint = `/approvals-v2/superadmin/pelanggaran/${item.id}`;
           break;
         case 'perilaku':
-          endpoint = `/perilaku/${item.id}/reject`;
+          endpoint = `/approvals-v2/superadmin/perilaku/${item.id}`;
           break;
         default:
           return;
       }
-      
-      await axios.put(endpoint, { rejection_reason: reason }, {
+
+      await axios.put(endpoint, { status: 'rejected', notes: reason }, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
+
       alert('Berhasil direject!');
       fetchApprovals();
+      fetchPendingCount();
     } catch (error) {
       alert(error.response?.data?.message || 'Gagal reject');
     }
@@ -152,7 +174,26 @@ function Approvals() {
 
   return (
     <div>
-      <h2>Approvals</h2>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+        <h2 style={{ margin: 0 }}>Approvals</h2>
+        {pendingCount > 0 && (
+          <span style={{
+            backgroundColor: '#ef4444',
+            color: 'white',
+            borderRadius: '50%',
+            minWidth: '24px',
+            height: '24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '12px',
+            fontWeight: 'bold',
+            padding: '0 8px'
+          }}>
+            {pendingCount}
+          </span>
+        )}
+      </div>
       <p>Pending submissions yang menunggu approval</p>
       
       {approvals.length === 0 ? (

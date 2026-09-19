@@ -90,8 +90,8 @@ function Leaderboard() {
         fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
         background: PAGE_BG,
         minHeight: "100vh",
-        padding: "20px 16px 48px",
-        maxWidth: '1100px',
+        padding: "clamp(16px, 3vw, 28px) clamp(12px, 2vw, 32px) clamp(40px, 6vw, 60px)",
+        maxWidth: '100%',
         margin: '0 auto',
         color: INK,
       }}
@@ -124,23 +124,29 @@ function Leaderboard() {
           gap:12px;
           margin-bottom:20px;
         }
+        @media (max-width: 480px){
+          .header-row{gap:10px;margin-bottom:16px;}
+        }
         .header-icon{
           flex:0 0 auto;
-          width:40px;height:40px;
+          width:clamp(36px, 5vw, 40px);
+          height:clamp(36px, 5vw, 40px);
           border-radius:10px;
           background:var(--amber-bg);
           display:flex;align-items:center;justify-content:center;
-          font-size:20px;
+          font-size:clamp(18px, 4vw, 20px);
         }
         .header-text h1{
           margin:0 0 2px;
-          font-size:clamp(18px,4vw,22px);
+          font-size:clamp(16px, 4vw, 22px);
           font-weight:700;
+          line-height:1.3;
         }
         .header-text p{
           margin:0;
-          font-size:13.5px;
+          font-size:clamp(12px, 2.5vw, 13.5px);
           color:var(--gray-500);
+          line-height:1.4;
         }
         .controls{
           display:flex;
@@ -150,6 +156,14 @@ function Leaderboard() {
           justify-content:space-between;
           margin-bottom:20px;
         }
+        @media (max-width: 640px){
+          .controls{
+            flex-direction:column;
+            align-items:stretch;
+            gap:10px;
+            margin-bottom:16px;
+          }
+        }
         .tabs{
           display:flex;
           gap:8px;
@@ -158,13 +172,13 @@ function Leaderboard() {
           border-radius:12px;
           box-shadow:var(--shadow);
           width:100%;
-          max-width:340px;
+          max-width:clamp(280px, 100%, 340px);
         }
         .tab{
           flex:1;
           border:none;
           background:transparent;
-          padding:9px 12px;
+          padding:clamp(8px, 2vw, 9px) clamp(10px, 2vw, 12px);
           border-radius:9px;
           cursor:pointer;
           font-family:inherit;
@@ -172,8 +186,8 @@ function Leaderboard() {
           transition:background .15s ease, color .15s ease;
           color:var(--gray-700);
         }
-        .tab strong{display:block;font-size:13.5px;font-weight:700;}
-        .tab span{display:block;font-size:11.5px;opacity:.85;margin-top:1px;}
+        .tab strong{display:block;font-size:clamp(12px, 2.5vw, 13.5px);font-weight:700;}
+        .tab span{display:block;font-size:clamp(10px, 2vw, 11.5px);opacity:.85;margin-top:1px;}
         .tab.active{
           background:var(--blue);
           color:var(--white);
@@ -188,12 +202,15 @@ function Leaderboard() {
           padding:10px 16px;
           border-radius:10px;
           font-family:inherit;
-          font-size:13.5px;
+          font-size:clamp(12px, 2.5vw, 13.5px);
           font-weight:600;
           cursor:pointer;
           box-shadow:var(--shadow);
           transition:background .15s ease, transform .1s ease;
           white-space:nowrap;
+        }
+        @media (max-width: 640px){
+          .refresh-btn{justify-content:center;width:100%;}
         }
         .refresh-btn:hover{background:var(--blue-dark);}
         .refresh-btn:active{transform:scale(.97);}
@@ -210,50 +227,60 @@ function Leaderboard() {
           margin-bottom:20px;
         }
         .card-head{
-          padding:18px 20px;
+          padding:clamp(16px, 3vw, 18px) clamp(16px, 3vw, 20px);
           border-bottom:1px solid var(--gray-100);
         }
         .card-head h2{
           margin:0 0 3px;
-          font-size:16px;
+          font-size:clamp(14px, 3vw, 16px);
           display:flex;
           align-items:center;
           gap:8px;
+          line-height:1.3;
         }
         .card-head p{
           margin:0;
-          font-size:13px;
+          font-size:clamp(12px, 2.5vw, 13px);
           color:var(--gray-500);
+          line-height:1.4;
         }
-        .table-wrap{display:block;}
+        .table-wrap{
+          display:block;
+          overflow-x:auto;
+          -webkit-overflow-scrolling:touch;
+        }
         table{
           width:100%;
           border-collapse:collapse;
+          min-width:600px;
         }
         thead th{
           text-align:left;
-          font-size:12.5px;
+          font-size:clamp(11px, 2.5vw, 12.5px);
           font-weight:600;
           color:var(--gray-500);
           background:var(--gray-50);
-          padding:12px 20px;
+          padding:clamp(10px, 2vw, 12px) clamp(16px, 3vw, 20px);
           border-bottom:1px solid var(--gray-200);
+          white-space:nowrap;
         }
         tbody td{
-          padding:16px 20px;
+          padding:clamp(12px, 2vw, 16px) clamp(16px, 3vw, 20px);
           border-bottom:1px solid var(--gray-100);
           vertical-align:middle;
-          font-size:14px;
+          font-size:clamp(13px, 2.5vw, 14px);
         }
         tbody tr:last-child td{border-bottom:none;}
         .pos-badge{
-          width:30px;height:30px;
+          width:clamp(26px, 4vw, 30px);
+          height:clamp(26px, 4vw, 30px);
           border-radius:50%;
           display:flex;align-items:center;justify-content:center;
           font-weight:700;
-          font-size:13px;
+          font-size:clamp(11px, 2.5vw, 13px);
           background:var(--gray-100);
           color:var(--gray-700);
+          flex-shrink:0;
         }
         .pos-badge.top{
           background:var(--amber-bg);
@@ -264,55 +291,99 @@ function Leaderboard() {
           display:flex;
           align-items:center;
           gap:10px;
+          min-width:0;
         }
         .avatar{
-          width:34px;height:34px;
+          width:clamp(30px, 5vw, 34px);
+          height:clamp(30px, 5vw, 34px);
           border-radius:50%;
           background:var(--blue-light);
           color:var(--blue);
           display:flex;align-items:center;justify-content:center;
           font-weight:700;
-          font-size:14px;
+          font-size:clamp(12px, 2.5vw, 14px);
           flex:0 0 auto;
         }
-        .student-name{font-weight:600;font-size:14px;}
-        .student-nis{font-size:12px;color:var(--gray-500);}
+        .student-name{
+          font-weight:600;
+          font-size:clamp(13px, 2.5vw, 14px);
+          white-space:nowrap;
+          overflow:hidden;
+          text-overflow:ellipsis;
+        }
+        .student-nis{
+          font-size:clamp(11px, 2vw, 12px);
+          color:var(--gray-500);
+        }
         .pill{
           display:inline-block;
           padding:3px 10px;
           border-radius:999px;
-          font-size:12.5px;
+          font-size:clamp(11px, 2vw, 12.5px);
           font-weight:600;
+          white-space:nowrap;
         }
         .pill.kelas{background:var(--green-bg);color:var(--green-text);}
         .pill.grha{background:var(--amber-bg);color:var(--amber-text);}
         .total-badge{
-          width:26px;height:26px;
+          width:clamp(22px, 4vw, 26px);
+          height:clamp(22px, 4vw, 26px);
           border-radius:50%;
           background:var(--blue-light);
           color:var(--blue);
           display:flex;align-items:center;justify-content:center;
           font-weight:700;
-          font-size:12.5px;
+          font-size:clamp(11px, 2vw, 12.5px);
+          flex-shrink:0;
         }
         .detail-box{
           background:var(--amber-bg);
           border:1px solid var(--amber-border);
           border-left:4px solid var(--amber-text);
           border-radius:10px;
-          padding:10px 14px;
+          padding:clamp(8px, 2vw, 10px) clamp(12px, 2vw, 14px);
+          flex-shrink:0;
         }
         .detail-title{
           display:flex;align-items:center;gap:6px;
           font-weight:700;
-          font-size:13.5px;
+          font-size:clamp(12px, 2.5vw, 13.5px);
           color:var(--amber-text);
           margin-bottom:2px;
+          line-height:1.3;
         }
-        .detail-sub{font-size:12.5px;color:var(--amber-text);opacity:.85;}
+        .detail-sub{
+          font-size:clamp(11px, 2vw, 12.5px);
+          color:var(--amber-text);
+          opacity:.85;
+          line-height:1.3;
+        }
+        .detail-scroll{
+          max-height:120px;
+          overflow-y:auto;
+          overflow-x:hidden;
+          display:flex;
+          flex-direction:column;
+          gap:6px;
+          padding-right:4px;
+        }
+        .detail-scroll::-webkit-scrollbar{
+          width:6px;
+        }
+        .detail-scroll::-webkit-scrollbar-track{
+          background:var(--gray-100);
+          border-radius:3px;
+        }
+        .detail-scroll::-webkit-scrollbar-thumb{
+          background:var(--amber-text);
+          border-radius:3px;
+        }
+        .detail-scroll::-webkit-scrollbar-thumb:hover{
+          background:var(--amber-border);
+        }
         .mobile-list{display:none;}
         .m-item{
-          padding:16px 18px;
+          padding:clamp(14px, 3vw, 16px) clamp(16px, 3vw, 18px);
           border-bottom:1px solid var(--gray-100);
         }
         .m-item:last-child{border-bottom:none;}
@@ -336,7 +407,7 @@ function Leaderboard() {
           display:flex;
           align-items:center;
           gap:6px;
-          font-size:12.5px;
+          font-size:clamp(11px, 2vw, 12.5px);
           color:var(--gray-500);
           margin-bottom:10px;
         }
@@ -344,62 +415,55 @@ function Leaderboard() {
           background:var(--white);
           border-radius:var(--radius);
           box-shadow:var(--shadow);
-          padding:18px 20px;
+          padding:clamp(16px, 3vw, 18px) clamp(16px, 3vw, 20px);
         }
         .keterangan h3{
           display:flex;align-items:center;gap:8px;
           margin:0 0 14px;
-          font-size:15px;
+          font-size:clamp(14px, 3vw, 15px);
         }
         .keterangan-grid{
           display:grid;
-          grid-template-columns:repeat(5,1fr);
-          gap:12px;
+          grid-template-columns:repeat(auto-fit, minmax(140px, 1fr));
+          gap:clamp(8px, 2vw, 12px);
           margin-bottom:16px;
         }
         .k-item{
           border:1px solid var(--gray-200);
           border-radius:10px;
-          padding:12px 14px;
+          padding:clamp(10px, 2vw, 12px) clamp(12px, 2vw, 14px);
         }
         .k-item .k-title{
           display:flex;align-items:center;gap:6px;
           font-weight:700;
-          font-size:13px;
+          font-size:clamp(12px, 2.5vw, 13px);
           color:var(--blue);
           margin-bottom:2px;
+          line-height:1.3;
         }
-        .k-item .k-sub{font-size:12px;color:var(--gray-500);}
+        .k-item .k-sub{
+          font-size:clamp(11px, 2vw, 12px);
+          color:var(--gray-500);
+          line-height:1.3;
+        }
         .note{
           background:var(--amber-bg);
           border:1px solid var(--amber-border);
           border-left:4px solid var(--amber-text);
           border-radius:8px;
-          padding:12px 16px;
-          font-size:13px;
+          padding:clamp(10px, 2vw, 12px) clamp(12px, 2vw, 16px);
+          font-size:clamp(12px, 2.5vw, 13px);
           color:var(--amber-text);
+          line-height:1.4;
         }
-        @media (max-width: 860px){
-          .keterangan-grid{grid-template-columns:repeat(3,1fr);}
-        }
-        @media (max-width: 640px){
-          .page{padding:14px 12px 36px;}
-          .header-row{margin-bottom:16px;}
-          .controls{
-            flex-direction:column;
-            align-items:stretch;
-            gap:10px;
-            margin-bottom:16px;
-          }
-          .tabs{max-width:none;}
-          .refresh-btn{justify-content:center;width:100%;}
-          .card-head{padding:16px;}
+        @media (max-width: 768px){
           .table-wrap{display:none;}
           .mobile-list{display:block;}
-          .keterangan{padding:16px;}
-          .keterangan-grid{grid-template-columns:repeat(2,1fr);gap:10px;}
         }
-        @media (max-width: 380px){
+        @media (max-width: 480px){
+          .keterangan-grid{grid-template-columns:repeat(2,1fr);}
+        }
+        @media (max-width: 360px){
           .keterangan-grid{grid-template-columns:1fr;}
         }
       `}</style>
@@ -499,12 +563,14 @@ function Leaderboard() {
                       <td><span className="total-badge">{s.total_prestasi}</span></td>
                       <td>
                         {s.detail_prestasi && s.detail_prestasi.length > 0 ? (
-                          s.detail_prestasi.map((d, i) => (
-                            <div key={i} className="detail-box" style={{ marginBottom: i < s.detail_prestasi.length - 1 ? 6 : 0 }}>
-                              <div className="detail-title">🏅 {d.nama_lomba}</div>
-                              <div className="detail-sub">{d.juara}</div>
-                            </div>
-                          ))
+                          <div className="detail-scroll">
+                            {s.detail_prestasi.map((d, i) => (
+                              <div key={i} className="detail-box">
+                                <div className="detail-title">🏅 {d.nama_lomba}</div>
+                                <div className="detail-sub">{d.juara}</div>
+                              </div>
+                            ))}
+                          </div>
                         ) : (
                           <span style={{ opacity: 0.6, fontStyle: 'italic' }}>Tidak ada detail</span>
                         )}
@@ -551,12 +617,14 @@ function Leaderboard() {
                   </div>
                   <div className="m-total">📋 Total prestasi: <span className="total-badge">{s.total_prestasi}</span></div>
                   {s.detail_prestasi && s.detail_prestasi.length > 0 ? (
-                    s.detail_prestasi.map((d, i) => (
-                      <div key={i} className="detail-box" style={{ marginBottom: i < s.detail_prestasi.length - 1 ? 6 : 0 }}>
-                        <div className="detail-title">🏅 {d.nama_lomba}</div>
-                        <div className="detail-sub">{d.juara}</div>
-                      </div>
-                    ))
+                    <div className="detail-scroll">
+                      {s.detail_prestasi.map((d, i) => (
+                        <div key={i} className="detail-box">
+                          <div className="detail-title">🏅 {d.nama_lomba}</div>
+                          <div className="detail-sub">{d.juara}</div>
+                        </div>
+                      ))}
+                    </div>
                   ) : (
                     <span style={{ opacity: 0.6, fontStyle: 'italic' }}>Tidak ada detail</span>
                   )}

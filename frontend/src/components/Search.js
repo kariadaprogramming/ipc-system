@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 
 function Search() {
@@ -6,25 +6,44 @@ function Search() {
   const [results, setResults] = useState([]);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [debouncedQuery, setDebouncedQuery] = useState('');
 
-  const handleSearch = async () => {
-    if (!query.trim()) return;
-    
-    setLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-       const response = await axios.get(`/search/students?query=${encodeURIComponent(query)}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setResults(response.data);
-    } catch (error) {
-      console.error('Error searching:', error);
-    } finally {
-      setLoading(false);
+  // Debounce search query (300ms delay)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(query);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  // Search when debounced query changes
+  useEffect(() => {
+    if (!debouncedQuery.trim()) {
+      setResults([]);
+      return;
     }
-  };
 
-  const handleViewDetails = async (student) => {
+    const searchStudents = async () => {
+      setLoading(true);
+      try {
+        const token = localStorage.getItem('token');
+        const response = await axios.get(`/search/students?query=${encodeURIComponent(debouncedQuery)}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setResults(response.data);
+      } catch (error) {
+        console.error('Error searching:', error);
+        setResults([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    searchStudents();
+  }, [debouncedQuery]);
+
+  const handleViewDetails = useCallback(async (student) => {
     try {
       const token = localStorage.getItem('token');
       const response = await axios.get(`/search/student/${student.id}`, {
@@ -34,13 +53,13 @@ function Search() {
     } catch (error) {
       console.error('Error fetching details:', error);
     }
-  };
+  }, []);
 
   return (
     <div>
       <h2>Search Siswa</h2>
       <div className="card">
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           <input
             type="text"
             value={query}
@@ -48,9 +67,7 @@ function Search() {
             placeholder="Cari berdasarkan nama atau NIS..."
             style={{ flex: 1, padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
           />
-          <button className="btn btn-primary" onClick={handleSearch} disabled={loading}>
-            {loading ? 'Mencari...' : 'Cari'}
-          </button>
+          {loading && <span style={{ fontSize: '12px', color: '#666' }}>Mencari...</span>}
         </div>
       </div>
 

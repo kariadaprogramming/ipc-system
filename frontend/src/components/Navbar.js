@@ -1,13 +1,68 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 
 function Navbar({ user, onLogout, isMobileMenuOpen, toggleMobileMenu }) {
-  // const [permissions, setPermissions] = useState(null);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [unreadCount, setUnreadCount] = useState(0);
   const location = useLocation();
   const navigate = useNavigate();
 
   console.log('Navbar - User:', user);
   console.log('Navbar - User Role:', user?.role);
+
+  // Fetch pending approvals count for superadmin
+  useEffect(() => {
+    if (user?.role === 'superadmin') {
+      fetchPendingCount();
+
+      // Refresh count every 30 seconds
+      const interval = setInterval(fetchPendingCount, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [user]);
+
+  // Fetch unread notifications count for siswa/guru
+  useEffect(() => {
+    if (user?.role === 'siswa' || user?.role === 'guru') {
+      fetchUnreadCount();
+
+      // Refresh count every 30 seconds
+      const interval = setInterval(fetchUnreadCount, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [user]);
+
+  // Refresh unread count when navigating to notifications page
+  useEffect(() => {
+    if (location.pathname === '/notifications' && (user?.role === 'siswa' || user?.role === 'guru')) {
+      fetchUnreadCount();
+    }
+  }, [location.pathname, user]);
+
+  const fetchPendingCount = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get('/approvals-v2/pending-count', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setPendingCount(response.data.total || 0);
+    } catch (error) {
+      console.error('Error fetching pending count:', error);
+    }
+  };
+
+  const fetchUnreadCount = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get('/approvals-v2/notifications/count', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setUnreadCount(response.data.count || 0);
+    } catch (error) {
+      console.error('Error fetching unread count:', error);
+    }
+  };
 
   // Permission fetching disabled for now
   // const fetchPermissions = useCallback(async () => {
@@ -74,7 +129,7 @@ function Navbar({ user, onLogout, isMobileMenuOpen, toggleMobileMenu }) {
         <ul className="sidebar-nav">
           {filteredNavItems.map(item => (
             <li key={item.path}>
-              <a 
+              <a
                 href={item.path}
                 className={location.pathname === item.path ? 'active' : ''}
                 onClick={(e) => {
@@ -86,8 +141,47 @@ function Navbar({ user, onLogout, isMobileMenuOpen, toggleMobileMenu }) {
                     toggleMobileMenu();
                   }
                 }}
+                style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '8px' }}
               >
                 {item.label}
+                {item.path === '/approvals' && pendingCount > 0 && (
+                  <span
+                    style={{
+                      backgroundColor: '#ef4444',
+                      color: 'white',
+                      borderRadius: '50%',
+                      minWidth: '20px',
+                      height: '20px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '11px',
+                      fontWeight: 'bold',
+                      padding: '0 6px'
+                    }}
+                  >
+                    {pendingCount}
+                  </span>
+                )}
+                {item.path === '/notifications' && unreadCount > 0 && (
+                  <span
+                    style={{
+                      backgroundColor: '#ef4444',
+                      color: 'white',
+                      borderRadius: '50%',
+                      minWidth: '20px',
+                      height: '20px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '11px',
+                      fontWeight: 'bold',
+                      padding: '0 6px'
+                    }}
+                  >
+                    {unreadCount}
+                  </span>
+                )}
               </a>
             </li>
           ))}

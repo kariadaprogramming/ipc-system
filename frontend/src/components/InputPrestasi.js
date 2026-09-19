@@ -74,10 +74,24 @@ function InputPrestasi() {
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     setUserRole(user.role || '');
+
+    // Auto-fill biodata for siswa
+    if (user.role === 'siswa') {
+      setFormData(prev => ({
+        ...prev,
+        nama: user.nama || '',
+        nis: user.nis || '',
+        kelas: user.kelas || '',
+        grha: user.grha || ''
+      }));
+    } else {
+      // Only fetch students for guru/superadmin
+      fetchStudents();
+    }
+
     fetchTeachers();
     fetchUserSubmissions();
     fetchIpcConfig();
-    fetchStudents();
     checkAccess();
     if (user.role === 'superadmin') {
       fetchAllPrestasi();
@@ -243,11 +257,11 @@ function InputPrestasi() {
   const fetchStudents = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('/users', {
+      const response = await axios.get('/users?role=siswa&limit=500', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      // Filter only students
-      const studentList = response.data.filter(user => user.role === 'siswa');
+      // Use the new pagination format
+      const studentList = response.data.users || [];
       setStudents(studentList);
     } catch (error) {
       console.error('Error fetching students:', error);
@@ -513,37 +527,69 @@ function InputPrestasi() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <div className="form-group">
             <label>Nama <span className="required">*</span></label>
-            <Select
-              value={students.find(s => s.nama === formData.nama && s.nis === formData.nis) ? { value: formData.nama, label: formData.nama, nama: formData.nama, nis: formData.nis, kelas: formData.kelas, grha: formData.grha } : null}
-              onChange={(selected) => handleStudentSelect(selected)}
-              options={students.map(student => ({ value: student.nama, label: `${student.nama} (${student.nis})`, nama: student.nama, nis: student.nis, kelas: student.kelas, grha: student.grha }))}
-              placeholder="Cari nama siswa..."
-              isSearchable
-              isClearable
-              styles={{
-                control: (provided) => ({
-                  ...provided,
-                  minHeight: '40px'
-                })
-              }}
-            />
+            {userRole === 'siswa' ? (
+              <input
+                type="text"
+                value={formData.nama}
+                disabled
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #d0d0d0',
+                  borderRadius: '4px',
+                  backgroundColor: '#f5f5f5',
+                  color: '#666'
+                }}
+              />
+            ) : (
+              <Select
+                value={students.find(s => s.nama === formData.nama && s.nis === formData.nis) ? { value: formData.nama, label: formData.nama, nama: formData.nama, nis: formData.nis, kelas: formData.kelas, grha: formData.grha } : null}
+                onChange={(selected) => handleStudentSelect(selected)}
+                options={students.map(student => ({ value: student.nama, label: `${student.nama} (${student.nis})`, nama: student.nama, nis: student.nis, kelas: student.kelas, grha: student.grha }))}
+                placeholder="Cari nama siswa..."
+                isSearchable
+                isClearable
+                styles={{
+                  control: (provided) => ({
+                    ...provided,
+                    minHeight: '40px'
+                  })
+                }}
+              />
+            )}
           </div>
           <div className="form-group">
             <label>NIS <span className="required">*</span></label>
-            <Select
-              value={students.find(s => s.nis === formData.nis) ? { value: formData.nis, label: formData.nis, nama: formData.nama, nis: formData.nis, kelas: formData.kelas, grha: formData.grha } : null}
-              onChange={(selected) => handleStudentSelect(selected)}
-              options={students.map(student => ({ value: student.nis, label: `${student.nis} - ${student.nama}`, nama: student.nama, nis: student.nis, kelas: student.kelas, grha: student.grha }))}
-              placeholder="Cari NIS siswa..."
-              isSearchable
-              isClearable
-              styles={{
-                control: (provided) => ({
-                  ...provided,
-                  minHeight: '40px'
-                })
-              }}
-            />
+            {userRole === 'siswa' ? (
+              <input
+                type="text"
+                value={formData.nis}
+                disabled
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #d0d0d0',
+                  borderRadius: '4px',
+                  backgroundColor: '#f5f5f5',
+                  color: '#666'
+                }}
+              />
+            ) : (
+              <Select
+                value={students.find(s => s.nis === formData.nis) ? { value: formData.nis, label: formData.nis, nama: formData.nama, nis: formData.nis, kelas: formData.kelas, grha: formData.grha } : null}
+                onChange={(selected) => handleStudentSelect(selected)}
+                options={students.map(student => ({ value: student.nis, label: `${student.nis} - ${student.nama}`, nama: student.nama, nis: student.nis, kelas: student.kelas, grha: student.grha }))}
+                placeholder="Cari NIS siswa..."
+                isSearchable
+                isClearable
+                styles={{
+                  control: (provided) => ({
+                    ...provided,
+                    minHeight: '40px'
+                  })
+                }}
+              />
+            )}
           </div>
         </div>
         
@@ -748,32 +794,40 @@ function InputPrestasi() {
       {/* Submission History - Hidden for Superadmin */}
       {JSON.parse(localStorage.getItem('user') || '{}').role !== 'superadmin' && (
         <div style={{ marginTop: '30px' }}>
-          <h3>Riwayat Pengajuan</h3>
+          <h3 style={{ marginBottom: '15px', fontSize: '18px' }}>📋 Riwayat Pengajuan Prestasi</h3>
           {submissions.length === 0 ? (
             <p className="text-muted">Belum ada pengajuan</p>
           ) : (
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Tanggal</th>
-                  <th>Lomba</th>
-                  <th>Juara</th>
-                  <th>Pembina</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {submissions.slice(0, 5).map(item => (
-                  <tr key={item.id}>
-                    <td>{new Date(item.created_at).toLocaleDateString('id-ID')}</td>
-                    <td>{item.nama_lomba}</td>
-                    <td>{formatDisplayText(item.juara)}</td>
-                    <td>{item.pembina || '-'}</td>
-                    <td>{getStatusBadge(item)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div style={{ display: 'grid', gap: '10px' }}>
+              {submissions.map((sub, index) => (
+                <div key={sub.id || index} style={{
+                  padding: '15px',
+                  backgroundColor: '#f8f9fa',
+                  borderRadius: '8px',
+                  border: '1px solid #e0e0e0',
+                  display: 'grid',
+                  gridTemplateColumns: '1fr auto',
+                  gap: '10px',
+                  alignItems: 'center'
+                }}>
+                  <div>
+                    <strong style={{ fontSize: '14px' }}>{sub.nama_lomba}</strong>
+                    <p style={{ margin: '4px 0', fontSize: '13px', color: '#666' }}>
+                      {sub.nama} ({sub.nis}) - {formatDisplayText(sub.juara)}
+                    </p>
+                    <p style={{ margin: '4px 0', fontSize: '13px', color: '#666' }}>
+                      Pembina: {sub.pembina || '-'}
+                    </p>
+                    <p style={{ margin: 0, fontSize: '12px', color: '#999' }}>
+                      Diajukan: {new Date(sub.created_at).toLocaleDateString('id-ID')}
+                    </p>
+                  </div>
+                  <div>
+                    {getStatusBadge(sub)}
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       )}

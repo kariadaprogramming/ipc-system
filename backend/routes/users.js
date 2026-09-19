@@ -6,6 +6,7 @@ const { auth, superAdminOnly, teacherOrSuperAdmin } = require('../middleware/aut
 const db = require('../config/database');
 const { getStudentRecords } = require('../utils/studentRecords');
 const { validateTahunPelajaran, calculateCurrentClass, shouldGraduate, getClassInfo, calculateFullClass } = require('../utils/academicYear');
+const { logActivity } = require('../utils/logger');
 
 async function applyIpcAwalUpdate(userId, newIpcAwal, adminId) {
     const parsedAwal = parseInt(newIpcAwal, 10);
@@ -143,38 +144,112 @@ router.get('/nama/:nama', auth, async (req, res) => {
     }
 });
 
-// Get all users (Superadmin and Teacher)
+// Get all users (Superadmin and Teacher) - with pagination
 router.get('/', auth, teacherOrSuperAdmin, async (req, res) => {
     try {
+        const { page = 1, limit = 50, search = '', role: roleFilter } = req.query;
+        const offset = (page - 1) * limit;
+
         // If guru, only return students (excluding graduated)
         if (req.user.role === 'guru') {
-            const [users] = await db.query('SELECT id, nama, nis, nip, role, kelas, grha, wali_kelas, ipc_total, ipc_awal, created_at, tahun_pelajaran, is_graduated, jurusan FROM users WHERE role = ? AND (is_graduated = 0 OR is_graduated IS NULL)', ['siswa']);
-            
+            let query = 'SELECT id, nama, nis, nip, role, kelas, grha, wali_kelas, ipc_total, ipc_awal, created_at, tahun_pelajaran, is_graduated, jurusan FROM users WHERE role = ? AND (is_graduated = 0 OR is_graduated IS NULL)';
+            let params = ['siswa'];
+
+            if (search) {
+                query += ' AND (nama LIKE ? OR nis LIKE ?)';
+                params.push(`%${search}%`, `%${search}%`);
+            }
+
+            query += ' ORDER BY nama ASC LIMIT ? OFFSET ?';
+            params.push(parseInt(limit), parseInt(offset));
+
+            const [users] = await db.query(query, params);
+
+            // Get total count for pagination
+            let countQuery = 'SELECT COUNT(*) as total FROM users WHERE role = ? AND (is_graduated = 0 OR is_graduated IS NULL)';
+            let countParams = ['siswa'];
+            if (search) {
+                countQuery += ' AND (nama LIKE ? OR nis LIKE ?)';
+                countParams.push(`%${search}%`, `%${search}%`);
+            }
+            const [countResult] = await db.query(countQuery, countParams);
+
             // Calculate and update class for each student
             const usersWithCalculatedClass = users.map(user => {
                 const calculatedClass = calculateFullClass(user.tahun_pelajaran, user.jurusan);
                 return {
                     ...user,
-                    kelas: calculatedClass || user.kelas // Use calculated class, fallback to stored
+                    kelas: calculatedClass || user.kelas
                 };
             });
-            return res.json(usersWithCalculatedClass);
+
+            return res.json({
+                users: usersWithCalculatedClass,
+                pagination: {
+                    page: parseInt(page),
+                    limit: parseInt(limit),
+                    total: countResult[0].total,
+                    totalPages: Math.ceil(countResult[0].total / limit)
+                }
+            });
         }
+
         // If superadmin, return all users (including graduated)
-        const [users] = await db.query('SELECT id, nama, nis, nip, role, kelas, grha, wali_kelas, ipc_total, ipc_awal, created_at, tahun_pelajaran, is_graduated, jurusan FROM users');
-        
+        let query = 'SELECT id, nama, nis, nip, role, kelas, grha, wali_kelas, ipc_total, ipc_awal, created_at, tahun_pelajaran, is_graduated, jurusan FROM users WHERE 1=1';
+        let params = [];
+
+        if (roleFilter) {
+            query += ' AND role = ?';
+            params.push(roleFilter);
+        }
+
+        if (search) {
+            query += ' AND (nama LIKE ? OR nis LIKE ? OR nip LIKE ?)';
+            params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+        }
+
+        query += ' ORDER BY nama ASC LIMIT ? OFFSET ?';
+        params.push(parseInt(limit), parseInt(offset));
+
+        const [users] = await db.query(query, params);
+
+        // Get total count for pagination
+        let countQuery = 'SELECT COUNT(*) as total FROM users WHERE 1=1';
+        let countParams = [];
+
+        if (roleFilter) {
+            countQuery += ' AND role = ?';
+            countParams.push(roleFilter);
+        }
+
+        if (search) {
+            countQuery += ' AND (nama LIKE ? OR nis LIKE ? OR nip LIKE ?)';
+            countParams.push(`%${search}%`, `%${search}%`, `%${search}%`);
+        }
+
+        const [countResult] = await db.query(countQuery, countParams);
+
         // Calculate and update class for each student
         const usersWithCalculatedClass = users.map(user => {
             if (user.role === 'siswa') {
                 const calculatedClass = calculateFullClass(user.tahun_pelajaran, user.jurusan);
                 return {
                     ...user,
-                    kelas: calculatedClass || user.kelas // Use calculated class, fallback to stored
+                    kelas: calculatedClass || user.kelas
                 };
             }
             return user;
         });
-        res.json(usersWithCalculatedClass);
+
+        res.json({
+            users: usersWithCalculatedClass,
+            pagination: {
+                page: parseInt(page),
+                limit: parseInt(limit),
+                total: countResult[0].total,
+                totalPages: Math.ceil(countResult[0].total / limit)
+            }
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error' });
@@ -480,17 +555,17 @@ router.put('/:id', auth, async (req, res) => {
         if (teacherJabatan && !VALID_TEACHER_JABATAN.includes(teacherJabatan)) {
             return res.status(400).json({ message: `Jabatan tidak valid. Gunakan: ${VALID_TEACHER_JABATAN.join(', ')}` });
         }
-        
+
+        // Get current user data for logging
+        const [targetUserData] = await db.query('SELECT nama, role FROM users WHERE id = ?', [userId]);
+
         await db.query(
             'UPDATE users SET nama = ?, alamat = ?, no_hp = ?, detail = ? WHERE id = ?',
             [nama, alamat, no_hp, teacherJabatan, userId]
         );
 
         // Log activity
-        await db.query(
-            'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [currentUser.id, 'Update User', `Updated user ID ${userId}`]
-        );
+        await logActivity(currentUser.id, 'UPDATE_BIODATA', `User ${currentUser.nama} (${currentUser.role}) updated biodata for ${targetUserData[0]?.nama || userId} (${targetUserData[0]?.role})`, req.ip);
 
         res.json({ message: 'User updated successfully' });
     } catch (error) {
@@ -702,39 +777,42 @@ router.put('/biodata-approvals/:id', auth, superAdminOnly, async (req, res) => {
     try {
         const approvalId = parseInt(req.params.id);
         const { status, notes } = req.body;
-        
+
         // Get approval data
         const [approval] = await db.query(
             'SELECT * FROM biodata_update_approvals WHERE id = ?',
             [approvalId]
         );
-        
+
         if (approval.length === 0) {
             return res.status(404).json({ message: 'Approval request not found' });
         }
-        
+
         const data = approval[0];
-        
+
         if (status === 'approved') {
             // Update student data with new biodata
             await db.query(
                 'UPDATE users SET nama = ?, nis = ?, kelas = ?, jurusan = ?, tahun_pelajaran = ?, grha = ? WHERE id = ?',
                 [data.nama_baru, data.nis_baru, data.kelas_baru, data.jurusan_baru, data.tahun_pelajaran_baru, data.grha_baru, data.user_id]
             );
-            
+
             // Update approval status
             await db.query(
                 'UPDATE biodata_update_approvals SET superadmin_status = ?, superadmin_notes = ?, superadmin_approved_at = NOW() WHERE id = ?',
                 ['approved', notes || 'Disetujui oleh SuperAdmin', approvalId]
             );
-            
+
+            // Log activity
+            await logActivity(req.user.id, 'APPROVE_BIODATA_UPDATE', `SuperAdmin ${req.user.nama} approved biodata update for student ${data.nama_lama} (${data.nis_lama})`, req.ip);
+
             // Notify student
             await db.query(
-                `INSERT INTO notifications (user_id, type, title, message, related_id, related_type) 
+                `INSERT INTO notifications (user_id, type, title, message, related_id, related_type)
                  VALUES (?, 'approved', 'Biodata Diperbarui', ?, ?, 'biodata')`,
                 [data.user_id, 'Biodata Anda telah berhasil diperbarui oleh SuperAdmin.', approvalId]
             );
-            
+
             res.json({ message: 'Biodata siswa berhasil diupdate' });
         } else {
             // Reject
@@ -742,14 +820,17 @@ router.put('/biodata-approvals/:id', auth, superAdminOnly, async (req, res) => {
                 'UPDATE biodata_update_approvals SET superadmin_status = ?, superadmin_notes = ? WHERE id = ?',
                 ['rejected', notes || 'Ditolak oleh SuperAdmin', approvalId]
             );
-            
+
+            // Log activity
+            await logActivity(req.user.id, 'REJECT_BIODATA_UPDATE', `SuperAdmin ${req.user.nama} rejected biodata update for student ${data.nama_lama} (${data.nis_lama})`, req.ip);
+
             // Notify student
             await db.query(
-                `INSERT INTO notifications (user_id, type, title, message, related_id, related_type) 
+                `INSERT INTO notifications (user_id, type, title, message, related_id, related_type)
                  VALUES (?, 'rejected', 'Pengajuan Update Biodata Ditolak', ?, ?, 'biodata')`,
                 [data.user_id, `Pengajuan update biodata ditolak: ${notes || 'Tidak ada alasan'}`, approvalId]
             );
-            
+
             res.json({ message: 'Pengajuan update biodata ditolak' });
         }
     } catch (error) {
@@ -766,13 +847,14 @@ router.put('/:id/biodata', auth, superAdminOnly, async (req, res) => {
         const teacherJabatan = jabatan || detail;
 
         // Get user current data
-        const [user] = await db.query('SELECT role FROM users WHERE id = ?', [userId]);
+        const [user] = await db.query('SELECT nama, role FROM users WHERE id = ?', [userId]);
         if (user.length === 0) {
             return res.status(404).json({ message: 'User not found' });
         }
-        
+
         const role = user[0].role;
-        
+        const oldName = user[0].nama;
+
         if (role === 'siswa') {
             // Validate tahun_pelajaran format if provided
             if (tahun_pelajaran && !validateTahunPelajaran(tahun_pelajaran)) {
@@ -781,12 +863,15 @@ router.put('/:id/biodata', auth, superAdminOnly, async (req, res) => {
 
             // Calculate new class based on updated jurusan and tahun_pelajaran
             const calculatedClass = calculateFullClass(tahun_pelajaran, jurusan);
-            
+
             // Update siswa biodata
             await db.query(
                 'UPDATE users SET nama = ?, nis = ?, jurusan = ?, grha = ?, tahun_pelajaran = ?, kelas = ? WHERE id = ?',
                 [nama, nis, jurusan, grha, tahun_pelajaran, calculatedClass, userId]
             );
+
+            // Log activity
+            await logActivity(req.user.id, 'UPDATE_BIODATA_DIRECT', `SuperAdmin ${req.user.nama} directly updated biodata for student ${oldName} (${nis}) to ${nama}`, req.ip);
         } else if (role === 'guru') {
             if (!VALID_TEACHER_JABATAN.includes(teacherJabatan)) {
                 return res.status(400).json({ message: `Jabatan tidak valid. Gunakan: ${VALID_TEACHER_JABATAN.join(', ')}` });
@@ -796,14 +881,11 @@ router.put('/:id/biodata', auth, superAdminOnly, async (req, res) => {
                 'UPDATE users SET nama = ?, nip = ?, detail = ?, alamat = ?, no_hp = ? WHERE id = ?',
                 [nama, nip, teacherJabatan, alamat, no_hp, userId]
             );
+
+            // Log activity
+            await logActivity(req.user.id, 'UPDATE_BIODATA_DIRECT', `SuperAdmin ${req.user.nama} directly updated biodata for teacher ${oldName} (${nip}) to ${nama}`, req.ip);
         }
-        
-        // Log activity
-        await db.query(
-            'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Update Biodata', `Updated biodata for ${role} ID ${userId}`]
-        );
-        
+
         res.json({ message: 'Biodata updated successfully' });
     } catch (error) {
         console.error(error);

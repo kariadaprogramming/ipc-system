@@ -3,6 +3,7 @@ const router = express.Router();
 const { auth } = require('../middleware/auth');
 const db = require('../config/database');
 const { getStudentRecords } = require('../utils/studentRecords');
+const { logActivity } = require('../utils/logger');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -216,7 +217,7 @@ router.post('/change-password', auth, async (req, res) => {
         }
 
         // Get user with current password
-        const [user] = await db.query('SELECT password FROM users WHERE id = ?', [req.user.id]);
+        const [user] = await db.query('SELECT password, nama, role FROM users WHERE id = ?', [req.user.id]);
 
         if (user.length === 0) {
             return res.status(404).json({ message: 'User not found' });
@@ -234,6 +235,9 @@ router.post('/change-password', auth, async (req, res) => {
 
         // Update password
         await db.query('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, req.user.id]);
+
+        // Log activity
+        await logActivity(req.user.id, 'CHANGE_PASSWORD', `User ${user[0].nama} (${user[0].role}) changed password`, req.ip);
 
         res.json({ message: 'Password changed successfully' });
     } catch (error) {

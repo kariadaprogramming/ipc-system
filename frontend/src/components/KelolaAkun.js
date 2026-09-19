@@ -45,17 +45,18 @@ function KelolaAkun() {
   const [showClassValidationModal, setShowClassValidationModal] = useState(false);
   const [validationResults, setValidationResults] = useState(null);
   const [validatingClasses, setValidatingClasses] = useState(false);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 50,
+    total: 0,
+    totalPages: 0
+  });
+  const [searchQuery, setSearchQuery] = useState('');
 
   const grhaOptions = GRHA_OPTIONS;
 
-  const filteredUsers = users.filter(user => {
-    if (filters.role && user.role !== filters.role) return false;
-    if (filters.kelas && user.kelas !== filters.kelas) return false;
-    if (filters.grha && user.grha !== filters.grha) return false;
-    if (filters.jurusan && user.jurusan !== filters.jurusan) return false;
-    if (filters.tahun_pelajaran && user.tahun_pelajaran !== filters.tahun_pelajaran) return false;
-    return true;
-  });
+  // Remove client-side filtering since backend handles it now
+  const filteredUsers = users;
 
   const handleFilterChange = (key, value) => {
     setFilters(prev => ({ ...prev, [key]: value }));
@@ -71,26 +72,44 @@ function KelolaAkun() {
     fetchUsers();
   }, []);
 
-  const fetchUsers = async () => {
+  const fetchUsers = async (page = 1) => {
     try {
+      setLoading(true);
       const token = localStorage.getItem('token');
-      const response = await axios.get('/users', {
+      const params = new URLSearchParams({
+        page: page,
+        limit: pagination.limit,
+        search: searchQuery
+      });
+
+      if (filters.role) params.append('role', filters.role);
+
+      const response = await axios.get(`/users?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      // If guru, only show students. If superadmin, show all users
-      const user = JSON.parse(localStorage.getItem('user'));
-      if (user?.role === 'guru') {
-        const students = response.data.filter(user => user.role === 'siswa');
-        setUsers(students);
-      } else {
-        setUsers(response.data);
-      }
+
+      setUsers(response.data.users || []);
+      setPagination(response.data.pagination || {
+        page: 1,
+        limit: 50,
+        total: 0,
+        totalPages: 0
+      });
     } catch (error) {
       console.error('Error fetching users:', error);
     } finally {
       setLoading(false);
     }
   };
+
+  // Debounced search effect
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchUsers(1);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, filters.role]);
 
   const handleCreateStudent = async (e) => {
     e.preventDefault();
@@ -255,7 +274,7 @@ function KelolaAkun() {
       setShowEditBiodataModal(false);
       setEditStudent(null);
       setFormData({});
-      fetchUsers();
+      fetchUsers(pagination.page);
     } catch (error) {
       setMessage(error.response?.data?.message || 'Gagal update data');
     }
@@ -407,7 +426,7 @@ function KelolaAkun() {
 
       setImportResults(results);
       setMessage(`Import completed: ${results.filter(r => r.status === 'success').length} successful, ${results.filter(r => r.status === 'error').length} failed`);
-      fetchUsers();
+      fetchUsers(pagination.page);
     } catch (error) {
       setMessage('Error reading Excel file: ' + error.message);
     } finally {
@@ -670,14 +689,29 @@ function KelolaAkun() {
         {/* Filters */}
         <div style={{ background: '#f9f9f9', border: '1px solid #e0e0e0', borderRadius: '4px', padding: '16px', marginBottom: '24px' }}>
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            <div style={{ flex: '2', minWidth: '200px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#666', marginBottom: '6px' }}>Cari</label>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Cari nama, NIS, atau NIP..."
+                style={{
+                  width: '100%', padding: '8px 12px', border: '1px solid #d0d0d0', borderRadius: '4px',
+                  fontSize: '13px', background: 'white', color: '#333', transition: 'all 0.3s ease'
+                }}
+                onFocus={(e) => { e.target.style.borderColor = '#1e88e5'; e.target.style.boxShadow = '0 0 0 2px rgba(30, 136, 229, 0.1)'; }}
+                onBlur={(e) => { e.target.style.borderColor = '#d0d0d0'; e.target.style.boxShadow = 'none'; }}
+              />
+            </div>
             {userRole === 'superadmin' && (
               <div style={{ flex: '1', minWidth: '160px' }}>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#666', marginBottom: '6px' }}>Role</label>
                 <select
                   value={filters.role}
                   onChange={(e) => handleFilterChange('role', e.target.value)}
-                  style={{ 
-                    width: '100%', padding: '8px 12px', border: '1px solid #d0d0d0', borderRadius: '4px', 
+                  style={{
+                    width: '100%', padding: '8px 12px', border: '1px solid #d0d0d0', borderRadius: '4px',
                     fontSize: '13px', background: 'white', color: '#333', transition: 'all 0.3s ease'
                   }}
                   onFocus={(e) => { e.target.style.borderColor = '#1e88e5'; e.target.style.boxShadow = '0 0 0 2px rgba(30, 136, 229, 0.1)'; }}
@@ -964,14 +998,11 @@ function KelolaAkun() {
         {/* Bulk Actions */}
         {userRole === 'superadmin' && (
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '16px', borderTop: '1px solid #e0e0e0' }}>
-            <div style={{ fontSize: '12px', color: '#999' }}>
-              Menampilkan {filteredUsers.length} pengguna
-            </div>
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button 
+              <button
                 onClick={selectAllFiltered}
-                style={{ 
-                  padding: '6px 12px', border: '1px solid #d0d0d0', background: 'white', borderRadius: '3px', 
+                style={{
+                  padding: '6px 12px', border: '1px solid #d0d0d0', background: 'white', borderRadius: '3px',
                   fontSize: '12px', cursor: 'pointer', color: '#333'
                 }}
                 onMouseOver={(e) => { e.target.style.background = '#f5f5f5'; e.target.style.borderColor = '#bbb'; }}
@@ -981,10 +1012,10 @@ function KelolaAkun() {
               </button>
               {selectedIds.length > 0 && (
                 <>
-                  <button 
+                  <button
                     onClick={handleBulkDelete}
-                    style={{ 
-                      padding: '6px 12px', border: '1px solid #d0d0d0', background: '#dc3545', borderRadius: '3px', 
+                    style={{
+                      padding: '6px 12px', border: '1px solid #d0d0d0', background: '#dc3545', borderRadius: '3px',
                       fontSize: '12px', cursor: 'pointer', color: 'white'
                     }}
                     onMouseOver={(e) => { e.target.style.background = '#c82333'; }}
@@ -992,10 +1023,10 @@ function KelolaAkun() {
                   >
                     Hapus ({selectedIds.length})
                   </button>
-                  <button 
+                  <button
                     onClick={clearSelection}
-                    style={{ 
-                      padding: '6px 12px', border: '1px solid #d0d0d0', background: 'white', borderRadius: '3px', 
+                    style={{
+                      padding: '6px 12px', border: '1px solid #d0d0d0', background: 'white', borderRadius: '3px',
                       fontSize: '12px', cursor: 'pointer', color: '#333'
                     }}
                     onMouseOver={(e) => { e.target.style.background = '#f5f5f5'; e.target.style.borderColor = '#bbb'; }}
@@ -1006,8 +1037,40 @@ function KelolaAkun() {
                 </>
               )}
             </div>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <button
+                onClick={() => fetchUsers(pagination.page - 1)}
+                disabled={pagination.page === 1 || loading}
+                style={{
+                  padding: '6px 12px', border: '1px solid #d0d0d0', borderRadius: '4px',
+                  fontSize: '12px', cursor: pagination.page === 1 || loading ? 'not-allowed' : 'pointer',
+                  background: pagination.page === 1 || loading ? '#f5f5f5' : 'white',
+                  color: pagination.page === 1 || loading ? '#999' : '#333'
+                }}
+              >
+                ← Sebelumnya
+              </button>
+              <span style={{ fontSize: '12px', color: '#666' }}>
+                {pagination.page} / {pagination.totalPages}
+              </span>
+              <button
+                onClick={() => fetchUsers(pagination.page + 1)}
+                disabled={pagination.page === pagination.totalPages || loading}
+                style={{
+                  padding: '6px 12px', border: '1px solid #d0d0d0', borderRadius: '4px',
+                  fontSize: '12px', cursor: pagination.page === pagination.totalPages || loading ? 'not-allowed' : 'pointer',
+                  background: pagination.page === pagination.totalPages || loading ? '#f5f5f5' : 'white',
+                  color: pagination.page === pagination.totalPages || loading ? '#999' : '#333'
+                }}
+              >
+                Selanjutnya →
+              </button>
+            </div>
           </div>
         )}
+        <div style={{ fontSize: '12px', color: '#999', marginTop: '8px' }}>
+          Menampilkan {users.length} dari {pagination.total} pengguna (Halaman {pagination.page} dari {pagination.totalPages})
+        </div>
         {userRole === 'superadmin' && selectionRole && (
           <p style={{ fontSize: '13px', color: '#666', marginTop: '12px' }}>
             Mode pilihan: <strong>{selectionRole === 'siswa' ? 'Siswa' : 'Guru'}</strong> — hanya role yang sama yang bisa dipilih.
