@@ -12,6 +12,9 @@ function Login() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [schoolConfig, setSchoolConfig] = useState(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [shake, setShake] = useState(false);
+  const [focusedField, setFocusedField] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -45,217 +48,376 @@ function Login() {
       navigate('/dashboard');
     } catch (error) {
       setError(error.response?.data?.message || 'Login failed');
+      setShake(true);
+      setTimeout(() => setShake(false), 450);
     } finally {
       setLoading(false);
     }
   };
 
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    setFormData({ username: '', password: '' });
+    setError('');
+  };
+
   return (
-    <div className="login-container" style={{
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    <div style={{
       minHeight: '100vh',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: '20px'
+      padding: '1.5rem',
+      position: 'relative',
+      overflowX: 'hidden',
+      background: 'radial-gradient(circle at 20% 20%, rgba(108,127,216,.55), transparent 45%), radial-gradient(circle at 82% 78%, rgba(122,94,199,.55), transparent 50%), linear-gradient(150deg, #6c7fd8 0%, #7a6bcf 45%, #7c4fb0 100%)'
     }}>
-      <div className="login-content">
-        <div className="login-card" style={{
-          background: 'white',
-          borderRadius: '12px',
-          padding: '40px',
-          boxShadow: '0 10px 40px rgba(0,0,0,0.1)',
-          width: '100%',
-          maxWidth: '400px'
+      {/* Background Orbs */}
+      <div style={{
+        position: 'fixed',
+        borderRadius: '50%',
+        filter: 'blur(60px)',
+        opacity: '.35',
+        pointerEvents: 'none',
+        zIndex: 0,
+        width: '340px',
+        height: '340px',
+        top: '-100px',
+        left: '-90px',
+        background: '#a6b4ff',
+        animation: 'driftA 14s ease-in-out infinite'
+      }}></div>
+      <div style={{
+        position: 'fixed',
+        borderRadius: '50%',
+        filter: 'blur(60px)',
+        opacity: '.35',
+        pointerEvents: 'none',
+        zIndex: 0,
+        width: '280px',
+        height: '280px',
+        bottom: '-90px',
+        right: '-70px',
+        background: '#5b3f9c',
+        animation: 'driftB 16s ease-in-out infinite'
+      }}></div>
+
+      <style>{`
+        @keyframes driftA {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          50% { transform: translate(40px, 30px) scale(1.1); }
+        }
+        @keyframes driftB {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          50% { transform: translate(-30px, -25px) scale(1.15); }
+        }
+        @keyframes shake {
+          10%, 90% { transform: translateX(-1px); }
+          20%, 80% { transform: translateX(2px); }
+          30%, 50%, 70% { transform: translateX(-4px); }
+          40%, 60% { transform: translateX(4px); }
+        }
+        @keyframes cardIn {
+          from { opacity: 0; transform: translateY(18px) scale(0.98); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
+
+      <div style={{
+        position: 'relative',
+        zIndex: 1,
+        width: '100%',
+        maxWidth: '400px',
+        background: '#fff',
+        borderRadius: '20px',
+        padding: 'clamp(1.8rem, 4vw, 2.6rem)',
+        boxShadow: '0 25px 60px -15px rgba(20,20,60,.45)',
+        animation: 'cardIn .7s cubic-bezier(.2,.9,.25,1) both',
+        transform: shake ? 'translateX(-4px)' : 'none',
+        transition: 'transform 0.1s'
+      }}>
+        {/* Logo / Brand */}
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          textAlign: 'center',
+          marginBottom: '2.2rem'
         }}>
-          <div className="login-logo" style={{ textAlign: 'center', marginBottom: '10px', height: '72px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{
+            width: '64px',
+            height: '64px',
+            marginBottom: '.9rem',
+            filter: 'drop-shadow(0 6px 14px rgba(40,57,107,.25))',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
             {schoolConfig?.logo_url ? (
               <img
                 src={`${API_BASE_URL.replace('/api', '')}${schoolConfig.logo_url}`}
                 alt="Logo Sekolah"
                 style={{
-                  maxWidth: '150px',
-                  maxHeight: '72px',
+                  maxWidth: '64px',
+                  maxHeight: '64px',
                   width: 'auto',
                   height: 'auto',
                   objectFit: 'contain'
                 }}
               />
             ) : (
-              <span style={{ color: '#667eea', fontSize: '48px', fontWeight: 'bold' }}>IPC</span>
+              <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" style={{ width: '64px', height: '64px' }}>
+                <circle cx="50" cy="50" r="44" stroke="#28396b" strokeWidth="2.2" fill="none"/>
+                <path d="M28 38 C 28 34, 34 32, 50 32 C 66 32, 72 34, 72 38 L 72 64 C 72 60, 66 58, 50 58 C 34 58, 28 60, 28 64 Z" stroke="#28396b" strokeWidth="2" fill="none"/>
+                <path d="M50 32 L50 58" stroke="#28396b" strokeWidth="1.6" fill="none"/>
+                <path d="M30 66 C 22 62, 20 50, 24 40 C 20 48, 22 58, 30 66 Z" stroke="#28396b" strokeWidth="1.6" fill="none"/>
+                <path d="M70 66 C 78 62, 80 50, 76 40 C 80 48, 78 58, 70 66 Z" stroke="#28396b" strokeWidth="1.6" fill="none"/>
+              </svg>
             )}
           </div>
-          <h2 style={{ color: '#333', textAlign: 'center', marginBottom: '5px' }}>School System</h2>
-          <p className="login-subtitle" style={{ color: '#666', textAlign: 'center', marginBottom: '25px' }}>Individual Point Card</p>
-          <div className="login-divider" style={{ color: '#ccc', textAlign: 'center', marginBottom: '25px' }}><span style={{ background: 'white', color: '#666', padding: '0 10px' }}>Pilih Tipe Akun</span></div>
+          <h1 style={{
+            fontFamily: 'Georgia, serif',
+            fontWeight: '600',
+            fontSize: '1.5rem',
+            margin: '0',
+            color: '#1c2333'
+          }}>
+            School System
+          </h1>
+          <p style={{
+            margin: '.25rem 0 0',
+            fontSize: '.86rem',
+            color: '#5b6478'
+          }}>
+            Individual Point Card
+          </p>
+        </div>
 
         {/* Tabs */}
-        <div style={{ display: 'flex', marginBottom: '20px', borderBottom: '1px solid #e0e0e0' }}>
-          <button
-            onClick={() => { setActiveTab('siswa'); setFormData({ username: '', password: '' }); setError(''); }}
-            style={{
-              flex: 1,
-              padding: '12px',
-              border: 'none',
-              background: 'transparent',
-              color: activeTab === 'siswa' ? '#667eea' : '#999',
-              fontWeight: '600',
-              cursor: 'pointer',
-              borderBottom: activeTab === 'siswa' ? '2px solid #667eea' : '2px solid transparent',
-              transition: 'all 0.2s'
-            }}
-          >
-            Siswa
-          </button>
-          <button
-            onClick={() => { setActiveTab('guru'); setFormData({ username: '', password: '' }); setError(''); }}
-            style={{
-              flex: 1,
-              padding: '12px',
-              border: 'none',
-              background: 'transparent',
-              color: activeTab === 'guru' ? '#667eea' : '#999',
-              fontWeight: '600',
-              cursor: 'pointer',
-              borderBottom: activeTab === 'guru' ? '2px solid #667eea' : '2px solid transparent',
-              transition: 'all 0.2s'
-            }}
-          >
-            Guru
-          </button>
-          <button
-            onClick={() => { setActiveTab('superadmin'); setFormData({ username: '', password: '' }); setError(''); }}
-            style={{
-              flex: 1,
-              padding: '12px',
-              border: 'none',
-              background: 'transparent',
-              color: activeTab === 'superadmin' ? '#667eea' : '#999',
-              fontWeight: '600',
-              cursor: 'pointer',
-              borderBottom: activeTab === 'superadmin' ? '2px solid #667eea' : '2px solid transparent',
-              transition: 'all 0.2s'
-            }}
-          >
-            SuperAdmin
-          </button>
+        <div style={{
+          display: 'flex',
+          marginBottom: '1.2rem',
+          borderBottom: '1px solid #e1ddd0'
+        }}>
+          {['siswa', 'guru', 'superadmin'].map((tab) => (
+            <button
+              key={tab}
+              onClick={() => handleTabChange(tab)}
+              style={{
+                flex: 1,
+                padding: '12px',
+                border: 'none',
+                background: 'transparent',
+                color: activeTab === tab ? '#354a86' : '#5b6478',
+                fontWeight: '600',
+                cursor: 'pointer',
+                borderBottom: activeTab === tab ? '2px solid #354a86' : '2px solid transparent',
+                transition: 'all 0.2s',
+                fontSize: '0.9rem',
+                textTransform: 'capitalize'
+              }}
+            >
+              {tab}
+            </button>
+          ))}
         </div>
-        
+
         {error && (
-          <div className="alert alert-danger" style={{ marginBottom: '16px' }}>
+          <div style={{
+            marginBottom: '1rem',
+            padding: '0.75rem',
+            background: '#fee',
+            border: '1px solid #fcc',
+            borderRadius: '8px',
+            color: '#c33',
+            fontSize: '0.9rem',
+            textAlign: 'center'
+          }}>
             {error}
           </div>
         )}
-        
-        <form onSubmit={handleSubmit}>
-          {activeTab === 'siswa' && (
-            <>
-              <div className="form-group">
-                <label>NIS</label>
-                <input
-                  type="text"
-                  name="username"
-                  value={formData.username}
-                  onChange={handleChange}
-                  placeholder="Masukkan User"
-                  required
-                  autoComplete="username"
-                />
-              </div>
-              <div className="form-group">
-                <label>Password</label>
-                <input
-                  type="password"
-                  name="password"
-                  value={formData.password}
-                  onChange={handleChange}
-                  placeholder="Masukkan password"
-                  required
-                  autoComplete="current-password"
-                />
-              </div>
-            </>
-          )}
 
-          {activeTab === 'guru' && (
-            <>
-              <div className="form-group">
-                <label>NIP</label>
-                <input
-                  type="text"
-                  name="username"
-                  value={formData.username}
-                  onChange={handleChange}
-                  placeholder="Masukkan User"
-                  required
-                  autoComplete="username"
-                />
-              </div>
-              <div className="form-group">
-                <label>Password</label>
-                <input
-                  type="password"
-                  name="password"
-                  value={formData.password}
-                  onChange={handleChange}
-                  placeholder="Masukkan password"
-                  required
-                  autoComplete="current-password"
-                />
-              </div>
-            </>
-          )}
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+          <div style={{ position: 'relative' }}>
+            <input
+              type="text"
+              name="username"
+              value={formData.username}
+              onChange={handleChange}
+              onFocus={() => setFocusedField('username')}
+              onBlur={() => setFocusedField(null)}
+              placeholder=" "
+              required
+              autoComplete="username"
+              style={{
+                width: '100%',
+                padding: '1.15rem .95rem .5rem',
+                fontFamily: 'Inter, sans-serif',
+                fontSize: '.98rem',
+                border: '1.5px solid #e1ddd0',
+                borderRadius: '10px',
+                background: '#fbfaf6',
+                color: '#1c2333',
+                outline: 'none',
+                transition: 'border-color .25s ease, box-shadow .25s ease',
+                borderColor: focusedField === 'username' || formData.username ? '#354a86' : '#e1ddd0',
+                boxShadow: focusedField === 'username' ? '0 0 0 4px rgba(53,74,134,.12)' : 'none'
+              }}
+            />
+            <label style={{
+              position: 'absolute',
+              left: '.95rem',
+              top: focusedField === 'username' || formData.username ? '.5rem' : '1.05rem',
+              fontSize: focusedField === 'username' || formData.username ? '.68rem' : '.98rem',
+              color: focusedField === 'username' || formData.username ? '#28396b' : '#5b6478',
+              pointerEvents: 'none',
+              transition: 'all .2s cubic-bezier(.4, 0, .2, 1)',
+              fontWeight: focusedField === 'username' || formData.username ? '600' : 'normal',
+              letterSpacing: focusedField === 'username' || formData.username ? '.03em' : 'normal',
+              transform: focusedField === 'username' || formData.username ? 'translateY(-2px)' : 'translateY(0)'
+            }}>
+              {activeTab === 'siswa' ? 'NIS' : activeTab === 'guru' ? 'NIP' : 'Username'}
+            </label>
+          </div>
 
-          {activeTab === 'superadmin' && (
-            <>
-              <div className="form-group">
-                <label>NIS (ADMIN001)</label>
-                <input
-                  type="text"
-                  name="username"
-                  value={formData.username}
-                  onChange={handleChange}
-                  placeholder="Masukkan User"
-                  required
-                  autoComplete="username"
-                />
-              </div>
-              <div className="form-group">
-                <label>Password</label>
-                <input
-                  type="password"
-                  name="password"
-                  value={formData.password}
-                  onChange={handleChange}
-                  placeholder="Masukkan password"
-                  required
-                  autoComplete="current-password"
-                />
-              </div>
-            </>
-          )}
+          <div style={{ position: 'relative' }}>
+            <input
+              type={showPassword ? 'text' : 'password'}
+              name="password"
+              value={formData.password}
+              onChange={handleChange}
+              onFocus={() => setFocusedField('password')}
+              onBlur={() => setFocusedField(null)}
+              placeholder=" "
+              required
+              autoComplete="current-password"
+              style={{
+                width: '100%',
+                padding: '1.15rem .95rem .5rem',
+                fontFamily: 'Inter, sans-serif',
+                fontSize: '.98rem',
+                border: '1.5px solid #e1ddd0',
+                borderRadius: '10px',
+                background: '#fbfaf6',
+                color: '#1c2333',
+                outline: 'none',
+                transition: 'border-color .25s ease, box-shadow .25s ease',
+                borderColor: focusedField === 'password' || formData.password ? '#354a86' : '#e1ddd0',
+                boxShadow: focusedField === 'password' ? '0 0 0 4px rgba(53,74,134,.12)' : 'none'
+              }}
+            />
+            <label style={{
+              position: 'absolute',
+              left: '.95rem',
+              top: focusedField === 'password' || formData.password ? '.5rem' : '1.05rem',
+              fontSize: focusedField === 'password' || formData.password ? '.68rem' : '.98rem',
+              color: focusedField === 'password' || formData.password ? '#28396b' : '#5b6478',
+              pointerEvents: 'none',
+              transition: 'all .2s cubic-bezier(.4, 0, .2, 1)',
+              fontWeight: focusedField === 'password' || formData.password ? '600' : 'normal',
+              letterSpacing: focusedField === 'password' || formData.password ? '.03em' : 'normal',
+              transform: focusedField === 'password' || formData.password ? 'translateY(-2px)' : 'translateY(0)'
+            }}>
+              Password
+            </label>
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              style={{
+                position: 'absolute',
+                right: '.7rem',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '.35rem',
+                color: '#5b6478',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'color .2s ease'
+              }}
+              onMouseEnter={(e) => e.target.style.color = '#28396b'}
+              onMouseLeave={(e) => e.target.style.color = '#5b6478'}
+            >
+              {showPassword ? (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" style={{ width: '18px', height: '18px' }}>
+                  <path d="M3 3l18 18M10.6 10.6a2 2 0 0 0 2.8 2.8M9.9 5.1A10.6 10.6 0 0 1 12 5c7 0 11 7 11 7a13.2 13.2 0 0 1-3.4 3.9M6.6 6.6C3.9 8.3 2 12 2 12s4 7 10 7c1.4 0 2.7-.3 3.9-.9"/>
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" style={{ width: '18px', height: '18px' }}>
+                  <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+              )}
+            </button>
+          </div>
 
           <button
             type="submit"
             disabled={loading}
             style={{
-              width: '100%',
-              marginTop: '8px',
-              padding: '12px',
-              background: '#667eea',
-              color: 'white',
+              position: 'relative',
+              marginTop: '.2rem',
+              padding: '.95rem 1rem',
               border: 'none',
-              borderRadius: '6px',
-              fontSize: '16px',
-              fontWeight: '600',
+              borderRadius: '10px',
+              background: 'linear-gradient(135deg, #6c7fd8, #28396b)',
+              color: '#fff',
+              fontFamily: 'Inter, sans-serif',
+              fontWeight: '700',
+              fontSize: '.98rem',
+              letterSpacing: '.02em',
               cursor: loading ? 'not-allowed' : 'pointer',
-              transition: 'background 0.2s'
+              overflow: 'hidden',
+              transition: 'transform .15s ease, box-shadow .25s ease',
+              boxShadow: '0 10px 22px rgba(53,74,134,.35)',
+              opacity: loading ? 0.7 : 1
+            }}
+            onMouseEnter={(e) => {
+              if (!loading) {
+                e.target.style.transform = 'translateY(-1px)';
+                e.target.style.boxShadow = '0 12px 26px rgba(53,74,134,.42)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.transform = 'translateY(0)';
+              e.target.style.boxShadow = '0 10px 22px rgba(53,74,134,.35)';
             }}
           >
-            {loading ? 'Loading...' : 'Login'}
+            <span style={{ display: 'inline-flex', visibility: loading ? 'hidden' : 'visible', alignItems: 'center', gap: '.5rem' }}>
+              Login
+            </span>
+            {loading && (
+              <span style={{
+                display: 'block',
+                position: 'absolute',
+                left: '50%',
+                top: '50%',
+                margin: '-8px 0 0 -8px',
+                width: '16px',
+                height: '16px',
+                borderRadius: '50%',
+                border: '2px solid rgba(255,255,255,.35)',
+                borderTopColor: '#fff',
+                animation: 'spin .7s linear infinite'
+              }}></span>
+            )}
           </button>
+
+          <p style={{
+            textAlign: 'center',
+            fontSize: '.85rem',
+            color: '#5b6478',
+            marginTop: '.4rem'
+          }}>
+            Butuh bantuan? <a href="https://chat.whatsapp.com/KXKKoHbVJzlE0ARqcBz1Cw" style={{ color: '#28396b', fontWeight: '600', textDecoration: 'none' }}>Hubungi admin sekolah</a>
+          </p>
         </form>
-        </div>
       </div>
     </div>
   );
