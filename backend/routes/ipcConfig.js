@@ -282,9 +282,13 @@ router.post('/', auth, superAdminOnly, async (req, res) => {
                 clearConfigCache();
                 return res.status(201).json((await getPelanggaranConfigs()).find(item => item.id === `detail-${result.insertId}`));
             }
+            const levelPoint = Number(point_value);
+            if (!Number.isFinite(levelPoint) || levelPoint >= 0) {
+                return res.status(400).json({ message: 'Point pelanggaran harus negatif (< 0)' });
+            }
             const [result] = await db.query(
                 'INSERT INTO ipc_pelanggaran_level (name, point_value, description, is_active) VALUES (?, ?, ?, ?)',
-                [field1, point_value, description || null, is_active !== undefined ? is_active : true]
+                [field1, levelPoint, description || null, is_active !== undefined ? is_active : true]
             );
             clearConfigCache();
             return res.status(201).json((await getPelanggaranConfigs()).find(item => item.id === `level-${result.insertId}`));
@@ -320,6 +324,12 @@ router.put('/:id', auth, superAdminOnly, async (req, res) => {
         const pelanggaranId = parsePelanggaranId(id);
         if (pelanggaranId) {
             const table = pelanggaranId.type === 'level' ? 'ipc_pelanggaran_level' : 'ipc_pelanggaran_detail';
+            if (pelanggaranId.type === 'level' && point_value !== undefined) {
+                const lvlPoint = Number(point_value);
+                if (!Number.isFinite(lvlPoint) || lvlPoint >= 0) {
+                    return res.status(400).json({ message: 'Point pelanggaran harus negatif (< 0)' });
+                }
+            }
             const fieldUpdates = pelanggaranId.type === 'level'
                 ? ['point_value = ?', 'description = ?', 'is_active = ?']
                 : ['is_active = ?'];
@@ -335,6 +345,15 @@ router.put('/:id', auth, superAdminOnly, async (req, res) => {
         const [existing] = await db.query('SELECT id, category, field1, field2, field3, point_value, description, is_active, created_at, updated_at, updated_by FROM ipc_config WHERE id = ?', [id]);
         if (existing.length === 0) {
             return res.status(404).json({ message: 'Configuration not found' });
+        }
+
+        // Point pelanggaran (termasuk baris legacy di ipc_config) harus negatif
+        const targetCategory = category || existing[0].category;
+        if (targetCategory === 'pelanggaran' && point_value !== undefined) {
+            const pv = Number(point_value);
+            if (!Number.isFinite(pv) || pv >= 0) {
+                return res.status(400).json({ message: 'Point pelanggaran harus negatif (< 0)' });
+            }
         }
         
         await db.query(`

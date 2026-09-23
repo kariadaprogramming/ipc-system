@@ -578,6 +578,12 @@ function KonfigurasiIPC() {
             <h3 style={{ marginBottom: 20 }}>Edit Konfigurasi</h3>
             <form onSubmit={(e) => {
               e.preventDefault();
+              // Point pelanggaran harus negatif (mengurangi IPC)
+              const pvRaw = e.target.point_value?.value;
+              if (activeCategory === 'pelanggaran' && pvRaw !== undefined && !(parseInt(pvRaw) < 0)) {
+                setMessage('Point pelanggaran harus negatif (< 0)');
+                return;
+              }
               handleUpdateConfig(editingConfig.id, {
                 field2: e.target.field2?.value || editingConfig.field2,
                 point_value: activeCategory === 'pelanggaran' && pelanggaranAddType === 'detail'
@@ -620,9 +626,13 @@ function KonfigurasiIPC() {
                   name="point_value"
                   defaultValue={editingConfig.point_value}
                   required
+                  {...(activeCategory === 'pelanggaran' ? { max: -1 } : {})}
                   className="form-control"
                   placeholder="Masukkan nilai point"
                 />
+                {activeCategory === 'pelanggaran' && (
+                  <small style={{ color: '#666', fontSize: '12px' }}>Point pelanggaran harus negatif karena mengurangi IPC</small>
+                )}
               </div>
               {!(activeCategory === 'pelanggaran' && editingConfig.field2) && <div className="form-group">
                 <label>Deskripsi</label>
@@ -694,6 +704,12 @@ function KonfigurasiIPC() {
             </p>
             <form onSubmit={(e) => {
               e.preventDefault();
+              // Point pelanggaran harus negatif (mengurangi IPC)
+              const pvRaw = e.target.point_value?.value;
+              if (activeCategory === 'pelanggaran' && pvRaw !== undefined && !(parseInt(pvRaw) < 0)) {
+                setMessage('Point pelanggaran harus negatif (< 0)');
+                return;
+              }
               handleAddConfig({
                 category: activeCategory,
                 field1: e.target.field1.value,
@@ -825,10 +841,14 @@ function KonfigurasiIPC() {
                   type="number"
                   name="point_value"
                   required
+                  {...(activeCategory === 'pelanggaran' ? { max: -1 } : {})}
                   className="form-control"
-                  placeholder="Masukkan nilai point"
+                  placeholder={activeCategory === 'pelanggaran' ? 'Contoh: -1, -5, -25' : 'Masukkan nilai point'}
                   style={{ fontSize: 14 }}
                 />
+                {activeCategory === 'pelanggaran' && (
+                  <small style={{ color: '#666', fontSize: '12px' }}>Point pelanggaran harus negatif karena mengurangi IPC</small>
+                )}
               </div>}
               {!(activeCategory === 'pelanggaran' && pelanggaranAddType === 'detail') && <div className="form-group" style={{ marginBottom: 20 }}>
                 <label style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 500 }}>Deskripsi</label>
