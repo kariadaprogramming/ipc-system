@@ -146,10 +146,6 @@ function Profile() {
           {user.role === 'siswa' && (
             <>
               <div className="form-group">
-                <label>Alamat</label>
-                <input type="text" value={editData.alamat || ''} onChange={(e) => setEditData({...editData, alamat: e.target.value})} />
-              </div>
-              <div className="form-group">
                 <label>No HP</label>
                 <input type="text" value={editData.no_hp || ''} onChange={(e) => setEditData({...editData, no_hp: e.target.value})} />
               </div>
@@ -158,17 +154,16 @@ function Profile() {
           {user.role === 'guru' && (
             <>
               <div className="form-group">
-                <label>Alamat</label>
-                <input type="text" value={editData.alamat || ''} onChange={(e) => setEditData({...editData, alamat: e.target.value})} />
-              </div>
-              <div className="form-group">
                 <label>No HP</label>
                 <input type="text" value={editData.no_hp || ''} onChange={(e) => setEditData({...editData, no_hp: e.target.value})} />
               </div>
               <div className="form-group">
                 <label>Jabatan</label>
-                <select value={editData.jabatan || editData.detail || ''} onChange={(e) => setEditData({...editData, jabatan: e.target.value})} required>
+                <select value={editData.jabatan || editData.detail || ''} onChange={(e) => setEditData({...editData, jabatan: e.target.value})}>
                   <option value="">Pilih Jabatan</option>
+                  {!JABATAN_OPTIONS.includes(editData.jabatan || editData.detail) && (editData.jabatan || editData.detail) ? (
+                    <option value={editData.jabatan || editData.detail}>{editData.jabatan || editData.detail} (lama)</option>
+                  ) : null}
                   {JABATAN_OPTIONS.map((jabatan) => (
                     <option key={jabatan} value={jabatan}>{jabatan}</option>
                   ))}
@@ -181,10 +176,6 @@ function Profile() {
               <div className="form-group">
                 <label>Nama</label>
                 <input type="text" value={editData.nama || ''} onChange={(e) => setEditData({...editData, nama: e.target.value})} />
-              </div>
-              <div className="form-group">
-                <label>Alamat</label>
-                <input type="text" value={editData.alamat || ''} onChange={(e) => setEditData({...editData, alamat: e.target.value})} />
               </div>
               <div className="form-group">
                 <label>No HP</label>
@@ -219,7 +210,6 @@ function Profile() {
           <p><strong>NIS:</strong> {profile?.nis || '-'}</p>
         )}
         <p><strong>Role:</strong> {profile?.role}</p>
-        <p><strong>Alamat:</strong> {profile?.alamat || '-'}</p>
         <p><strong>No HP:</strong> {profile?.no_hp || '-'}</p>
         <button className="btn btn-primary" onClick={() => setEditMode(true)} style={{ marginTop: '10px' }}>Edit Biodata</button>
       </>

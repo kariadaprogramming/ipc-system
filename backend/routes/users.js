@@ -563,13 +563,20 @@ router.put('/:id', auth, async (req, res) => {
         }
 
         const { nama, alamat, no_hp, jabatan, detail } = req.body;
-        const teacherJabatan = jabatan || detail;
-        if (teacherJabatan && !VALID_TEACHER_JABATAN.includes(teacherJabatan)) {
+
+        // Get current user data for logging (dan untuk validasi jabatan)
+        const [targetUserData] = await db.query('SELECT nama, role, detail FROM users WHERE id = ?', [userId]);
+        const storedJabatan = targetUserData[0]?.detail || null;
+
+        let teacherJabatan = jabatan || detail;
+        if (!teacherJabatan) {
+            // Tidak dikirim / kosong -> pertahankan nilai yang sudah ada
+            teacherJabatan = storedJabatan;
+        } else if (teacherJabatan !== storedJabatan && !VALID_TEACHER_JABATAN.includes(teacherJabatan)) {
+            // Hanya nilai BARU yang divalidasi; nilai lama (legacy) yang tidak
+            // diubah tetap diterima agar edit biodata lain tidak terkunci
             return res.status(400).json({ message: `Jabatan tidak valid. Gunakan: ${VALID_TEACHER_JABATAN.join(', ')}` });
         }
-
-        // Get current user data for logging
-        const [targetUserData] = await db.query('SELECT nama, role FROM users WHERE id = ?', [userId]);
 
         await db.query(
             'UPDATE users SET nama = ?, alamat = ?, no_hp = ?, detail = ? WHERE id = ?',
@@ -859,7 +866,7 @@ router.put('/:id/biodata', auth, superAdminOnly, async (req, res) => {
         const teacherJabatan = jabatan || detail;
 
         // Get user current data
-        const [user] = await db.query('SELECT nama, role FROM users WHERE id = ?', [userId]);
+        const [user] = await db.query('SELECT nama, role, detail FROM users WHERE id = ?', [userId]);
         if (user.length === 0) {
             return res.status(404).json({ message: 'User not found' });
         }
@@ -885,13 +892,16 @@ router.put('/:id/biodata', auth, superAdminOnly, async (req, res) => {
             // Log activity
             await logActivity(req.user.id, 'UPDATE_BIODATA_DIRECT', `SuperAdmin ${req.user.nama} directly updated biodata for student ${oldName} (${nis}) to ${nama}`, req.ip);
         } else if (role === 'guru') {
-            if (!VALID_TEACHER_JABATAN.includes(teacherJabatan)) {
+            const storedDetail = user[0].detail || null;
+            const newJabatan = teacherJabatan || storedDetail;
+            // Nilai BARU harus valid; nilai lama (legacy) yang tidak diubah tetap diterima
+            if (newJabatan && newJabatan !== storedDetail && !VALID_TEACHER_JABATAN.includes(newJabatan)) {
                 return res.status(400).json({ message: `Jabatan tidak valid. Gunakan: ${VALID_TEACHER_JABATAN.join(', ')}` });
             }
             // Update guru biodata
             await db.query(
                 'UPDATE users SET nama = ?, nip = ?, detail = ?, alamat = ?, no_hp = ? WHERE id = ?',
-                [nama, nip, teacherJabatan, alamat, no_hp, userId]
+                [nama, nip, newJabatan, alamat, no_hp, userId]
             );
 
             // Log activity

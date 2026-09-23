@@ -1521,6 +1521,9 @@ function KelolaAkun() {
                     <label>Jabatan</label>
                     <select value={formData.jabatan || ''} onChange={(e) => setFormData({...formData, jabatan: e.target.value})} required>
                       <option value="">Pilih Jabatan</option>
+                      {!JABATAN_OPTIONS.includes(formData.jabatan) && formData.jabatan ? (
+                        <option value={formData.jabatan}>{formData.jabatan} (lama)</option>
+                      ) : null}
                       {JABATAN_OPTIONS.map((jabatan) => (
                         <option key={jabatan} value={jabatan}>{jabatan}</option>
                       ))}
