@@ -1,5 +1,3 @@
-import API_BASE_URL from '../config';
-
 const UPLOAD_FOLDERS = {
     prestasi: 'prestasi',
     event: 'event',

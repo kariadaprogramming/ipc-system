@@ -15,7 +15,7 @@
 - **Automatic IP-based blocking** for excessive requests
 
 ### 3. SQL Injection Prevention
-- **Parameterized Queries**: All database queries use parameterized statements (mysql2/promise)
+- **Parameterized Queries**: All database queries use parameterized statements (node-postgres `pg` with `$1, $2, ...` placeholders)
 - **Input Validation**: Automatic SQL injection pattern detection
 - **Blocked Patterns**: SELECT, INSERT, UPDATE, DELETE, DROP, CREATE, ALTER, EXEC, UNION, etc.
 - **Escape Character Detection**: Automatic blocking of suspicious characters

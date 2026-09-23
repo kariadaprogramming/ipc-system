@@ -163,7 +163,7 @@ router.post('/organisasi-options', auth, superAdminOnly, async (req, res) => {
         const options = await getOrganisasiOptions();
         res.status(201).json(options.find(option => option.id === result.insertId));
     } catch (error) {
-        if (error.code === 'ER_DUP_ENTRY') return res.status(400).json({ message: 'Organisasi sudah terdaftar' });
+        if (error.code === '23505') return res.status(400).json({ message: 'Organisasi sudah terdaftar' });
         console.error('Error creating organisasi option:', error);
         res.status(500).json({ message: 'Server error' });
     }
@@ -209,7 +209,7 @@ router.post('/perilaku-characters', auth, superAdminOnly, async (req, res) => {
         const options = await getPerilakuCharacters();
         res.status(201).json(options.find(option => option.id === result.insertId));
     } catch (error) {
-        if (error.code === 'ER_DUP_ENTRY') return res.status(400).json({ message: 'Karakter sudah terdaftar' });
+        if (error.code === '23505') return res.status(400).json({ message: 'Karakter sudah terdaftar' });
         console.error('Error creating perilaku character:', error);
         res.status(500).json({ message: 'Server error' });
     }
@@ -255,7 +255,7 @@ router.post('/perilaku-ratings', auth, superAdminOnly, async (req, res) => {
         const options = await getPerilakuRatings();
         res.status(201).json(options.find(option => option.id === result.insertId));
     } catch (error) {
-        if (error.code === 'ER_DUP_ENTRY') return res.status(400).json({ message: 'Tingkat penilaian sudah terdaftar' });
+        if (error.code === '23505') return res.status(400).json({ message: 'Tingkat penilaian sudah terdaftar' });
         console.error('Error creating perilaku rating:', error);
         res.status(500).json({ message: 'Server error' });
     }
@@ -358,7 +358,7 @@ router.post('/', auth, superAdminOnly, async (req, res) => {
         res.status(201).json(newConfig[0]);
     } catch (error) {
         console.error('Error creating IPC configuration:', error);
-        if (error.code === 'ER_DUP_ENTRY') {
+        if (error.code === '23505') {
             return res.status(400).json({ message: 'Configuration with this category, field1, and field2 already exists' });
         }
         res.status(500).json({ message: 'Server error' });
@@ -411,7 +411,7 @@ router.put('/:id', auth, superAdminOnly, async (req, res) => {
         res.json(updatedConfig[0]);
     } catch (error) {
         console.error('Error updating IPC configuration:', error);
-        if (error.code === 'ER_DUP_ENTRY') {
+        if (error.code === '23505') {
             return res.status(400).json({ message: 'Configuration with this category, field1, and field2 already exists' });
         }
         res.status(500).json({ message: 'Server error' });

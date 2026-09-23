@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import Select from 'react-select';
 import EditModal from './EditModal';
 import useEditModal from '../hooks/useEditModal';
@@ -79,10 +79,7 @@ function InputOrganisasi() {
 
   const fetchOrganisasiOptions = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/ipc-config/organisasi-options', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/ipc-config/organisasi-options');
       setOrganisasiOptions(response.data.filter(option => option.is_active));
     } catch (error) {
       console.error('Error fetching organisasi options:', error);
@@ -91,10 +88,7 @@ function InputOrganisasi() {
 
   const fetchStudents = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/users?role=siswa&limit=500', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/users?role=siswa&limit=500');
       setStudents(response.data.users?.filter(user => user.role === 'siswa') || []);
     } catch (error) {
       console.error('Error fetching students:', error);
@@ -104,10 +98,7 @@ function InputOrganisasi() {
   const fetchAllOrganisasi = async () => {
     try {
       setLoadingIndex(true);
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/organisasi/all', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/organisasi/all');
       setAllOrganisasi(response.data);
     } catch (error) {
       console.error('Error fetching all organisasi:', error);
@@ -118,7 +109,6 @@ function InputOrganisasi() {
 
   const checkAccess = async () => {
     try {
-      const token = localStorage.getItem('token');
       const user = JSON.parse(localStorage.getItem('user') || '{}');
       
       // Superadmin always has access
@@ -128,9 +118,7 @@ function InputOrganisasi() {
         return;
       }
       
-      const response = await axios.get('/input-access/status/my-access', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/input-access/status/my-access');
       
       const canInputOrganisasi = response.data.organisasi;
       setHasAccess(canInputOrganisasi);
@@ -148,10 +136,7 @@ function InputOrganisasi() {
 
   const fetchUserSubmissions = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/approvals-v2/user-submissions', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/approvals-v2/user-submissions');
       setSubmissions(response.data.organisasi || []);
     } catch (error) {
       console.error('Error fetching submissions:', error);
@@ -160,10 +145,7 @@ function InputOrganisasi() {
 
   const fetchIpcConfig = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/ipc-config/active', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/ipc-config/active');
       setIpcConfig(response.data);
     } catch (error) {
       console.error('Error fetching IPC config:', error);
@@ -232,10 +214,7 @@ function InputOrganisasi() {
 
   const fetchStudentData = async (nis) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`/users/nis/${nis}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get(`/users/nis/${nis}`);
       
       if (response.data) {
         setFormData(prev => ({
@@ -254,10 +233,7 @@ function InputOrganisasi() {
 
   const fetchStudentDataByName = async (nama) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`/users/nama/${nama}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get(`/users/nama/${nama}`);
       
       if (response.data) {
         setFormData(prev => ({
@@ -284,7 +260,6 @@ function InputOrganisasi() {
     setLoading(true);
 
     try {
-      const token = localStorage.getItem('token');
       const data = new FormData();
       Object.keys(formData).forEach(key => {
         data.append(key, formData[key]);
@@ -297,12 +272,7 @@ function InputOrganisasi() {
         data.append('foto', fileToUpload);
       }
 
-      await axios.post('/approvals-v2/organisasi/submit', data, {
-        headers: { 
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data'
-        }
-      });
+      await api.post('/approvals-v2/organisasi/submit', data);
 
       setMessage(userRole === 'superadmin' ? 'Organisasi berhasil ditambahkan!' : 'Organisasi berhasil diajukan untuk persetujuan!');
       if (userRole === 'superadmin') {
@@ -337,10 +307,7 @@ function InputOrganisasi() {
     }
 
     try {
-      const token = localStorage.getItem('token');
-      await axios.delete(`/organisasi/${id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.delete(`/organisasi/${id}`);
       setMessage('Organisasi berhasil dihapus!');
       fetchAllOrganisasi();
     } catch (error) {
@@ -355,7 +322,6 @@ function InputOrganisasi() {
   const handleUpdate = async () => {
     editModal.setIsLoading(true);
     try {
-      const token = localStorage.getItem('token');
       const data = new FormData();
       Object.keys(editModal.editFormData).forEach(key => {
         if (key !== 'id' && key !== 'created_at' && key !== 'status' && key !== 'user_id') {
@@ -369,12 +335,7 @@ function InputOrganisasi() {
         data.append('foto', fileToUpload);
       }
 
-      await axios.put(`/organisasi/${editModal.editingItem.id}`, data, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data'
-        }
-      });
+      await api.put(`/organisasi/${editModal.editingItem.id}`, data);
 
       setMessage('Organisasi berhasil diperbarui!');
       fetchAllOrganisasi();

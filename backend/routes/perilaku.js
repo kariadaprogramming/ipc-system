@@ -113,7 +113,7 @@ router.post('/', auth, checkInputAccess('perilaku'), async (req, res) => {
         // Log activity
         await logActivity(req.user.id, 'SUBMIT_PERILAKU', `User ${req.user.nama} (${req.user.role}) submitted perilaku for ${nama} (${nis}): ${karakter}`, req.ip);
 
-        const [superadmins] = await db.query('SELECT id FROM users WHERE role = "superadmin"');
+        const [superadmins] = await db.query("SELECT id FROM users WHERE role = 'superadmin'");
         for (const admin of superadmins) {
             await db.query(
                 `INSERT INTO notifications (user_id, type, title, message, related_id, related_type)

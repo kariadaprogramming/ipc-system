@@ -393,7 +393,7 @@ router.get('/:id', auth, async (req, res) => {
                 SELECT u.nama as wali_kelas_nama, u.nip as wali_kelas_nip
                 FROM wali_kelas_assignment wka
                 JOIN users u ON wka.guru_id = u.id
-                WHERE wka.kelas = ? AND wka.tahun_ajaran = YEAR(CURDATE())
+                WHERE wka.kelas = ? AND SPLIT_PART(wka.tahun_ajaran, '-', 1)::INT = EXTRACT(YEAR FROM CURRENT_DATE)::INT
                 ORDER BY wka.id DESC
                 LIMIT 1
             `, [user.kelas]);
@@ -436,7 +436,7 @@ router.post('/create-student', auth, teacherOrSuperAdmin, async (req, res) => {
 
         // Check for duplicate in pending approvals
         const [existingApproval] = await db.query(
-            'SELECT id FROM student_creation_approvals WHERE nis = ? AND superadmin_status = "pending"',
+            "SELECT id FROM student_creation_approvals WHERE nis = ? AND superadmin_status = 'pending'",
             [nis]
         );
 
@@ -477,12 +477,12 @@ router.post('/create-student', auth, teacherOrSuperAdmin, async (req, res) => {
 
         // If Guru, create approval request
         const [result] = await db.query(
-            'INSERT INTO student_creation_approvals (nama, nis, kelas, grha, jurusan, password, tahun_pelajaran, requested_by, superadmin_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, "pending")',
+            "INSERT INTO student_creation_approvals (nama, nis, kelas, grha, jurusan, password, tahun_pelajaran, requested_by, superadmin_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')",
             [nama, nis, calculatedClass, grha, jurusan, hashedPassword, tahun_pelajaran, req.user.id]
         );
 
         // Notify superadmin
-        const [superadmins] = await db.query('SELECT id FROM users WHERE role = "superadmin"');
+        const [superadmins] = await db.query("SELECT id FROM users WHERE role = 'superadmin'");
         for (const admin of superadmins) {
             await db.query(
                 `INSERT INTO notifications (user_id, type, title, message, related_id, related_type) 
@@ -594,7 +594,7 @@ async function deleteUserAndDependencies(conn, userId) {
         } catch (e) {
             // Some installations/older schemas may not have certain columns (e.g. pembina_id).
             // In that case we retry with a simpler query instead of failing deletion.
-            if (e && e.code === 'ER_BAD_FIELD_ERROR') {
+            if (e && (e.code === 'ER_BAD_FIELD_ERROR' || e.code === '42703')) {
                 return false;
             }
             throw e;
@@ -768,7 +768,7 @@ router.post('/:id/biodata-request', auth, async (req, res) => {
         );
         
         // Notify superadmin
-        const [superadmins] = await db.query('SELECT id FROM users WHERE role = "superadmin"');
+        const [superadmins] = await db.query("SELECT id FROM users WHERE role = 'superadmin'");
         for (const admin of superadmins) {
             await db.query(
                 `INSERT INTO notifications (user_id, type, title, message, related_id, related_type) 

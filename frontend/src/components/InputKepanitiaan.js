@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import Select from 'react-select';
 import EditModal from './EditModal';
 import useEditModal from '../hooks/useEditModal';
@@ -73,10 +73,7 @@ function InputKepanitiaan() {
   const fetchAllKepanitiaan = async () => {
     try {
       setLoadingIndex(true);
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/kepanitiaan/all', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/kepanitiaan/all');
       setAllKepanitiaan(response.data);
     } catch (error) {
       console.error('Error fetching all kepanitiaan:', error);
@@ -87,7 +84,6 @@ function InputKepanitiaan() {
 
   const checkAccess = async () => {
     try {
-      const token = localStorage.getItem('token');
       const user = JSON.parse(localStorage.getItem('user') || '{}');
       
       // Superadmin always has access
@@ -97,9 +93,7 @@ function InputKepanitiaan() {
         return;
       }
       
-      const response = await axios.get('/input-access/status/my-access', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/input-access/status/my-access');
       
       const canInputKepanitiaan = response.data.kepanitiaan;
       setHasAccess(canInputKepanitiaan);
@@ -117,10 +111,7 @@ function InputKepanitiaan() {
 
   const fetchUserSubmissions = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/approvals-v2/user-submissions', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/approvals-v2/user-submissions');
       setSubmissions(response.data.kepanitiaan || []);
     } catch (error) {
       console.error('Error fetching submissions:', error);
@@ -129,10 +120,7 @@ function InputKepanitiaan() {
 
   const fetchIpcConfig = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/ipc-config/active', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/ipc-config/active');
       setIpcConfig(response.data);
     } catch (error) {
       console.error('Error fetching IPC config:', error);
@@ -141,10 +129,7 @@ function InputKepanitiaan() {
 
   const fetchStudents = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/users?role=siswa&limit=500', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/users?role=siswa&limit=500');
       const studentList = response.data.users?.filter(user => user.role === 'siswa') || [];
       setStudents(studentList);
     } catch (error) {
@@ -210,10 +195,7 @@ function InputKepanitiaan() {
 
   const fetchStudentData = async (nis) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`/users/nis/${nis}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get(`/users/nis/${nis}`);
       
       if (response.data) {
         setFormData(prev => ({
@@ -232,10 +214,7 @@ function InputKepanitiaan() {
 
   const fetchStudentDataByName = async (nama) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`/users/nama/${nama}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get(`/users/nama/${nama}`);
       
       if (response.data) {
         setFormData(prev => ({
@@ -262,7 +241,6 @@ function InputKepanitiaan() {
     setLoading(true);
 
     try {
-      const token = localStorage.getItem('token');
       const data = new FormData();
       Object.keys(formData).forEach(key => {
         data.append(key, formData[key]);
@@ -275,12 +253,7 @@ function InputKepanitiaan() {
         data.append('foto', fileToUpload);
       }
 
-      await axios.post('/approvals-v2/kepanitiaan/submit', data, {
-        headers: { 
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data'
-        }
-      });
+      await api.post('/approvals-v2/kepanitiaan/submit', data);
 
       setMessage(userRole === 'superadmin' ? 'Kepanitiaan berhasil ditambahkan!' : 'Kepanitiaan berhasil diajukan untuk persetujuan!');
       if (userRole === 'superadmin') {
@@ -315,10 +288,7 @@ function InputKepanitiaan() {
     }
 
     try {
-      const token = localStorage.getItem('token');
-      await axios.delete(`/kepanitiaan/${id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.delete(`/kepanitiaan/${id}`);
       setMessage('Kepanitiaan berhasil dihapus!');
       fetchAllKepanitiaan();
     } catch (error) {
@@ -333,7 +303,6 @@ function InputKepanitiaan() {
   const handleUpdate = async () => {
     editModal.setIsLoading(true);
     try {
-      const token = localStorage.getItem('token');
       const data = new FormData();
       Object.keys(editModal.editFormData).forEach(key => {
         if (key !== 'id' && key !== 'created_at' && key !== 'status' && key !== 'user_id') {
@@ -347,12 +316,7 @@ function InputKepanitiaan() {
         data.append('foto', fileToUpload);
       }
 
-      await axios.put(`/kepanitiaan/${editModal.editingItem.id}`, data, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data'
-        }
-      });
+      await api.put(`/kepanitiaan/${editModal.editingItem.id}`, data);
 
       setMessage('Kepanitiaan berhasil diperbarui!');
       fetchAllKepanitiaan();

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 
 function KonfigurasiIPC() {
   const [configs, setConfigs] = useState([]);
@@ -37,10 +37,7 @@ function KonfigurasiIPC() {
 
   const fetchOrganisasiOptions = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/ipc-config/organisasi-options', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/ipc-config/organisasi-options');
       setOrganisasiOptions(response.data);
     } catch (error) {
       console.error('Error fetching organisasi options:', error);
@@ -50,10 +47,7 @@ function KonfigurasiIPC() {
 
   const fetchPerilakuRatings = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/ipc-config/perilaku-ratings', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/ipc-config/perilaku-ratings');
       if (!Array.isArray(response.data)) {
         throw new Error('Invalid perilaku rating response');
       }
@@ -68,10 +62,7 @@ function KonfigurasiIPC() {
     event.preventDefault();
     try {
       setSaving(true);
-      const token = localStorage.getItem('token');
-      await axios.post('/ipc-config/perilaku-ratings', { name: perilakuRatingName }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.post('/ipc-config/perilaku-ratings', { name: perilakuRatingName });
       setPerilakuRatingName('');
       setMessage('Tingkat penilaian berhasil ditambahkan!');
       await fetchPerilakuRatings();
@@ -85,10 +76,7 @@ function KonfigurasiIPC() {
   const deletePerilakuRating = async (rating) => {
     if (!window.confirm(`Hapus tingkat penilaian ${rating.name}?`)) return;
     try {
-      const token = localStorage.getItem('token');
-      await axios.delete(`/ipc-config/perilaku-ratings/${rating.id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.delete(`/ipc-config/perilaku-ratings/${rating.id}`);
       setMessage('Tingkat penilaian berhasil dihapus!');
       fetchPerilakuRatings();
     } catch (error) {
@@ -100,10 +88,7 @@ function KonfigurasiIPC() {
     event.preventDefault();
     try {
       setSaving(true);
-      const token = localStorage.getItem('token');
-      await axios.post('/ipc-config/organisasi-options', { name: organisasiName }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.post('/ipc-config/organisasi-options', { name: organisasiName });
       setOrganisasiName('');
       setMessage('Organisasi berhasil ditambahkan!');
       fetchOrganisasiOptions();
@@ -117,10 +102,7 @@ function KonfigurasiIPC() {
   const deleteOrganisasiOption = async (option) => {
     if (!window.confirm(`Hapus organisasi ${option.name}?`)) return;
     try {
-      const token = localStorage.getItem('token');
-      await axios.delete(`/ipc-config/organisasi-options/${option.id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.delete(`/ipc-config/organisasi-options/${option.id}`);
       setMessage('Organisasi berhasil dihapus!');
       fetchOrganisasiOptions();
     } catch (error) {
@@ -131,10 +113,7 @@ function KonfigurasiIPC() {
   const fetchConfigs = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/ipc-config/all', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/ipc-config/all');
       setConfigs(response.data);
     } catch (error) {
       console.error('Error fetching IPC configurations:', error);
@@ -147,10 +126,7 @@ function KonfigurasiIPC() {
   const handleUpdateConfig = async (configId, updatedData) => {
     try {
       setSaving(true);
-      const token = localStorage.getItem('token');
-      await axios.put(`/ipc-config/${configId}`, updatedData, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.put(`/ipc-config/${configId}`, updatedData);
       setMessage('Konfigurasi berhasil diperbarui!');
       setShowEditModal(false);
       setEditingConfig(null);
@@ -165,10 +141,7 @@ function KonfigurasiIPC() {
   const handleAddConfig = async (newData) => {
     try {
       setSaving(true);
-      const token = localStorage.getItem('token');
-      await axios.post('/ipc-config', newData, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.post('/ipc-config', newData);
       setMessage('Konfigurasi berhasil ditambahkan!');
       setShowAddModal(false);
       fetchConfigs();
@@ -183,10 +156,7 @@ function KonfigurasiIPC() {
     if (!window.confirm('Apakah Anda yakin ingin menghapus konfigurasi ini?')) return;
 
     try {
-      const token = localStorage.getItem('token');
-      await axios.delete(`/ipc-config/${configId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.delete(`/ipc-config/${configId}`);
       setMessage('Konfigurasi berhasil dihapus!');
       fetchConfigs();
     } catch (error) {
@@ -196,10 +166,7 @@ function KonfigurasiIPC() {
 
   const handleToggleActive = async (configId, currentStatus) => {
     try {
-      const token = localStorage.getItem('token');
-      await axios.put(`/ipc-config/${configId}`, { is_active: !currentStatus }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.put(`/ipc-config/${configId}`, { is_active: !currentStatus });
       setMessage(`Konfigurasi berhasil ${!currentStatus ? 'diaktifkan' : 'dinonaktifkan'}!`);
       fetchConfigs();
     } catch (error) {
@@ -213,10 +180,7 @@ function KonfigurasiIPC() {
 
     try {
       setSaving(true);
-      const token = localStorage.getItem('token');
-      await axios.delete(`/ipc-config/all/${activeCategory}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.delete(`/ipc-config/all/${activeCategory}`);
       setMessage(`Semua konfigurasi ${categoryLabel} berhasil dihapus!`);
       fetchConfigs();
     } catch (error) {

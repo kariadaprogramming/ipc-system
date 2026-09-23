@@ -4,7 +4,7 @@ IPC SCHOOL SYSTEM - DOKUMENTASI & FLOWCHART
 
 Dibuat: 8 Mei 2026
 Sistem: IPC School System v1.0
-Deskripsi: Sistem Indeks Prestasi dan Karakter Sekolah
+Deskripsi: Sistem Individual Point Card Siswa
 
 ================================================================================
 DAFTAR FILE DOKUMENTASI
@@ -21,7 +21,7 @@ DAFTAR FILE DOKUMENTASI
 
 📄 2. REQUIREMENTS.md  
    - System requirements (minimum & recommended)
-   - Software prerequisites (Node.js, MySQL, npm)
+   - Software prerequisites (Node.js, PostgreSQL, npm)
    - Step-by-step installation guide
    - Dependencies list
    - Environment configuration
@@ -122,7 +122,7 @@ KEBUTUHAN SISTEM
 
 Software:
 - Node.js 16.x atau higher
-- MySQL 8.0 atau higher (atau XAMPP)
+- PostgreSQL 14 atau higher (installer EDB sudah termasuk pgAdmin 4)
 - npm 8.x atau higher
 - Browser modern (Chrome/Firefox/Edge)
 
@@ -151,16 +151,16 @@ INSTALLASI CEPAT
 ================================================================================
 
 1. Install Node.js dari https://nodejs.org
-2. Install XAMPP dari https://www.apachefriends.org
-3. Jalankan XAMPP, start Apache & MySQL
-4. Buka phpMyAdmin, buat database "ipc_school"
-5. Import file: backend/database/skema.sql
+2. Install PostgreSQL dari https://www.postgresql.org/download/
+   (Windows: installer EDB, ingat password user postgres)
+3. Verifikasi server jalan: pg_isready (harusnya: accepting connections)
 
-Backend:
+Backend (otomatis buat database + impor skema):
 cd backend
 npm install
 copy .env.example .env
-# Edit .env: isi DB_PASSWORD dan JWT_SECRET
+# Edit .env: isi DB_PASSWORD (password postgres) dan JWT_SECRET
+npm run db:setup
 npm start
 
 Frontend:

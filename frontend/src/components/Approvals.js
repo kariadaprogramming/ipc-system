@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 
 function Approvals() {
   const [approvals, setApprovals] = useState([]);
@@ -13,10 +13,7 @@ function Approvals() {
 
   const fetchApprovals = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/approvals-v2/all', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/approvals-v2/all');
       setApprovals(response.data);
     } catch (error) {
       console.error('Error fetching approvals:', error);
@@ -27,10 +24,7 @@ function Approvals() {
 
   const fetchPendingCount = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/approvals-v2/pending-count', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/approvals-v2/pending-count');
       setPendingCount(response.data.total || 0);
     } catch (error) {
       console.error('Error fetching pending count:', error);
@@ -39,7 +33,6 @@ function Approvals() {
 
   const handleApprove = async (item) => {
     try {
-      const token = localStorage.getItem('token');
       let endpoint = '';
 
       switch(item.type) {
@@ -65,9 +58,7 @@ function Approvals() {
           return;
       }
 
-      await axios.put(endpoint, { status: 'approved' }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.put(endpoint, { status: 'approved' });
 
       alert('Berhasil diapprove!');
       fetchApprovals();
@@ -82,7 +73,6 @@ function Approvals() {
     if (!reason) return;
 
     try {
-      const token = localStorage.getItem('token');
       let endpoint = '';
 
       switch(item.type) {
@@ -108,9 +98,7 @@ function Approvals() {
           return;
       }
 
-      await axios.put(endpoint, { status: 'rejected', notes: reason }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.put(endpoint, { status: 'rejected', notes: reason });
 
       alert('Berhasil direject!');
       fetchApprovals();

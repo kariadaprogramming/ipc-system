@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import API_BASE_URL from '../config';
 
 const PAGE_BG = "#f8fafc";
@@ -22,15 +22,9 @@ function Leaderboard() {
   const fetchLeaderboardData = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-      
       const [akademikRes, nonAkademikRes] = await Promise.all([
-        axios.get('/search/leaderboard/akademik', {
-          headers: { Authorization: `Bearer ${token}` }
-        }),
-        axios.get('/search/leaderboard/nonakademik', {
-          headers: { Authorization: `Bearer ${token}` }
-        })
+        api.get('/search/leaderboard/akademik'),
+        api.get('/search/leaderboard/nonakademik')
       ]);
 
       setAkademikData(akademikRes.data);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import EditModal from './EditModal';
 import useEditModal from '../hooks/useEditModal';
 import API_BASE_URL from '../config';
@@ -69,10 +69,7 @@ function InputPelanggaran() {
   const fetchAllPelanggaran = async () => {
     try {
       setLoadingIndex(true);
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/pelanggaran/all', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/pelanggaran/all');
       setAllPelanggaran(response.data);
     } catch (error) {
       console.error('Error fetching all pelanggaran:', error);
@@ -83,10 +80,7 @@ function InputPelanggaran() {
 
   const fetchIpcConfig = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/ipc-config/active', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/ipc-config/active');
       setIpcConfig(response.data);
       const firstDetail = (response.data.pelanggaran || []).find(config => config.field2);
       if (firstDetail) {
@@ -100,10 +94,7 @@ function InputPelanggaran() {
 
   const fetchStudents = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/users?role=siswa&limit=500', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/users?role=siswa&limit=500');
       const studentList = response.data.users?.filter(user => user.role === 'siswa') || [];
       setStudents(studentList);
     } catch (error) {
@@ -113,10 +104,7 @@ function InputPelanggaran() {
 
   const fetchUserSubmissions = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/approvals-v2/user-submissions', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/approvals-v2/user-submissions');
       setSubmissions(response.data.pelanggaran || []);
     } catch (error) {
       console.error('Error fetching submissions:', error);
@@ -202,10 +190,7 @@ function InputPelanggaran() {
 
   const fetchStudentData = async (nis) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`/users/nis/${nis}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get(`/users/nis/${nis}`);
       
       if (response.data) {
         setFormData(prev => ({
@@ -224,10 +209,7 @@ function InputPelanggaran() {
 
   const fetchStudentDataByName = async (nama) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`/users/nama/${nama}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get(`/users/nama/${nama}`);
       
       if (response.data) {
         setFormData(prev => ({
@@ -254,7 +236,6 @@ function InputPelanggaran() {
     setLoading(true);
 
     try {
-      const token = localStorage.getItem('token');
       const data = new FormData();
       Object.keys(formData).forEach(key => {
         data.append(key, formData[key]);
@@ -267,12 +248,7 @@ function InputPelanggaran() {
         data.append('foto', fileToUpload);
       }
 
-      await axios.post('/approvals-v2/pelanggaran/submit', data, {
-        headers: { 
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data'
-        }
-      });
+      await api.post('/approvals-v2/pelanggaran/submit', data);
 
       setMessage(userRole === 'superadmin' ? 'Pelanggaran berhasil ditambahkan!' : 'Pelanggaran berhasil diajukan untuk persetujuan!');
       if (userRole === 'superadmin') {
@@ -307,10 +283,7 @@ function InputPelanggaran() {
     }
 
     try {
-      const token = localStorage.getItem('token');
-      await axios.delete(`/pelanggaran/${id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.delete(`/pelanggaran/${id}`);
       setMessage('Pelanggaran berhasil dihapus!');
       fetchAllPelanggaran();
     } catch (error) {
@@ -325,7 +298,6 @@ function InputPelanggaran() {
   const handleUpdate = async () => {
     editModal.setIsLoading(true);
     try {
-      const token = localStorage.getItem('token');
       const data = new FormData();
       Object.keys(editModal.editFormData).forEach(key => {
         if (key !== 'id' && key !== 'created_at' && key !== 'status' && key !== 'user_id') {
@@ -339,12 +311,7 @@ function InputPelanggaran() {
         data.append('foto', fileToUpload);
       }
 
-      await axios.put(`/pelanggaran/${editModal.editingItem.id}`, data, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data'
-        }
-      });
+      await api.put(`/pelanggaran/${editModal.editingItem.id}`, data);
 
       setMessage('Pelanggaran berhasil diperbarui!');
       fetchAllPelanggaran();

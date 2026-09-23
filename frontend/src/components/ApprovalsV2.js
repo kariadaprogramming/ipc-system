@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import API_BASE_URL from '../config';
 
 function ApprovalsV2() {
@@ -39,17 +39,10 @@ function ApprovalsV2() {
 
   const fetchApprovals = async () => {
     try {
-      const token = localStorage.getItem('token');
       const [approvalsRes, biodataRes, studentCreationRes] = await Promise.all([
-        axios.get('/approvals-v2/all', {
-          headers: { Authorization: `Bearer ${token}` }
-        }),
-        axios.get('/users/biodata-approvals', {
-          headers: { Authorization: `Bearer ${token}` }
-        }),
-        axios.get('/users/student-creation-approvals', {
-          headers: { Authorization: `Bearer ${token}` }
-        })
+        api.get('/approvals-v2/all'),
+        api.get('/users/biodata-approvals'),
+        api.get('/users/student-creation-approvals')
       ]);
       setApprovals({
         ...approvalsRes.data,
@@ -66,28 +59,20 @@ function ApprovalsV2() {
 
   const handleApprove = async (type, id) => {
     try {
-      const token = localStorage.getItem('token');
-      
       if (type === 'biodata') {
-        await axios.put(`/users/biodata-approvals/${id}`, {
+        await api.put(`/users/biodata-approvals/${id}`, {
           status: 'approved',
           notes: notes || 'Disetujui'
-        }, {
-          headers: { Authorization: `Bearer ${token}` }
         });
       } else if (type === 'student_creation') {
-        await axios.put(`/users/student-creation-approvals/${id}`, {
+        await api.put(`/users/student-creation-approvals/${id}`, {
           status: 'approved',
           notes: notes || 'Disetujui'
-        }, {
-          headers: { Authorization: `Bearer ${token}` }
         });
       } else {
-        await axios.put(`/approvals-v2/superadmin/${type}/${id}`, {
+        await api.put(`/approvals-v2/superadmin/${type}/${id}`, {
           status: 'approved',
           notes: notes || 'Disetujui'
-        }, {
-          headers: { Authorization: `Bearer ${token}` }
         });
       }
       
@@ -112,28 +97,20 @@ function ApprovalsV2() {
 
   const handleReject = async (type, id) => {
     try {
-      const token = localStorage.getItem('token');
-      
       if (type === 'biodata') {
-        await axios.put(`/users/biodata-approvals/${id}`, {
+        await api.put(`/users/biodata-approvals/${id}`, {
           status: 'rejected',
           notes: notes || 'Ditolak'
-        }, {
-          headers: { Authorization: `Bearer ${token}` }
         });
       } else if (type === 'student_creation') {
-        await axios.put(`/users/student-creation-approvals/${id}`, {
+        await api.put(`/users/student-creation-approvals/${id}`, {
           status: 'rejected',
           notes: notes || 'Ditolak'
-        }, {
-          headers: { Authorization: `Bearer ${token}` }
         });
       } else {
-        await axios.put(`/approvals-v2/superadmin/${type}/${id}`, {
+        await api.put(`/approvals-v2/superadmin/${type}/${id}`, {
           status: 'rejected',
           notes: notes || 'Ditolak'
-        }, {
-          headers: { Authorization: `Bearer ${token}` }
         });
       }
       

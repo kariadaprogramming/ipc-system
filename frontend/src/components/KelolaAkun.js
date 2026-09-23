@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
 import StudentDetail from './StudentDetail';
@@ -75,7 +75,6 @@ function KelolaAkun() {
   const fetchUsers = async (page = 1) => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
       const params = new URLSearchParams({
         page: page,
         limit: pagination.limit,
@@ -84,9 +83,7 @@ function KelolaAkun() {
 
       if (filters.role) params.append('role', filters.role);
 
-      const response = await axios.get(`/users?${params.toString()}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get(`/users?${params.toString()}`);
 
       setUsers(response.data.users || []);
       setPagination(response.data.pagination || {
@@ -114,10 +111,7 @@ function KelolaAkun() {
   const handleCreateStudent = async (e) => {
     e.preventDefault();
     try {
-      const token = localStorage.getItem('token');
-      await axios.post('/users/create-student', formData, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.post('/users/create-student', formData);
       setMessage('Akun siswa berhasil dibuat!');
       setShowCreateModal(false);
       setFormData({});
@@ -130,10 +124,7 @@ function KelolaAkun() {
   const handleCreateTeacher = async (e) => {
     e.preventDefault();
     try {
-      const token = localStorage.getItem('token');
-      await axios.post('/users/create-teacher', formData, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.post('/users/create-teacher', formData);
       setMessage('Akun guru berhasil dibuat!');
       setShowCreateModal(false);
       setFormData({});
@@ -147,10 +138,7 @@ function KelolaAkun() {
     if (!window.confirm('Apakah Anda yakin ingin menghapus akun ini?')) return;
     
     try {
-      const token = localStorage.getItem('token');
-      await axios.delete(`/users/${userId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.delete(`/users/${userId}`);
       setMessage('Akun berhasil dihapus!');
       fetchUsers();
     } catch (error) {
@@ -170,10 +158,7 @@ function KelolaAkun() {
     }
 
     try {
-      const token = localStorage.getItem('token');
-      await axios.post('/users/bulk-delete', { user_ids: selectedIds }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.post('/users/bulk-delete', { user_ids: selectedIds });
       setMessage(`Berhasil menghapus ${selectedIds.length} akun`);
       setSelectedIds([]);
       setSelectionRole(null);
@@ -255,19 +240,13 @@ function KelolaAkun() {
   const handleUpdateUser = async (e) => {
     e.preventDefault();
     try {
-      const token = localStorage.getItem('token');
-      
       if (userRole === 'guru' && editStudent.role === 'siswa') {
         // Guru needs approval to update student biodata
-        await axios.post(`/users/${editStudent.id}/biodata-request`, formData, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        await api.post(`/users/${editStudent.id}/biodata-request`, formData);
         setMessage('Permintaan update biodata berhasil diajukan, menunggu persetujuan SuperAdmin!');
       } else {
         // SuperAdmin updates directly
-        await axios.put(`/users/${editStudent.id}/biodata`, formData, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        await api.put(`/users/${editStudent.id}/biodata`, formData);
         setMessage(`Data ${editStudent.role === 'siswa' ? 'siswa' : 'guru'} berhasil diupdate!`);
       }
       
@@ -300,8 +279,6 @@ function KelolaAkun() {
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
       const jsonData = XLSX.utils.sheet_to_json(worksheet);
-
-      const token = localStorage.getItem('token');
 
       for (const row of jsonData) {
         try {
@@ -380,9 +357,7 @@ function KelolaAkun() {
               password: getRowField(row, 'password', 'Password') || '123456'
             };
 
-            await axios.post('/users/create-student', studentData, {
-              headers: { Authorization: `Bearer ${token}` }
-            });
+            await api.post('/users/create-student', studentData);
             results.push({ 
               status: 'success', 
               name: studentData.nama, 
@@ -410,9 +385,7 @@ function KelolaAkun() {
               continue;
             }
 
-            await axios.post('/users/create-teacher', teacherData, {
-              headers: { Authorization: `Bearer ${token}` }
-            });
+            await api.post('/users/create-teacher', teacherData);
             results.push({ status: 'success', name: teacherData.nama, type: 'guru' });
           }
         } catch (error) {
@@ -553,10 +526,7 @@ function KelolaAkun() {
   const handleValidateClasses = async () => {
     setValidatingClasses(true);
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/academic-year/validate-classes', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/academic-year/validate-classes');
       setValidationResults(response.data);
       setShowClassValidationModal(true);
     } catch (error) {
@@ -569,10 +539,8 @@ function KelolaAkun() {
 
   const handleFixDiscrepancies = async (dryRun = false) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.post('/academic-year/fix-discrepancies', 
-        { dryRun },
-        { headers: { Authorization: `Bearer ${token}` } }
+      const response = await api.post('/academic-year/fix-discrepancies', 
+        { dryRun }
       );
       
       if (dryRun) {

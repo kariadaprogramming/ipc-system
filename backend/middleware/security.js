@@ -155,7 +155,9 @@ const securityHeaders = helmet({
       fontSrc: ["'self'"],
       objectSrc: ["'none'"],
       mediaSrc: ["'self'"],
-      frameSrc: ["'none'"],
+      // Allow blob: so client-generated PDF previews (URL.createObjectURL)
+      // can render in <iframe>. frameAncestors stays 'none' (clickjacking).
+      frameSrc: ["'self'", "blob:"],
       frameAncestors: ["'none'"],
       baseUri: ["'self'"],
       formAction: ["'self'"],

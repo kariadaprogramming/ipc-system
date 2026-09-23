@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 
 function Search() {
   const [query, setQuery] = useState('');
@@ -27,10 +27,7 @@ function Search() {
     const searchStudents = async () => {
       setLoading(true);
       try {
-        const token = localStorage.getItem('token');
-        const response = await axios.get(`/search/students?query=${encodeURIComponent(debouncedQuery)}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        const response = await api.get(`/search/students?query=${encodeURIComponent(debouncedQuery)}`);
         setResults(response.data);
       } catch (error) {
         console.error('Error searching:', error);
@@ -45,10 +42,7 @@ function Search() {
 
   const handleViewDetails = useCallback(async (student) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`/search/student/${student.id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get(`/search/student/${student.id}`);
       setSelectedStudent(response.data);
     } catch (error) {
       console.error('Error fetching details:', error);

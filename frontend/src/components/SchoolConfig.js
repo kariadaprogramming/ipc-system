@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import API_BASE_URL from '../config';
 
 const buildAssetUrl = (path) => {
@@ -45,7 +45,7 @@ function SchoolConfig() {
 
   const fetchConfig = async () => {
     try {
-      const response = await axios.get('/school-config');
+      const response = await api.get('/school-config');
       if (mountedRef.current) {
         setConfig(response.data);
       }
@@ -81,7 +81,7 @@ function SchoolConfig() {
     setSaving(true);
     setMessage(null);
     try {
-      await axios.put('/school-config', config);
+      await api.put('/school-config', config);
       if (mountedRef.current) {
         await fetchConfig();
         setMessage({ type: 'success', text: 'Konfigurasi sekolah berhasil disimpan!' });
@@ -128,7 +128,7 @@ function SchoolConfig() {
     setUploading(true);
     setMessage(null);
     try {
-      await axios.post('/school-config/upload-logo', formData);
+      await api.post('/school-config/upload-logo', formData);
       if (mountedRef.current) {
         await fetchConfig();
         setMessage({ type: 'success', text: 'Logo berhasil diupload!' });

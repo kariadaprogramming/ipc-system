@@ -503,7 +503,7 @@ router.post('/', auth, superAdminOnly, async (req, res) => {
         );
 
         // Notify all pembina (gurus)
-        const [pembinas] = await db.query('SELECT id FROM users WHERE role = "guru"');
+        const [pembinas] = await db.query("SELECT id FROM users WHERE role = 'guru'");
         for (const pembina of pembinas) {
             await db.query(
                 `INSERT INTO notifications (user_id, type, title, message, related_id, related_type) 

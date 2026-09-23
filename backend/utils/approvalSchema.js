@@ -7,8 +7,10 @@ async function getApprovalStatusColumn() {
         return statusColumn;
     }
 
+    // Postgres equivalent of SHOW COLUMNS ... LIKE (schema is fixed, but keep the probe PG-safe)
     const [columns] = await db.query(
-        "SHOW COLUMNS FROM prestasi_approvals LIKE 'superadmin_status'"
+        `SELECT column_name FROM information_schema.columns
+         WHERE table_name = 'prestasi_approvals' AND column_name = 'superadmin_status'`
     );
     statusColumn = columns.length > 0 ? 'superadmin_status' : 'status';
     return statusColumn;

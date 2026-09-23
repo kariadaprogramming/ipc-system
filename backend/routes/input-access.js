@@ -121,8 +121,9 @@ router.post('/admin/global', auth, superAdminOnly, async (req, res) => {
             await db.query(
                 `INSERT INTO input_access_control (control_type, role_target, jenis_input, is_enabled, updated_by)
                  VALUES (?, 'all', ?, ?, ?)
-                 ON DUPLICATE KEY UPDATE is_enabled = ?, updated_by = ?, updated_at = CURRENT_TIMESTAMP`,
-                ['global', jenis, is_enabled, adminId, is_enabled, adminId]
+                 ON CONFLICT (control_type, role_target, jenis_input) DO UPDATE
+                 SET is_enabled = EXCLUDED.is_enabled, updated_by = EXCLUDED.updated_by, updated_at = CURRENT_TIMESTAMP`,
+                ['global', jenis, is_enabled, adminId]
             );
             
             // Log the change
@@ -155,7 +156,7 @@ router.post('/admin/global', auth, superAdminOnly, async (req, res) => {
             : `SuperAdmin telah mematikan input data ${jenis_input === 'all' ? 'semua jenis' : jenis_input}. Anda tidak dapat menginput data untuk sementara.`;
         
         // Get all users (siswa and guru)
-        const [users] = await db.query('SELECT id, role FROM users WHERE role IN ("siswa", "guru")');
+        const [users] = await db.query("SELECT id, role FROM users WHERE role IN ('siswa', 'guru')");
         
         for (const user of users) {
             await db.query(
@@ -194,8 +195,9 @@ router.post('/admin/role', auth, superAdminOnly, async (req, res) => {
             await db.query(
                 `INSERT INTO input_access_control (control_type, role_target, jenis_input, is_enabled, updated_by)
                  VALUES (?, ?, ?, ?, ?)
-                 ON DUPLICATE KEY UPDATE is_enabled = ?, updated_by = ?, updated_at = CURRENT_TIMESTAMP`,
-                ['role', role, jenis, is_enabled, adminId, is_enabled, adminId]
+                 ON CONFLICT (control_type, role_target, jenis_input) DO UPDATE
+                 SET is_enabled = EXCLUDED.is_enabled, updated_by = EXCLUDED.updated_by, updated_at = CURRENT_TIMESTAMP`,
+                ['role', role, jenis, is_enabled, adminId]
             );
             
             // Log the change
@@ -509,8 +511,9 @@ router.post('/admin/reset-all', auth, superAdminOnly, async (req, res) => {
             await db.query(
                 `INSERT INTO input_access_control (control_type, role_target, jenis_input, is_enabled, updated_by)
                  VALUES ('global', 'all', ?, TRUE, ?)
-                 ON DUPLICATE KEY UPDATE is_enabled = TRUE, updated_by = ?, updated_at = CURRENT_TIMESTAMP`,
-                [jenis, adminId, adminId]
+                 ON CONFLICT (control_type, role_target, jenis_input) DO UPDATE
+                 SET is_enabled = TRUE, updated_by = EXCLUDED.updated_by, updated_at = CURRENT_TIMESTAMP`,
+                [jenis, adminId]
             );
         }
         
@@ -522,7 +525,7 @@ router.post('/admin/reset-all', auth, superAdminOnly, async (req, res) => {
         );
         
         // Send notification to all users
-        const [users] = await db.query('SELECT id FROM users WHERE role IN ("siswa", "guru")');
+        const [users] = await db.query("SELECT id FROM users WHERE role IN ('siswa', 'guru')");
         for (const user of users) {
             await db.query(
                 `INSERT INTO notifications (user_id, type, title, message, related_type) 

@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
-import API_BASE_URL from '../config';
 
 function Login() {
   const [activeTab, setActiveTab] = useState('siswa');
@@ -20,7 +19,7 @@ function Login() {
   useEffect(() => {
     const fetchSchoolConfig = async () => {
       try {
-        const response = await axios.get('/school-config/public');
+        const response = await api.get('/school-config/public');
         setSchoolConfig(response.data);
       } catch (error) {
         console.error('Error fetching school config:', error);
@@ -158,7 +157,7 @@ function Login() {
           }}>
             {schoolConfig?.logo_url ? (
               <img
-                src={`${API_BASE_URL.replace('/api', '')}${schoolConfig.logo_url}`}
+                src={schoolConfig.logo_url}
                 alt="Logo Sekolah"
                 style={{
                   maxWidth: '64px',

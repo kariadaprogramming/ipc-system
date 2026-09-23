@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import './IpcReport.css';
 
 function formatTahunPelajaran(date = new Date()) {
@@ -29,17 +29,11 @@ function IpcReport({ studentId, onClose }) {
 
   const fetchReportData = async () => {
     try {
-      const token = localStorage.getItem('token');
-
       // Fetch student data
-      const studentResponse = await axios.get(`/users/${studentId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const studentResponse = await api.get(`/users/${studentId}`);
 
       // Fetch IPC card data (includes breakdown)
-      const ipcResponse = await axios.get(`/reports/ipc-card/${studentId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const ipcResponse = await api.get(`/reports/ipc-card/${studentId}`);
 
       // Extract wali kelas data from IPC card response
       const waliKelasData = ipcResponse.data.wali || { nama: null, nip: null };
@@ -66,10 +60,7 @@ function IpcReport({ studentId, onClose }) {
 
   const fetchSchoolConfig = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/school-config', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/school-config');
       setSchoolConfig(response.data);
     } catch (error) {
       console.error('Error fetching school config:', error);

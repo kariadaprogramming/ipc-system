@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import ExcelJS from 'exceljs';
+import { createIndividualIpcExcelBuffer, fetchKopImage } from '../utils/ipcExcel';
 import '../ipcPrint.css';
 
 // ------------------------------------------------------------------
@@ -221,10 +222,7 @@ function LaporanCetak({ user }) {
   const checkWaliKelasStatus = async () => {
     if (user?.role === 'guru') {
       try {
-        const token = localStorage.getItem('token');
-        const response = await axios.get('/wali-kelas/my-class', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        const response = await api.get('/wali-kelas/my-class');
         setIsWaliKelas(true);
         setWaliKelasInfo(response.data);
         setSelectedClass(response.data.kelas);
@@ -250,21 +248,16 @@ function LaporanCetak({ user }) {
 
   const fetchStudents = async () => {
     try {
-      const token = localStorage.getItem('token');
       let response;
       
       if (isWaliKelas && waliKelasInfo) {
         // For wali kelas, fetch only their class students
-        response = await axios.get(`/reports/class-ipc/${waliKelasInfo.kelas}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        response = await api.get(`/reports/class-ipc/${waliKelasInfo.kelas}`);
         setStudents(response.data);
         setClasses([waliKelasInfo.kelas]); // Only show their class
       } else {
         // For superadmin, fetch all students
-        response = await axios.get('/reports/students', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        response = await api.get('/reports/students');
         setStudents(response.data);
 
         // Get unique classes from calculated classes
@@ -284,19 +277,13 @@ function LaporanCetak({ user }) {
   };
 
   const fetchIpcCard = async (userId) => {
-    const token = localStorage.getItem('token');
-    const response = await axios.get(`/reports/ipc-card/${userId}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
+    const response = await api.get(`/reports/ipc-card/${userId}`);
     return response.data;
   };
 
   const fetchClassStudents = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`/reports/class-ipc/${selectedClass}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get(`/reports/class-ipc/${selectedClass}`);
       setClassStudents(response.data);
     } catch (error) {
       console.error('Error fetching class students:', error);
@@ -305,10 +292,7 @@ function LaporanCetak({ user }) {
 
   const fetchSchoolConfig = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/school-config', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/school-config');
       setSchoolConfig(response.data);
     } catch (error) {
       console.error('Error fetching school config:', error);
@@ -337,10 +321,7 @@ function LaporanCetak({ user }) {
       // Fetch wali kelas data for this class
       let waliKelasData = { nama: 'Wali Kelas Belum Ditentukan', nip: '' };
       try {
-        const token = localStorage.getItem('token');
-        const response = await axios.get(`/wali-kelas/class/${selectedClass}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        const response = await api.get(`/wali-kelas/class/${selectedClass}`);
          if (response.data && response.data.nama) {
           waliKelasData = response.data;
         }
@@ -1100,6 +1081,50 @@ function LaporanCetak({ user }) {
     }
   };
 
+  // Config sekolah terbaru untuk kop Excel (jangan pakai state yg bisa basi)
+  const getFreshSchoolConfig = async () => {
+    try {
+      const res = await api.get('/school-config');
+      return res.data;
+    } catch {
+      return schoolConfig || {};
+    }
+  };
+
+  // Download Excel Individual Point Card (layout Raport IPC resmi sekolah)
+  const handleDownloadIndividualExcel = async () => {
+    if (!selectedStudentId) {
+      alert('Pilih siswa terlebih dahulu');
+      return;
+    }
+    try {
+      setExcelLoading(true);
+      const cardData = await fetchIpcCard(selectedStudentId);
+      const school = await getFreshSchoolConfig();
+      const kopImage = await fetchKopImage([school?.logo_url, '/header.png'].filter(Boolean));
+      const buffer = await createIndividualIpcExcelBuffer({
+        student: cardData.student,
+        wali: cardData.wali,
+        points: cardData.points,
+        ipcTotal: cardData.ipc_total,
+        school,
+        kopImage,
+      });
+      const url = URL.createObjectURL(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+      const link = document.createElement('a');
+      link.href = url;
+      const safeName = String(cardData.student?.nama || 'SISWA').replace(/[\\/:*?"<>|]/g, '_');
+      link.download = `IPC_${safeName}_${cardData.student?.nis || ''}.xlsx`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error(e);
+      alert('Gagal membuat Excel');
+    } finally {
+      setExcelLoading(false);
+    }
+  };
+
   const handleDownloadExcel = async () => {
     const filename = `Laporan_IPC_Kelas_${selectedClass || 'SEMUA'}.xlsx`;
 
@@ -1135,11 +1160,8 @@ function LaporanCetak({ user }) {
 
       try {
         setIpcLoading(true);
-        const token = localStorage.getItem('token');
-        
         // Call backend endpoint for PDF generation
-        const response = await axios.get(`/reports/ipc-card-pdf/${selectedStudentId}`, {
-          headers: { Authorization: `Bearer ${token}` },
+        const response = await api.get(`/reports/ipc-card-pdf/${selectedStudentId}`, {
           responseType: 'blob'
         });
 
@@ -1179,11 +1201,8 @@ function LaporanCetak({ user }) {
 
       try {
         setIpcLoading(true);
-        const token = localStorage.getItem('token');
-        
         // Call backend endpoint for class report PDF generation
-        const response = await axios.get(`/reports/leger-pdf/${encodeURIComponent(selectedClass)}`, {
-          headers: { Authorization: `Bearer ${token}` },
+        const response = await api.get(`/reports/leger-pdf/${encodeURIComponent(selectedClass)}`, {
           responseType: 'blob'
         });
 
@@ -1226,11 +1245,8 @@ function LaporanCetak({ user }) {
 
       try {
         setIpcLoading(true);
-        const token = localStorage.getItem('token');
-        
         // Call backend endpoint for PDF preview (inline)
-        const response = await axios.get(`/reports/ipc-card-preview/${selectedStudentId}`, {
-          headers: { Authorization: `Bearer ${token}` },
+        const response = await api.get(`/reports/ipc-card-preview/${selectedStudentId}`, {
           responseType: 'blob'
         });
 
@@ -1252,11 +1268,8 @@ function LaporanCetak({ user }) {
 
       try {
         setIpcLoading(true);
-        const token = localStorage.getItem('token');
-        
         // Call backend endpoint for class report PDF preview (inline)
-        const response = await axios.get(`/reports/leger-preview/${encodeURIComponent(selectedClass)}`, {
-          headers: { Authorization: `Bearer ${token}` },
+        const response = await api.get(`/reports/leger-preview/${encodeURIComponent(selectedClass)}`, {
           responseType: 'blob'
         });
 
@@ -1355,6 +1368,9 @@ function LaporanCetak({ user }) {
               </button>
               <button type="button" onClick={handleDownloadPdf} disabled={(!selectedStudentId) || ipcLoading}>
                 {ipcLoading ? 'Membuat PDF...' : 'Download PDF'}
+              </button>
+              <button type="button" onClick={handleDownloadIndividualExcel} disabled={(!selectedStudentId) || excelLoading} className="btn btn-success">
+                {excelLoading ? 'Membuat Excel...' : 'Download Excel'}
               </button>
             </div>
           </>

@@ -3,6 +3,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
 const fs = require('fs');
+const cookieParser = require('cookie-parser');
 const { 
   securityHeaders, 
   apiLimiter, 
@@ -82,6 +83,9 @@ app.use(cors(corsOptions));
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Cookie parser middleware - required for HTTP-only cookie authentication
+app.use(cookieParser());
 
 // Static folder for uploads - with CORS headers for images
 app.use('/uploads', (req, res, next) => {

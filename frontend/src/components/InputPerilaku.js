@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import Select from 'react-select';
 import EditModal from './EditModal';
 import useEditModal from '../hooks/useEditModal';
@@ -67,10 +67,7 @@ function InputPerilaku() {
   const fetchAllPerilaku = async () => {
     try {
       setLoadingIndex(true);
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/perilaku/all', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/perilaku/all');
       setAllPerilaku(response.data);
     } catch (error) {
       console.error('Error fetching all perilaku:', error);
@@ -81,10 +78,7 @@ function InputPerilaku() {
 
   const fetchIpcConfig = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/ipc-config/active', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/ipc-config/active');
       setIpcConfig(response.data);
     } catch (error) {
       console.error('Error fetching IPC config:', error);
@@ -93,10 +87,7 @@ function InputPerilaku() {
 
   const fetchPerilakuRatings = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/ipc-config/perilaku-ratings', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/ipc-config/perilaku-ratings');
       if (!Array.isArray(response.data)) {
         throw new Error('Invalid perilaku rating response');
       }
@@ -108,10 +99,7 @@ function InputPerilaku() {
 
   const fetchStudents = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/users?role=siswa&limit=500', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/users?role=siswa&limit=500');
       const studentList = response.data.users?.filter(user => user.role === 'siswa') || [];
       setStudents(studentList);
     } catch (error) {
@@ -121,10 +109,7 @@ function InputPerilaku() {
 
   const fetchUserSubmissions = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/approvals-v2/user-submissions', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/approvals-v2/user-submissions');
       setSubmissions(response.data.perilaku || []);
     } catch (error) {
       console.error('Error fetching submissions:', error);
@@ -201,10 +186,7 @@ function InputPerilaku() {
 
   const fetchStudentData = async (nis) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`/users/nis/${nis}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get(`/users/nis/${nis}`);
       
       if (response.data) {
         setFormData(prev => ({
@@ -223,10 +205,7 @@ function InputPerilaku() {
 
   const fetchStudentDataByName = async (nama) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`/users/nama/${nama}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get(`/users/nama/${nama}`);
       
       if (response.data) {
         setFormData(prev => ({
@@ -249,10 +228,7 @@ function InputPerilaku() {
     setLoading(true);
 
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.post('/perilaku', formData, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.post('/perilaku', formData);
 
       setMessage(response.data.message || 'Perilaku berhasil dikirim!');
       if (userRole === 'superadmin') {
@@ -288,7 +264,6 @@ function InputPerilaku() {
   const handleUpdate = async () => {
     editModal.setIsLoading(true);
     try {
-      const token = localStorage.getItem('token');
       const updateData = {};
       Object.keys(editModal.editFormData).forEach(key => {
         if (key !== 'id' && key !== 'created_at' && key !== 'status' && key !== 'user_id') {
@@ -296,11 +271,7 @@ function InputPerilaku() {
         }
       });
 
-      await axios.put(`/perilaku/${editModal.editingItem.id}`, updateData, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
+      await api.put(`/perilaku/${editModal.editingItem.id}`, updateData);
 
       setMessage('Perilaku berhasil diperbarui!');
       fetchAllPerilaku();

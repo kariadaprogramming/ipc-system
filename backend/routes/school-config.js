@@ -38,7 +38,14 @@ router.get('/public', async (req, res) => {
       });
     }
 
-    res.json(rows[0]);
+    // Transform logo_url to ensure it's a proper relative path
+    const config = rows[0];
+    if (config.logo_url && !config.logo_url.startsWith('http')) {
+      // Ensure relative path starts with /
+      config.logo_url = config.logo_url.startsWith('/') ? config.logo_url : `/${config.logo_url}`;
+    }
+
+    res.json(config);
   } catch (error) {
     console.error('Error fetching public school config:', error);
     res.status(500).json({ message: 'Failed to fetch school configuration' });
@@ -69,7 +76,13 @@ router.get('/', async (req, res) => {
       });
     }
 
-    res.json(rows[0]);
+    const config = rows[0];
+    // Transform logo_url to ensure it's a proper relative path
+    if (config.logo_url && !config.logo_url.startsWith('http')) {
+      config.logo_url = config.logo_url.startsWith('/') ? config.logo_url : `/${config.logo_url}`;
+    }
+
+    res.json(config);
   } catch (error) {
     console.error('Error fetching school config:', error);
     res.status(500).json({ message: 'Failed to fetch school configuration' });

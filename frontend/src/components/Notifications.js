@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 
 function Notifications() {
   const [notifications, setNotifications] = useState([]);
@@ -15,10 +15,7 @@ function Notifications() {
 
   const markAllAsRead = async () => {
     try {
-      const token = localStorage.getItem('token');
-      await axios.put('/approvals-v2/notifications/read-all', {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.put('/approvals-v2/notifications/read-all', {});
       fetchUnreadCount();
     } catch (error) {
       console.error('Error marking all as read:', error);
@@ -27,10 +24,7 @@ function Notifications() {
 
   const fetchNotifications = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/approvals-v2/notifications', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/approvals-v2/notifications');
       setNotifications(response.data);
     } catch (error) {
       console.error('Error fetching notifications:', error);
@@ -42,10 +36,7 @@ function Notifications() {
 
   const fetchUnreadCount = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/approvals-v2/notifications/count', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/approvals-v2/notifications/count');
       setUnreadCount(response.data.count || 0);
     } catch (error) {
       console.error('Error fetching unread count:', error);
@@ -54,10 +45,7 @@ function Notifications() {
 
   const markAsRead = async (id) => {
     try {
-      const token = localStorage.getItem('token');
-      await axios.put(`/approvals-v2/notifications/${id}/read`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.put(`/approvals-v2/notifications/${id}/read`, {});
       fetchNotifications();
       fetchUnreadCount();
     } catch (error) {

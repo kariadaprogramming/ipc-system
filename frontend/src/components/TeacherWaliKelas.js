@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 
 function getIpcDetailRows(points = {}) {
   return [
@@ -29,10 +29,7 @@ function TeacherWaliKelas() {
 
   const fetchMyClass = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/wali-kelas/my-class', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/wali-kelas/my-class');
       setClassData(response.data);
       setLoading(false);
     } catch (error) {
@@ -49,10 +46,7 @@ function TeacherWaliKelas() {
     setIpcDetail(null);
     
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`/reports/ipc-card/${student.id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get(`/reports/ipc-card/${student.id}`);
       setIpcDetail(response.data);
     } catch (error) {
       console.error('Error fetching IPC detail:', error);

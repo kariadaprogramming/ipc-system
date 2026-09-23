@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import API_BASE_URL from '../config';
 import StudentRecordsHistory from './StudentRecordsHistory';
 
@@ -24,20 +24,13 @@ function StudentDetail({ student, onClose }) {
 
         const fetchData = async () => {
             try {
-                const token = localStorage.getItem('token');
                 const [recordsRes, historyRes] = await Promise.all([
-                    axios.get(`/users/${student.id}/records`, {
-                        headers: { Authorization: `Bearer ${token}` }
-                    }),
-                    axios.get(`/users/${student.id}/ipc-history`, {
-                        headers: { Authorization: `Bearer ${token}` }
-                    })
+                    api.get(`/users/${student.id}/records`),
+                    api.get(`/users/${student.id}/ipc-history`)
                 ]);
                 setRecords(recordsRes.data);
                 setIpcHistory(historyRes.data || []);
-                const ipcCardRes = await axios.get(`/reports/ipc-card/${student.id}`, {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
+                const ipcCardRes = await api.get(`/reports/ipc-card/${student.id}`);
                 setIpcCard(ipcCardRes.data);
             } catch (err) {
                 setError(err.response?.data?.message || 'Gagal memuat detail siswa');

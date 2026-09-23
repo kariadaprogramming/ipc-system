@@ -62,7 +62,7 @@ router.get('/', auth, async (req, res) => {
                 SELECT u.nama as wali_kelas_nama, u.nip as wali_kelas_nip
                 FROM wali_kelas_assignment wka
                 JOIN users u ON wka.guru_id = u.id
-                WHERE wka.kelas = ? AND wka.tahun_ajaran = YEAR(CURDATE())
+                WHERE wka.kelas = ? AND SPLIT_PART(wka.tahun_ajaran, '-', 1)::INT = EXTRACT(YEAR FROM CURRENT_DATE)::INT
                 ORDER BY wka.id DESC
                 LIMIT 1
             `, [userData.kelas]);

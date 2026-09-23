@@ -126,7 +126,7 @@ router.post('/prestasi/submit', auth, checkInputAccess('prestasi'), upload.singl
         // SISWA/GURU: Submit for approval (superadmin only)
         const [result] = await db.query(
             `INSERT INTO prestasi_approvals
-            (user_id, nama, nis, jenis, nama_lomba, kelas, pembina, grha, juara, kategori, foto_path)
+            (user_id, nama, nis, jenis, nama_lomba, kelas, pembina, grha, juara, kategori, foto)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [userId, nama, nis, jenis, nama_lomba, calculatedClass, pembina, grha, juara, kategori, fotoPath]
         );
@@ -135,7 +135,7 @@ router.post('/prestasi/submit', auth, checkInputAccess('prestasi'), upload.singl
         await logActivity(req.user.id, 'SUBMIT_PRESTASI', `User ${req.user.nama} (${req.user.role}) submitted prestasi for ${nama} (${nis}): ${nama_lomba}`, req.ip);
 
         // Create notification for superadmin only
-        const [superadmins] = await db.query('SELECT id FROM users WHERE role = "superadmin"');
+        const [superadmins] = await db.query("SELECT id FROM users WHERE role = 'superadmin'");
         console.log('Prestasi - Superadmins found:', superadmins.length);
         for (const admin of superadmins) {
             await db.query(
@@ -276,7 +276,7 @@ router.post('/event/submit', auth, checkInputAccess('event'), upload.single('fot
         // SISWA/GURU: Submit for approval (superadmin only)
         const [result] = await db.query(
             `INSERT INTO event_approvals
-            (user_id, nama, nis, kelas, grha, pembina, nama_event, tingkat, foto_path)
+            (user_id, nama, nis, kelas, grha, pembina, nama_event, tingkat, foto)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [userId, nama, nis, calculatedClass, grha, pembina, nama_event, tingkat, foto_path]
         );
@@ -285,7 +285,7 @@ router.post('/event/submit', auth, checkInputAccess('event'), upload.single('fot
         await logActivity(req.user.id, 'SUBMIT_EVENT', `User ${req.user.nama} (${req.user.role}) submitted event for ${nama} (${nis}): ${nama_event}`, req.ip);
 
         // Create notification for superadmin only
-        const [superadmins] = await db.query('SELECT id FROM users WHERE role = "superadmin"');
+        const [superadmins] = await db.query("SELECT id FROM users WHERE role = 'superadmin'");
         console.log('Event - Superadmins found:', superadmins.length);
         for (const admin of superadmins) {
             await db.query(
@@ -358,7 +358,7 @@ router.post('/organisasi/submit', auth, checkInputAccess('organisasi'), upload.s
         // SISWA/GURU: Submit for approval (superadmin only)
         const [result] = await db.query(
             `INSERT INTO organisasi_approvals
-            (user_id, nama, nis, kelas, grha, pembina, jabatan_organisasi, kategori_organisasi, foto_path)
+            (user_id, nama, nis, kelas, grha, pembina, jabatan_organisasi, kategori_organisasi, foto)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [userId, nama, nis, calculatedClass, grha, pembina, jabatan_organisasi, kategori_organisasi, foto_path]
         );
@@ -367,7 +367,7 @@ router.post('/organisasi/submit', auth, checkInputAccess('organisasi'), upload.s
         await logActivity(req.user.id, 'SUBMIT_ORGANISASI', `User ${req.user.nama} (${req.user.role}) submitted organisasi for ${nama} (${nis}): ${kategori_organisasi}`, req.ip);
 
         // Create notification for superadmin only
-        const [superadmins] = await db.query('SELECT id FROM users WHERE role = "superadmin"');
+        const [superadmins] = await db.query("SELECT id FROM users WHERE role = 'superadmin'");
         console.log('Organisasi - Superadmins found:', superadmins.length);
         for (const admin of superadmins) {
             await db.query(
@@ -440,7 +440,7 @@ router.post('/kepanitiaan/submit', auth, checkInputAccess('kepanitiaan'), upload
         // SISWA/GURU: Submit for approval (superadmin only)
         const [result] = await db.query(
             `INSERT INTO kepanitiaan_approvals
-            (user_id, nama, nis, kelas, grha, pembina, jabatan_kepanitiaan, kategori_kepanitiaan, foto_path)
+            (user_id, nama, nis, kelas, grha, pembina, jabatan_kepanitiaan, kategori_kepanitiaan, foto)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [userId, nama, nis, calculatedClass, grha, pembina, jabatan_kepanitiaan, kategori_kepanitiaan, foto_path]
         );
@@ -449,7 +449,7 @@ router.post('/kepanitiaan/submit', auth, checkInputAccess('kepanitiaan'), upload
         await logActivity(req.user.id, 'SUBMIT_KEPANITIAAN', `User ${req.user.nama} (${req.user.role}) submitted kepanitiaan for ${nama} (${nis}): ${kategori_kepanitiaan}`, req.ip);
 
         // Create notification for superadmin only
-        const [superadmins] = await db.query('SELECT id FROM users WHERE role = "superadmin"');
+        const [superadmins] = await db.query("SELECT id FROM users WHERE role = 'superadmin'");
         console.log('Kepanitiaan - Superadmins found:', superadmins.length);
         for (const admin of superadmins) {
             await db.query(
@@ -483,7 +483,7 @@ router.put('/superadmin/:type/:id', auth, superAdminOnly, async (req, res) => {
         console.log(`SuperAdmin ${status} request: type=${type}, id=${id}`);
 
         if (type === 'pelanggaran' || type === 'perilaku') {
-            return handleLegacyApproval(type, id, status, notes, req.user.id, res);
+            return handleLegacyApproval(type, id, status, notes, req.user.id, req.ip, res);
         }
 
         let table, pointField, pointType, allowedColumns;
@@ -544,9 +544,10 @@ router.put('/superadmin/:type/:id', auth, superAdminOnly, async (req, res) => {
             }
 
             // Move photo to organized folder if exists
-            let finalFotoPath = data.foto_path;
-            if (data.foto_path) {
-                const movedPath = movePhotoToApprovedFolder(data.foto_path, type);
+            // `foto` is the current column name (`foto_path` kept as fallback for older DBs)
+            let finalFotoPath = data.foto ?? data.foto_path;
+            if (finalFotoPath) {
+                const movedPath = movePhotoToApprovedFolder(finalFotoPath, type);
                 if (movedPath) {
                     finalFotoPath = path.join('uploads', movedPath).replace(/\\/g, '/');
                 }
@@ -609,7 +610,7 @@ router.put('/superadmin/:type/:id', auth, superAdminOnly, async (req, res) => {
     }
 });
 
-async function handleLegacyApproval(type, id, status, notes, approverId, res) {
+async function handleLegacyApproval(type, id, status, notes, approverId, ipAddress, res) {
     const table = type;
     try {
         // Define allowed columns for each table type
@@ -654,7 +655,7 @@ async function handleLegacyApproval(type, id, status, notes, approverId, res) {
             }
 
             // Log activity
-            await logActivity(approverId, `APPROVE_${type.toUpperCase()}`, `SuperAdmin approved ${type} for ${data.nama} (${data.nis})`, req.ip);
+            await logActivity(approverId, `APPROVE_${type.toUpperCase()}`, `SuperAdmin approved ${type} for ${data.nama} (${data.nis})`, ipAddress);
 
             await db.query(
                 `INSERT INTO notifications (user_id, type, title, message, related_id, related_type) VALUES (?, 'approved', 'Pengajuan Disetujui', ?, ?, ?)`,
@@ -670,7 +671,7 @@ async function handleLegacyApproval(type, id, status, notes, approverId, res) {
         );
 
         // Log activity
-        await logActivity(approverId, `REJECT_${type.toUpperCase()}`, `SuperAdmin rejected ${type} for ${data.nama} (${data.nis}): ${notes || 'No reason'}`, req.ip);
+        await logActivity(approverId, `REJECT_${type.toUpperCase()}`, `SuperAdmin rejected ${type} for ${data.nama} (${data.nis}): ${notes || 'No reason'}`, ipAddress);
 
         await db.query(
             `INSERT INTO notifications (user_id, type, title, message, related_id, related_type) VALUES (?, 'rejected', 'Pengajuan Ditolak', ?, ?, ?)`,
@@ -692,22 +693,22 @@ router.get('/pending-count', auth, superAdminOnly, async (req, res) => {
         const col = await getApprovalStatusColumn();
 
         const [prestasiCount] = await db.query(
-            `SELECT COUNT(*) as count FROM prestasi_approvals WHERE ${col} = "pending"`
+            `SELECT COUNT(*) as count FROM prestasi_approvals WHERE ${col} = 'pending'`
         );
         const [eventCount] = await db.query(
-            `SELECT COUNT(*) as count FROM event_approvals WHERE ${col} = "pending"`
+            `SELECT COUNT(*) as count FROM event_approvals WHERE ${col} = 'pending'`
         );
         const [organisasiCount] = await db.query(
-            `SELECT COUNT(*) as count FROM organisasi_approvals WHERE ${col} = "pending"`
+            `SELECT COUNT(*) as count FROM organisasi_approvals WHERE ${col} = 'pending'`
         );
         const [kepanitiaanCount] = await db.query(
-            `SELECT COUNT(*) as count FROM kepanitiaan_approvals WHERE ${col} = "pending"`
+            `SELECT COUNT(*) as count FROM kepanitiaan_approvals WHERE ${col} = 'pending'`
         );
         const [pelanggaranCount] = await db.query(
-            'SELECT COUNT(*) as count FROM pelanggaran WHERE status = "pending"'
+            "SELECT COUNT(*) as count FROM pelanggaran WHERE status = 'pending'"
         );
         const [perilakuCount] = await db.query(
-            'SELECT COUNT(*) as count FROM perilaku WHERE status = "pending"'
+            "SELECT COUNT(*) as count FROM perilaku WHERE status = 'pending'"
         );
 
         const total = (prestasiCount[0].count || 0) +
@@ -779,21 +780,8 @@ router.get('/user-submissions', auth, async (req, res) => {
         const col = await getApprovalStatusColumn();
 
         const [prestasi] = await db.query(`
-            SELECT id, user_id, nama, nis, jenis, nama_lomba, foto, kelas, pembina, grha, juara, kategori, point, status, rejection_reason, created_at, 'prestasi' as type FROM prestasi_approvals WHERE user_id = ? ORDER BY created_at DESC
-        `, [userId]);
-        
-        const [event] = await db.query(`
-            SELECT id, user_id, nama, nis, kelas, grha, pembina, nama_event, tingkat, foto, point, status, rejection_reason, created_at, 'event' as type FROM event_approvals WHERE user_id = ? ORDER BY created_at DESC
-        `, [userId]);
-        
-        const [organisasi] = await db.query(`
-            SELECT id, user_id, nama, nis, kelas, grha, jabatan_organisasi, foto, kategori_organisasi, point, status, rejection_reason, created_at, 'organisasi' as type FROM organisasi_approvals WHERE user_id = ? ORDER BY created_at DESC
-        `, [userId]);
-        
-        const [kepanitiaan] = await db.query(`
-            SELECT id, user_id, nama, nis, kelas, grha, jabatan_kepanitiaan, foto, point, status, rejection_reason, created_at, 'kepanitiaan' as type FROM kepanitiaan_approvals WHERE user_id = ? ORDER BY created_at DESC
             SELECT *,
-                   COALESCE(superadmin_status, status) as status,
+                   superadmin_status as status,
                    'prestasi' as type
             FROM prestasi_approvals
             WHERE user_id = ?
@@ -802,7 +790,7 @@ router.get('/user-submissions', auth, async (req, res) => {
 
         const [event] = await db.query(`
             SELECT *,
-                   COALESCE(superadmin_status, status) as status,
+                   superadmin_status as status,
                    'event' as type
             FROM event_approvals
             WHERE user_id = ?
@@ -811,7 +799,7 @@ router.get('/user-submissions', auth, async (req, res) => {
 
         const [organisasi] = await db.query(`
             SELECT *,
-                   COALESCE(superadmin_status, status) as status,
+                   superadmin_status as status,
                    'organisasi' as type
             FROM organisasi_approvals
             WHERE user_id = ?
@@ -820,7 +808,7 @@ router.get('/user-submissions', auth, async (req, res) => {
 
         const [kepanitiaan] = await db.query(`
             SELECT *,
-                   COALESCE(superadmin_status, status) as status,
+                   superadmin_status as status,
                    'kepanitiaan' as type
             FROM kepanitiaan_approvals
             WHERE user_id = ?

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 
 function EditIPCAwal() {
   const [students, setStudents] = useState([]);
@@ -16,11 +16,9 @@ function EditIPCAwal() {
 
   const fetchStudents = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/users', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setStudents(response.data.filter(user => user.role === 'siswa'));
+      const response = await api.get('/users');
+      const users = Array.isArray(response.data) ? response.data : response.data.users;
+      setStudents(users.filter(user => user.role === 'siswa'));
     } catch (error) {
       console.error('Error fetching students:', error);
       setMessage('Gagal memuat data siswa');
@@ -74,13 +72,9 @@ function EditIPCAwal() {
 
     try {
       setSaving(true);
-      const token = localStorage.getItem('token');
-      
-      await axios.post('/users/bulk-update-ipc-awal', {
+      await api.post('/users/bulk-update-ipc-awal', {
         userIds: selectedStudents,
         ipcAwal: parsed
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
       });
 
       setMessage(`IPC awal berhasil diupdate untuk ${selectedStudents.length} siswa`);

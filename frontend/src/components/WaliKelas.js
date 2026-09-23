@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import API_BASE_URL from '../config';
 
 function getCurrentAcademicYear() {
@@ -40,19 +40,6 @@ function formatDisplayText(text) {
     });
 }
 
-// Create axios instance dengan base URL
-const apiClient = axios.create({
-  baseURL: API_BASE_URL,
-});
-
-// Add token interceptor
-apiClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-}, (error) => Promise.reject(error));
 
 function WaliKelas() {
   const [assignments, setAssignments] = useState([]);
@@ -91,7 +78,7 @@ function WaliKelas() {
 
   const fetchAssignments = useCallback(async () => {
     try {
-      const response = await apiClient.get('/wali-kelas');
+      const response = await api.get('/wali-kelas');
       setAssignments(response.data);
       setError(null);
     } catch (err) {
@@ -102,7 +89,7 @@ function WaliKelas() {
 
   const fetchClassStatistics = useCallback(async () => {
     try {
-      const response = await apiClient.get('/wali-kelas/class-statistics', {
+      const response = await api.get('/wali-kelas/class-statistics', {
         params: { tahun_ajaran: selectedAcademicYear }
       });
       setClassStats(response.data);
@@ -117,7 +104,7 @@ function WaliKelas() {
 
   const fetchTeachers = useCallback(async () => {
     try {
-      const response = await apiClient.get('/wali-kelas/available-teachers', {
+      const response = await api.get('/wali-kelas/available-teachers', {
         params: { tahun_ajaran: selectedAcademicYear }
       });
       setTeachers(response.data);
@@ -141,7 +128,7 @@ function WaliKelas() {
   const handleCreate = async (e) => {
     e.preventDefault();
     try {
-      const response = await apiClient.post('/wali-kelas', formData);
+      const response = await api.post('/wali-kelas', formData);
       alert(response.data.message);
       setShowForm(false);
       setFormData({ guru_id: '', kelas: '', tahun_ajaran: selectedAcademicYear });
@@ -159,7 +146,7 @@ function WaliKelas() {
     if (!window.confirm('Apakah Anda yakin ingin menghapus assignment ini?')) return;
     
     try {
-      const response = await apiClient.delete(`/wali-kelas/${id}`);
+      const response = await api.delete(`/wali-kelas/${id}`);
       alert(response.data.message);
       fetchAssignments();
       fetchClassStatistics();
@@ -181,7 +168,7 @@ function WaliKelas() {
     setShowStudentDetail(true);
     setLoadingHistory(true);
     try {
-      const response = await apiClient.get(`/users/${student.id}/ipc-history`);
+      const response = await api.get(`/users/${student.id}/ipc-history`);
       setStudentHistory(response.data);
     } catch (err) {
       console.error('Error fetching student history:', err);
@@ -215,7 +202,7 @@ function WaliKelas() {
   const handleCheckMismatches = async () => {
     setLoadingMismatches(true);
     try {
-      const response = await apiClient.get('/wali-kelas/class-mismatches', {
+      const response = await api.get('/wali-kelas/class-mismatches', {
         params: { tahun_ajaran: selectedAcademicYear }
       });
       setMismatches(response.data);

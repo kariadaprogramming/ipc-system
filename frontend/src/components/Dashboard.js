@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import API_BASE_URL from '../config';
 import {
   BarChart,
@@ -65,10 +65,7 @@ function Dashboard() {
 
   const fetchStats = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/dashboard/stats', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/dashboard/stats');
       setStats(response.data);
     } catch (error) {
       console.error('Error fetching stats:', error);
@@ -80,10 +77,7 @@ function Dashboard() {
 
   const fetchSchoolConfig = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/school-config', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/school-config');
       setSchoolConfig(response.data);
     } catch (error) {
       console.error('Error fetching school config:', error);
@@ -804,7 +798,7 @@ function Dashboard() {
         <div className="student-dashboard">
           <div className="student-info">
             <h3>🎯 IPC Anda: {user?.ipc_total || 0}</h3>
-            <p>Point Indeks Prestasi dan Karakter</p>
+            <p>Point Invidual Point Card</p>
           </div>
           
           <div className="student-details">

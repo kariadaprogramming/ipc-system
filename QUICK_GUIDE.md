@@ -18,7 +18,7 @@
 | RAM | 4GB | 8GB+ |
 | Storage | 10GB | 50GB SSD |
 | Node.js | 16.x | 18.x LTS |
-| MySQL | 8.0 | 8.0.32+ |
+| PostgreSQL | 14 | 16+ (installer EDB sudah termasuk pgAdmin 4) |
 | Browser | Chrome 100+ | Latest Chrome/Firefox |
 
 ---
@@ -30,18 +30,29 @@
 # 1. Install Node.js (https://nodejs.org)
 node -v  # Should show v16.x or higher
 
-# 2. Install MySQL or XAMPP
-# XAMPP: https://www.apachefriends.org
+# 2. Install PostgreSQL (https://www.postgresql.org/download/)
+# Windows: pakai installer EDB, ingat password user `postgres`
+# Verifikasi: pg_isready  (harusnya: accepting connections)
 
 # 3. Verify npm
 npm -v  # Should show 8.x or higher
 ```
 
 ### 2. Database Setup
+```bash
+# Otomatis: buat database + impor skema (disarankan)
+cd backend
+npm install
+npm run db:setup
+```
 ```sql
--- Open phpMyAdmin (http://localhost/phpmyadmin)
-CREATE DATABASE ipc_school;
--- Import: backend/database/skema.sql
+-- Atau manual:
+-- 1. Buat database ipc_school (pgAdmin: klik kanan Databases -> Create,
+--    atau terminal: createdb -U postgres ipc_school)
+-- 2. Impor skema:
+--    psql -U postgres -d ipc_school -f backend/database/skema.sql
+--
+-- Baru pakai pgAdmin? Lihat panduan klik-per-klik di REQUIREMENTS.md (Step 4).
 ```
 
 ### 3. Backend Setup
@@ -307,12 +318,15 @@ Login: NIS/NISN / (set by guru)
 
 #### 1. Database Connection Error
 ```
-Error: Access denied for user 'root'@'localhost'
+Error: password authentication failed for user "postgres"
+   atau: connection refused / database "ipc_school" does not exist
 ```
 **Solution:**
-- Check MySQL is running
-- Verify .env DB_PASSWORD matches MySQL root password
-- Try: `ALTER USER 'root'@'localhost' IDENTIFIED BY 'newpassword';`
+- Check PostgreSQL is running (`pg_isready`; Windows: *Services* → `postgresql-x64-*`)
+- Verify .env DB_PASSWORD matches the `postgres` user password
+- Kalau database belum ada, buat otomatis: `cd backend && npm run db:setup`
+- Ganti password bila lupa (via SQL Shell / psql):
+  `ALTER USER postgres PASSWORD 'password_baru';`
 
 #### 2. Port Already in Use
 ```
@@ -392,11 +406,14 @@ cd frontend && npm install
 
 ### Database
 ```bash
-# Backup
-mysqldump -u root -p ipc_school > backup.sql
+# Setup awal (buat DB + impor skema)
+cd backend && npm run db:setup
+
+# Backup (Windows: jalankan dari folder bin PostgreSQL atau tambahkan ke PATH)
+pg_dump -U postgres ipc_school > backup.sql
 
 # Restore
-mysql -u root -p ipc_school < backup.sql
+psql -U postgres -d ipc_school < backup.sql
 ```
 
 ### Logs

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 
 function IzinAkun() {
   const [users, setUsers] = useState([]);
@@ -103,10 +103,7 @@ function IzinAkun() {
 
   const fetchUsers = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/input-access/admin/users', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/input-access/admin/users');
       setUsers(response.data);
       setFilteredUsers(response.data);
     } catch (error) {
@@ -119,13 +116,9 @@ function IzinAkun() {
   // Update Individual User Access
   const handleIndividualUpdate = async (userId, permissions) => {
     try {
-      const token = localStorage.getItem('token');
-      
-      await axios.post('/input-access/admin/individual', {
+      await api.post('/input-access/admin/individual', {
         user_id: userId,
         permissions: permissions
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
       });
       
       // Update local state
@@ -164,10 +157,7 @@ function IzinAkun() {
     }
     
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.post('/input-access/admin/reset-all', {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.post('/input-access/admin/reset-all', {});
       
       setMessage(`✅ ${response.data.message}`);
       
@@ -186,7 +176,6 @@ function IzinAkun() {
     
     setBulkUpdating(true);
     try {
-      const token = localStorage.getItem('token');
       const roleLabel = role === 'siswa' ? 'Siswa' : 'Guru';
       const jenisLabel = jenisInputs.find(j => j.key === jenis)?.label || jenis;
       
@@ -214,11 +203,9 @@ function IzinAkun() {
             can_input_perilaku: jenis === 'perilaku' ? enable : (user.can_input_perilaku ?? true)
           };
           
-          await axios.post('/input-access/admin/individual', {
+          await api.post('/input-access/admin/individual', {
             user_id: user.id,
             permissions: newPermissions
-          }, {
-            headers: { Authorization: `Bearer ${token}` }
           });
           successCount++;
         } catch (err) {
@@ -244,10 +231,7 @@ function IzinAkun() {
     }
     
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.post(`/input-access/admin/clear-user-permissions/${user.id}`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.post(`/input-access/admin/clear-user-permissions/${user.id}`, {});
       
       setMessage(`✅ ${response.data.message}`);
       

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 
 function NotificationBadge() {
   const [count, setCount] = useState(0);
@@ -16,10 +16,7 @@ function NotificationBadge() {
 
   const fetchNotificationCount = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/approvals-v2/notifications/count', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/approvals-v2/notifications/count');
       
       const newCount = response.data.count;
       if (newCount > count && count > 0) {
@@ -34,14 +31,9 @@ function NotificationBadge() {
 
   const fetchNotifications = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/approvals-v2/notifications', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/approvals-v2/notifications');
       setNotifications(response.data);
-      await axios.put('/approvals-v2/notifications/read-all', {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.put('/approvals-v2/notifications/read-all', {});
       setCount(0);
     } catch (error) {
       console.error('Error fetching notifications:', error);

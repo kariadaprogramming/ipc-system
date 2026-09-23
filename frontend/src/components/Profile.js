@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import API_BASE_URL from '../config';
 import StudentRecordsHistory from './StudentRecordsHistory';
 
@@ -29,10 +29,7 @@ function Profile() {
 
   const fetchProfile = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/profile', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/profile');
       setProfile(response.data);
       setEditData(response.data);
     } catch (error) {
@@ -42,10 +39,7 @@ function Profile() {
 
   const fetchIpcHistory = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/profile/ipc-history', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/profile/ipc-history');
       setIpcHistory(response.data);
     } catch (error) {
       console.error('Error fetching IPC history:', error);
@@ -54,10 +48,7 @@ function Profile() {
 
   const fetchSummary = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/profile/summary', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/profile/summary');
       setSummary(response.data);
     } catch (error) {
       console.error('Error fetching summary:', error);
@@ -69,10 +60,7 @@ function Profile() {
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
     try {
-      const token = localStorage.getItem('token');
-      await axios.put(`/users/${profile.id}`, editData, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.put(`/users/${profile.id}`, editData);
       setEditMode(false);
       fetchProfile();
     } catch (error) {
@@ -89,16 +77,10 @@ function Profile() {
 
     setUploading(true);
     try {
-      const token = localStorage.getItem('token');
       const formData = new FormData();
       formData.append('avatar', avatarFile);
 
-      await axios.post('/profile/avatar', formData, {
-        headers: { 
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data'
-        }
-      });
+      await api.post('/profile/avatar', formData);
 
       alert('Avatar berhasil diupload');
       setAvatarFile(null);
@@ -114,10 +96,7 @@ function Profile() {
     if (!window.confirm('Hapus avatar?')) return;
 
     try {
-      const token = localStorage.getItem('token');
-      await axios.delete('/profile/avatar', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.delete('/profile/avatar');
 
       alert('Avatar berhasil dihapus');
       fetchProfile();
@@ -138,10 +117,7 @@ function Profile() {
     }
 
     try {
-      const token = localStorage.getItem('token');
-      await axios.post('/profile/change-password', passwordData, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.post('/profile/change-password', passwordData);
       alert('Password berhasil diubah');
       setPasswordMode(false);
       setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });

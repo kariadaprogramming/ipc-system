@@ -5,7 +5,7 @@
 ### Backend Requirements
 ```
 Node.js >= 16.x
-MySQL >= 8.0
+PostgreSQL >= 14
 npm >= 8.x
 ```
 
@@ -73,17 +73,38 @@ npm start
 npm run build
 ```
 
-### 3. Database Setup
+### 3. Database Setup (PostgreSQL)
 
-```sql
--- Import schema in phpMyAdmin
--- File: backend/database/skema.sql
+Cara otomatis (disarankan):
+```bash
+cd backend
+npm install
+npm run db:setup   # membuat database ipc_school + mengimpor skema
+```
 
--- Create database first
-CREATE DATABASE ipc_school;
-USE ipc_school;
+Cara manual:
+```bash
+# 1. Install PostgreSQL 14+ dari https://www.postgresql.org/download/
+#    (installer Windows EDB sudah termasuk pgAdmin 4)
 
--- Then import the schema
+# 2. Buat database
+createdb -U postgres ipc_school
+# (atau via pgAdmin: klik kanan Databases -> Create -> ipc_school)
+
+# 3. Impor skema (semua tabel + data awal)
+psql -U postgres -d ipc_school -f backend/database/skema.sql
+
+# 4. Verifikasi
+psql -U postgres -d ipc_school -c "\dt"
+```
+
+Pastikan `backend/.env` berisi kredensial PostgreSQL yang benar:
+```env
+DB_HOST=localhost
+DB_USER=postgres
+DB_PASSWORD=password_postgres_anda
+DB_PORT=5432
+DB_NAME=ipc_school
 ```
 
 ---
@@ -443,7 +464,7 @@ ipc-school/
 | Package | Version | Purpose |
 |---------|---------|---------|
 | express | ^4.18.2 | Web framework |
-| mysql2 | ^3.6.5 | Database driver |
+| pg | ^8.11.3 | PostgreSQL driver (node-postgres) |
 | bcryptjs | ^2.4.3 | Password hashing |
 | jsonwebtoken | ^9.0.2 | JWT authentication |
 | cors | ^2.8.5 | Cross-origin requests |
@@ -509,7 +530,7 @@ ipc-school/
 | Login fails | Check JWT_SECRET, database connection |
 | Avatar not loading | Check CORS headers, upload folder permissions |
 | Export fails | Check xlsx/jspdf dependencies |
-| Database error | Check MySQL service, credentials |
+| Database error | Check PostgreSQL service, credentials in .env, run `npm run db:setup` |
 | 404 errors | Check API routes, baseURL config |
 
 ---

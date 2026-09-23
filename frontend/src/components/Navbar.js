@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../utils/api';
 
 function Navbar({ user, onLogout, isMobileMenuOpen, toggleMobileMenu }) {
   const [pendingCount, setPendingCount] = useState(0);
@@ -42,10 +42,7 @@ function Navbar({ user, onLogout, isMobileMenuOpen, toggleMobileMenu }) {
 
   const fetchPendingCount = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/approvals-v2/pending-count', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/approvals-v2/pending-count');
       setPendingCount(response.data.total || 0);
     } catch (error) {
       console.error('Error fetching pending count:', error);
@@ -54,10 +51,7 @@ function Navbar({ user, onLogout, isMobileMenuOpen, toggleMobileMenu }) {
 
   const fetchUnreadCount = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/approvals-v2/notifications/count', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/approvals-v2/notifications/count');
       setUnreadCount(response.data.count || 0);
     } catch (error) {
       console.error('Error fetching unread count:', error);

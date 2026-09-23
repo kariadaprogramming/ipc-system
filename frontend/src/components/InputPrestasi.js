@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import EditModal from './EditModal';
 import useEditModal from '../hooks/useEditModal';
 import API_BASE_URL from '../config';
@@ -102,10 +102,7 @@ function InputPrestasi() {
   const fetchAllPrestasi = async () => {
     try {
       setLoadingIndex(true);
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/prestasi/all', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/prestasi/all');
       setAllPrestasi(response.data);
     } catch (error) {
       console.error('Error fetching all prestasi:', error);
@@ -124,10 +121,7 @@ function InputPrestasi() {
     }
 
     try {
-      const token = localStorage.getItem('token');
-      await axios.delete(`/prestasi/${id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.delete(`/prestasi/${id}`);
       setMessage('Prestasi berhasil dihapus!');
       fetchAllPrestasi();
     } catch (error) {
@@ -138,7 +132,6 @@ function InputPrestasi() {
   const handleUpdate = async () => {
     editModal.setIsLoading(true);
     try {
-      const token = localStorage.getItem('token');
       const updateData = {};
       Object.keys(editModal.editFormData).forEach(key => {
         if (key !== 'id' && key !== 'created_at' && key !== 'status' && key !== 'user_id') {
@@ -146,11 +139,7 @@ function InputPrestasi() {
         }
       });
       
-      await axios.put(`/prestasi/${editModal.editingItem.id}`, updateData, {
-        headers: { 
-          Authorization: `Bearer ${token}`
-        }
-      });
+      await api.put(`/prestasi/${editModal.editingItem.id}`, updateData);
       setMessage('Prestasi berhasil diperbarui!');
       fetchAllPrestasi();
       editModal.closeEditModal();
@@ -163,7 +152,6 @@ function InputPrestasi() {
 
   const checkAccess = async () => {
     try {
-      const token = localStorage.getItem('token');
       const user = JSON.parse(localStorage.getItem('user') || '{}');
       
       // Superadmin always has access
@@ -173,9 +161,7 @@ function InputPrestasi() {
         return;
       }
       
-      const response = await axios.get('/input-access/status/my-access', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/input-access/status/my-access');
       
       const canInputPrestasi = response.data.prestasi;
       setHasAccess(canInputPrestasi);
@@ -201,8 +187,7 @@ function InputPrestasi() {
   //   }
 
   //   try {
-  //     const token = localStorage.getItem('token');
-  //     const response = await axios.get('/permissions/' + user.id, {
+  //     //     const response = await api.get('/permissions/' + user.id, {
   //       headers: { Authorization: `Bearer ${token}` }
   //     });
   //     setHasPermission(response.data.can_input_prestasi === true);
@@ -216,10 +201,7 @@ function InputPrestasi() {
 
   const fetchUserSubmissions = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/approvals-v2/user-submissions', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/approvals-v2/user-submissions');
       setSubmissions(response.data.prestasi || []);
     } catch (error) {
       console.error('Error fetching submissions:', error);
@@ -228,10 +210,7 @@ function InputPrestasi() {
 
   const fetchTeachers = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/prestasi/teachers', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/prestasi/teachers');
       setTeachers(response.data);
     } catch (error) {
       console.error('Error fetching teachers:', error);
@@ -240,10 +219,7 @@ function InputPrestasi() {
 
   const fetchIpcConfig = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/ipc-config/active', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/ipc-config/active');
       setIpcConfig(response.data);
       const firstTingkat = response.data.prestasi?.[0]?.field1 || 'sekolah';
       const firstJuara = response.data.prestasi?.[0]?.field2 || 'juara_i';
@@ -256,10 +232,7 @@ function InputPrestasi() {
 
   const fetchStudents = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/users?role=siswa&limit=500', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/users?role=siswa&limit=500');
       // Use the new pagination format
       const studentList = response.data.users || [];
       setStudents(studentList);
@@ -336,10 +309,7 @@ function InputPrestasi() {
 
   const fetchStudentData = async (nis) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`/users/nis/${nis}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get(`/users/nis/${nis}`);
       
       if (response.data) {
         setFormData(prev => ({
@@ -357,10 +327,7 @@ function InputPrestasi() {
 
   const fetchStudentDataByName = async (nama) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`/users/nama/${nama}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get(`/users/nama/${nama}`);
       
       if (response.data) {
         setFormData(prev => ({
@@ -386,7 +353,6 @@ function InputPrestasi() {
     setLoading(true);
 
     try {
-      const token = localStorage.getItem('token');
       const data = new FormData();
       Object.keys(formData).forEach(key => {
         data.append(key, formData[key]);
@@ -399,12 +365,7 @@ function InputPrestasi() {
         data.append('foto', fileToUpload);
       }
 
-      const response = await axios.post('/approvals-v2/prestasi/submit', data, {
-        headers: { 
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data'
-        }
-      });
+      const response = await api.post('/approvals-v2/prestasi/submit', data);
 
       // Use message from backend response (different for superadmin vs regular user)
       setMessage(response.data?.message || 'Data prestasi berhasil dikirim!');

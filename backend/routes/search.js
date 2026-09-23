@@ -108,10 +108,9 @@ router.get('/leaderboard/akademik', auth, async (req, res) => {
                 u.foto,
                 COUNT(DISTINCT p.id) as total_prestasi,
                 COALESCE(SUM(p.point), 0) as total_point,
-                GROUP_CONCAT(
-                    CONCAT(p.nama_lomba, '|', p.kategori, '|', p.juara)
-                    ORDER BY p.created_at DESC
-                    SEPARATOR '|||'
+                STRING_AGG(
+                    CONCAT(p.nama_lomba, '|', p.kategori, '|', p.juara),
+                    '|||' ORDER BY p.created_at DESC
                 ) as competition_details
             FROM users u
             LEFT JOIN prestasi p ON u.id = p.user_id
@@ -119,7 +118,7 @@ router.get('/leaderboard/akademik', auth, async (req, res) => {
                 AND p.status = 'approved'
             WHERE u.role = 'siswa'
             GROUP BY u.id, u.nama, u.nis, u.kelas, u.grha, u.foto
-            HAVING total_prestasi > 0
+            HAVING COUNT(DISTINCT p.id) > 0
             ORDER BY total_prestasi DESC, total_point DESC, u.nama ASC
             LIMIT 20
         `);
@@ -166,10 +165,9 @@ router.get('/leaderboard/nonakademik', auth, async (req, res) => {
                 u.foto,
                 COUNT(DISTINCT p.id) as total_prestasi,
                 COALESCE(SUM(p.point), 0) as total_point,
-                GROUP_CONCAT(
-                    CONCAT(p.nama_lomba, '|', p.kategori, '|', p.juara)
-                    ORDER BY p.created_at DESC
-                    SEPARATOR '|||'
+                STRING_AGG(
+                    CONCAT(p.nama_lomba, '|', p.kategori, '|', p.juara),
+                    '|||' ORDER BY p.created_at DESC
                 ) as competition_details
             FROM users u
             LEFT JOIN prestasi p ON u.id = p.user_id
@@ -177,7 +175,7 @@ router.get('/leaderboard/nonakademik', auth, async (req, res) => {
                 AND p.status = 'approved'
             WHERE u.role = 'siswa'
             GROUP BY u.id, u.nama, u.nis, u.kelas, u.grha, u.foto
-            HAVING total_prestasi > 0
+            HAVING COUNT(DISTINCT p.id) > 0
             ORDER BY total_prestasi DESC, total_point DESC, u.nama ASC
             LIMIT 20
         `);
