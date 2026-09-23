@@ -36,6 +36,7 @@ async function getSchoolConfig() {
 async function getSchoolSignature() {
     const cfg = await getSchoolConfig();
     return {
+        school_name: cfg.school_name,
         nama_kepala_sekolah: cfg.principal_name,
         nip_kepala_sekolah: cfg.principal_nip,
     };

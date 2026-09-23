@@ -6,6 +6,7 @@ const { buildIpcCardBreakdown } = require('../utils/ipcCardBreakdown');
 const { calculateFullClass } = require('../utils/academicYear');
 const { generateRaportIPC, generateRaportIPCBuffer, generateLegerIPCBuffer, formatDateIndo } = require('../utils/pdfGenerator');
 const { getSchoolSignature } = require('../utils/schoolConfig');
+const { getRequestedSemester, getRequestedTahunPelajaran, getCutoffDate } = require('../utils/reportParams');
 const path = require('path');
 const fs = require('fs');
 
@@ -268,7 +269,7 @@ router.get('/ipc-card/:userId', auth, async (req, res) => {
             }
         }
 
-        const cardData = await buildIpcCardBreakdown(userId);
+        const cardData = await buildIpcCardBreakdown(userId, getCutoffDate(req));
         if (!cardData) {
             return res.status(404).json({ message: 'Siswa tidak ditemukan' });
         }
@@ -350,7 +351,7 @@ router.get('/ipc-card-pdf/:userId', auth, async (req, res) => {
             }
         }
 
-        const cardData = await buildIpcCardBreakdown(userId);
+        const cardData = await buildIpcCardBreakdown(userId, getCutoffDate(req));
         if (!cardData) {
             return res.status(404).json({ message: 'Siswa tidak ditemukan' });
         }
@@ -412,8 +413,8 @@ router.get('/ipc-card-pdf/:userId', auth, async (req, res) => {
             nis: student.nis || '-',
             grha: student.grha || '-',
             wali_kelas: wali?.wali_nama || 'Wali Kelas Belum Ditentukan',
-            semester: 'Ganjil',
-            tahun_pelajaran: new Date().getFullYear() + '/' + (new Date().getFullYear() + 1),
+            semester: getRequestedSemester(req),
+            tahun_pelajaran: getRequestedTahunPelajaran(req),
             point_awal: pointAwal,
             prestasi_akademik: prestasiAkademik,
             prestasi_non_akademik: prestasiNonAkademik,
@@ -487,7 +488,7 @@ router.get('/ipc-card-preview/:userId', auth, async (req, res) => {
             }
         }
 
-        const cardData = await buildIpcCardBreakdown(userId);
+        const cardData = await buildIpcCardBreakdown(userId, getCutoffDate(req));
         if (!cardData) {
             return res.status(404).json({ message: 'Siswa tidak ditemukan' });
         }
@@ -549,8 +550,8 @@ router.get('/ipc-card-preview/:userId', auth, async (req, res) => {
             nis: student.nis || '-',
             grha: student.grha || '-',
             wali_kelas: wali?.wali_nama || 'Wali Kelas Belum Ditentukan',
-            semester: 'Ganjil',
-            tahun_pelajaran: new Date().getFullYear() + '/' + (new Date().getFullYear() + 1),
+            semester: getRequestedSemester(req),
+            tahun_pelajaran: getRequestedTahunPelajaran(req),
             point_awal: pointAwal,
             prestasi_akademik: prestasiAkademik,
             prestasi_non_akademik: prestasiNonAkademik,

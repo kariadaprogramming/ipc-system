@@ -20,6 +20,7 @@ const F_SIGN = { name: TNR, size: 12, bold: true, underline: true };
 
 const A_CENTER = { vertical: 'middle', horizontal: 'center', wrapText: true };
 const A_LEFT = { vertical: 'middle', horizontal: 'left', wrapText: true };
+const A_LEFT_NW = { vertical: 'middle', horizontal: 'left' }; // tanpa wrap (area tanda tangan)
 
 const MERGES = [
   'A9:K9', 'A11:K11', 'A12:K12', 'A13:K13',
@@ -38,10 +39,6 @@ const MERGES = [
   'A35:A38', 'B35:G35', 'H35:K35',
   'C36:G36', 'H36:K36', 'C37:G37', 'H37:K37', 'C38:G38', 'H38:K38',
   'A39:G39', 'H39:K39',
-  'A42:F42', 'H42:L42',
-  'A43:G43',
-  'A47:G47', 'H47:K47',
-  'A48:F48',
 ];
 
 const ROW_HEIGHTS = {
@@ -183,9 +180,8 @@ export async function createIndividualIpcExcelBuffer({
 
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Raport IPC', {
-    pageSetup: { paperSize: 9, orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 1 },
+    pageSetup: { paperSize: 9, orientation: 'portrait', scale: 115 },
   });
-  sheet.pageSetup.scale = 94;
   sheet.pageMargins = { left: 0.53, right: 0.61, top: 0.18, bottom: 0.3, header: 0.12, footer: 0.12 };
   sheet.pageSetup.printArea = 'A1:L48';
 
@@ -243,9 +239,9 @@ export async function createIndividualIpcExcelBuffer({
   const prestasiRows = [['Akademik', p.prestasiAkademik], ['Non-Akademik', p.prestasiNonakademik]];
   prestasiRows.forEach(([label, val], i) => {
     const r = 22 + i;
-    setCell(sheet, `B${r}`, i + 1, { font: F_BOLD, alignment: A_CENTER });
-    setCell(sheet, `C${r}`, label, { font: F_BOLD, alignment: A_CENTER });
-    setCell(sheet, `H${r}`, val, { font: F_BOLD, alignment: A_CENTER });
+    setCell(sheet, `B${r}`, i + 1, { font: F_TEXT, alignment: A_CENTER });
+    setCell(sheet, `C${r}`, label, { font: F_TEXT, alignment: A_CENTER });
+    setCell(sheet, `H${r}`, val, { font: F_TEXT, alignment: A_CENTER });
   });
 
   setCell(sheet, 'A24', 'III', { font: F_BOLD, alignment: A_CENTER });
@@ -259,9 +255,9 @@ export async function createIndividualIpcExcelBuffer({
   ];
   karakterRows.forEach(([label, val], i) => {
     const r = 25 + i;
-    setCell(sheet, `B${r}`, i + 1, { font: F_BOLD, alignment: A_CENTER });
-    setCell(sheet, `C${r}`, label, { font: F_BOLD, alignment: A_CENTER });
-    setCell(sheet, `H${r}`, val, { font: F_BOLD, alignment: A_CENTER });
+    setCell(sheet, `B${r}`, i + 1, { font: F_TEXT, alignment: A_CENTER });
+    setCell(sheet, `C${r}`, label, { font: F_TEXT, alignment: A_CENTER });
+    setCell(sheet, `H${r}`, val, { font: F_TEXT, alignment: A_CENTER });
   });
 
   const aktifRows = [['IV', 'Organisasi', p.organisasi], ['V', 'Kepanitiaan', p.kepanitiaan], ['VI', 'Event', p.event]];
@@ -279,9 +275,9 @@ export async function createIndividualIpcExcelBuffer({
   const langgarRows = [['Ringan', p.pelanggaranRingan], ['Sedang', p.pelanggaranSedang], ['Berat', p.pelanggaranBerat]];
   langgarRows.forEach(([label, val], i) => {
     const r = 36 + i;
-    setCell(sheet, `B${r}`, i + 1, { font: F_BOLD, alignment: A_CENTER });
-    setCell(sheet, `C${r}`, label, { font: F_BOLD, alignment: A_CENTER });
-    setCell(sheet, `H${r}`, val, { font: F_BOLD, alignment: A_CENTER });
+    setCell(sheet, `B${r}`, i + 1, { font: F_TEXT, alignment: A_CENTER });
+    setCell(sheet, `C${r}`, label, { font: F_TEXT, alignment: A_CENTER });
+    setCell(sheet, `H${r}`, val, { font: F_TEXT, alignment: A_CENTER });
   });
 
   setCell(sheet, 'A39', 'TOTAL POINT IPC', { font: F_BOLD, alignment: A_CENTER });
@@ -289,18 +285,45 @@ export async function createIndividualIpcExcelBuffer({
 
   styleTableGrid(sheet);
 
-  // Tanda tangan
-  setCell(sheet, 'A42', 'Mengetahui.', { font: F_BOLD, alignment: A_LEFT });
-  setCell(sheet, 'H42', `Kubutambahan, ${tgl}`, { font: F_BOLD, alignment: A_LEFT });
-  setCell(sheet, 'A43', `Kepala ${schoolName}`, { font: F_BOLD, alignment: A_LEFT });
-  setCell(sheet, 'H43', 'Wali Kelas', { font: F_BOLD, alignment: A_LEFT });
-  setCell(sheet, 'A47', principalName, { font: F_SIGN, alignment: A_LEFT });
-  setCell(sheet, 'H47', waliNama, { font: F_SIGN, alignment: A_LEFT });
-  const nipLeft = setCell(sheet, 'A48', `NIP. ${principalNip}`, { font: F_BOLD, alignment: A_LEFT });
-  nipLeft.border = { left: { style: 'medium', color: { argb: INK } } };
-  const namaLeft = sheet.getCell('A47');
-  namaLeft.border = { left: { style: 'medium', color: { argb: INK } } };
-  setCell(sheet, 'H48', `NIP. ${waliNip}`, { font: F_BOLD, alignment: A_LEFT });
+  // Label tabel (A19:G38) rata kiri; kolom Point (H) tetap rata tengah.
+  for (let r = 19; r <= 38; r++) {
+    for (let c = 1; c <= 7; c++) {
+      sheet.getCell(r, c).alignment = A_LEFT;
+    }
+  }
+
+  // Tanda tangan (tanpa merge & tanpa wrap)
+  setCell(sheet, 'A42', 'Mengetahui.', { font: F_BOLD, alignment: A_LEFT_NW });
+  setCell(sheet, 'H42', `Kubutambahan, ${tgl}`, { font: F_BOLD, alignment: A_LEFT_NW });
+  setCell(sheet, 'A43', `Kepala ${schoolName}`, { font: F_BOLD, alignment: A_LEFT_NW });
+  setCell(sheet, 'H43', 'Wali Kelas', { font: F_BOLD, alignment: A_LEFT_NW });
+  setCell(sheet, 'A47', principalName, { font: F_SIGN, alignment: A_LEFT_NW });
+  setCell(sheet, 'H47', waliNama, { font: F_SIGN, alignment: A_LEFT_NW });
+  setCell(sheet, 'A48', `NIP. ${principalNip}`, { font: F_BOLD, alignment: A_LEFT_NW });
+  setCell(sheet, 'H48', `NIP. ${waliNip}`, { font: F_BOLD, alignment: A_LEFT_NW });
+
+  // Kunci border tabel: ExcelJS menyalin referensi objek style dari sel master
+  // merge ke semua anggotanya, sehingga penulisan border per-sel saling
+  // menimpa antar-sel dalam satu merge (tepi kiri A19/A39 jadi thin).
+  // Tulis ulang setiap sel tabel dengan objek style BARU yang lengkap agar
+  // tidak lagi berbagi referensi.
+  for (let r = 19; r <= 39; r++) {
+    for (let c = 1; c <= 11; c++) {
+      const cell = sheet.getCell(r, c);
+      const st = cell.style || {};
+      const side = (s) => ({ style: s, color: { argb: INK } });
+      cell.style = {
+        ...(st.font ? { font: { ...st.font } } : {}),
+        ...(st.alignment ? { alignment: { ...st.alignment } } : {}),
+        border: {
+          top: side(r === 19 ? 'medium' : 'thin'),
+          bottom: side(r === 39 ? 'medium' : 'thin'),
+          left: side(c === 1 ? 'medium' : 'thin'),
+          right: side(c === 11 ? 'medium' : 'thin'),
+        },
+      };
+    }
+  }
 
   return workbook.xlsx.writeBuffer();
 }

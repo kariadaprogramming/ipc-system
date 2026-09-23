@@ -86,7 +86,7 @@ function calculateBreakdownTotal(points) {
     return total;
 }
 
-async function buildIpcCardBreakdown(userId) {
+async function buildIpcCardBreakdown(userId, cutoff = null) {
     const [students] = await db.query(
         `SELECT id, nama, nis, kelas, grha, ipc_total, ipc_awal
          FROM users
@@ -101,9 +101,14 @@ async function buildIpcCardBreakdown(userId) {
     const student = students[0];
     const points = createEmptyPoints(student.ipc_awal ?? 80);
 
+    // Cutoff opsional (string 'YYYY-MM-DD'): hanya record dengan
+    // created_at SEBELUM tanggal ini yang dihitung. Tanpa cutoff = semua.
+    const before = cutoff ? ' AND created_at < ?' : '';
+    const beforeParam = (params) => (cutoff ? [...params, cutoff] : params);
+
     const [prestasi] = await db.query(
-        `SELECT jenis, point FROM prestasi WHERE user_id = ? AND status = 'approved'`,
-        [userId]
+        `SELECT jenis, point FROM prestasi WHERE user_id = ? AND status = 'approved'${before}`,
+        beforeParam([userId])
     );
     prestasi.forEach((row) => {
         if (row.jenis === 'akademik') {
@@ -114,26 +119,26 @@ async function buildIpcCardBreakdown(userId) {
     });
 
     const [organisasi] = await db.query(
-        `SELECT point FROM organisasi WHERE user_id = ? AND status = 'approved'`,
-        [userId]
+        `SELECT point FROM organisasi WHERE user_id = ? AND status = 'approved'${before}`,
+        beforeParam([userId])
     );
     points.organisasi = organisasi.reduce((sum, row) => sum + (row.point || 0), 0);
 
     const [kepanitiaan] = await db.query(
-        `SELECT point FROM kepanitiaan WHERE user_id = ? AND status = 'approved'`,
-        [userId]
+        `SELECT point FROM kepanitiaan WHERE user_id = ? AND status = 'approved'${before}`,
+        beforeParam([userId])
     );
     points.kepanitiaan = kepanitiaan.reduce((sum, row) => sum + (row.point || 0), 0);
 
     const [event] = await db.query(
-        `SELECT point FROM event WHERE user_id = ? AND status = 'approved'`,
-        [userId]
+        `SELECT point FROM event WHERE user_id = ? AND status = 'approved'${before}`,
+        beforeParam([userId])
     );
     points.event = event.reduce((sum, row) => sum + (row.point || 0), 0);
 
     const [pelanggaran] = await db.query(
-        `SELECT jenis_pelanggaran, point_dikurangi FROM pelanggaran WHERE user_id = ? AND status = 'approved'`,
-        [userId]
+        `SELECT jenis_pelanggaran, point_dikurangi FROM pelanggaran WHERE user_id = ? AND status = 'approved'${before}`,
+        beforeParam([userId])
     );
     pelanggaran.forEach((row) => {
         const jenis = row.jenis_pelanggaran?.toLowerCase();
@@ -148,11 +153,13 @@ async function buildIpcCardBreakdown(userId) {
         }
     });
 
+    // Perilaku memakai penilaian TERAKHIR; dengan cutoff berarti
+    // penilaian terakhir SEBELUM tanggal cutoff (kondisi saat itu).
     const [perilaku] = await db.query(
         `SELECT karakter_siswa, point FROM perilaku
-         WHERE user_id = ? AND status = 'approved'
+         WHERE user_id = ? AND status = 'approved'${before}
          ORDER BY created_at DESC LIMIT 1`,
-        [userId]
+        beforeParam([userId])
     );
     if (perilaku.length > 0) {
         await addPerilakuPoints(points, perilaku[0].karakter_siswa);

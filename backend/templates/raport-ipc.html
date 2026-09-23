@@ -13,6 +13,9 @@
   <img class="kop" src="{{logo_path}}" alt="Kop Surat Sekolah">
 
   <div class="judul">Individual Point Card</div>
+  <div class="sekolah">{{school_name}}</div>
+  <div class="tahun-label">Tahun Pelajaran</div>
+  <div class="tahun">{{tahun_pelajaran}}</div>
 
   <!-- ================= INFO SISWA ================= -->
   <table class="info">
@@ -27,7 +30,7 @@
     <tr>
       <td class="label">NIS/NISN</td>
       <td class="colon">:</td>
-      <td class="value">{{nis_nisn}}</td>
+      <td class="value">{{nis}}</td>
       <td class="label">Grha</td>
       <td class="colon">:</td>
       <td class="value">{{grha}}</td>
@@ -38,7 +41,7 @@
       <td class="value">{{wali_kelas}}</td>
       <td class="label">Semester</td>
       <td class="colon">:</td>
-      <td class="value">{{semester}} - {{tahun_pelajaran}}</td>
+      <td class="value">{{semester}}</td>
     </tr>
   </table>
 
@@ -68,10 +71,6 @@
       </tr>
       <tr class="item"><td></td><td class="num2">1</td><td>Akademik</td><td class="point">{{prestasi_akademik}}</td></tr>
       <tr class="item"><td></td><td class="num2">2</td><td>Non-Akademik</td><td class="point">{{prestasi_non_akademik}}</td></tr>
-      <tr class="total">
-        <td colspan="3">Jumlah Prestasi</td>
-        <td class="point">{{jumlah_prestasi}}</td>
-      </tr>
 
       <tr class="section-head">
         <td class="num">III</td>
@@ -85,10 +84,6 @@
       <tr class="item"><td></td><td class="num2">5</td><td>Spiritual</td><td class="point">{{karakter_spiritual}}</td></tr>
       <tr class="item"><td></td><td class="num2">6</td><td>Kejujuran</td><td class="point">{{karakter_kejujuran}}</td></tr>
       <tr class="item"><td></td><td class="num2">7</td><td>Kepercayaan Diri</td><td class="point">{{karakter_kepercayaan_diri}}</td></tr>
-      <tr class="total">
-        <td colspan="3">Jumlah Perkembangan Karakter</td>
-        <td class="point">{{jumlah_karakter}}</td>
-      </tr>
 
       <tr class="section-head">
         <td class="num">IV</td>
@@ -108,11 +103,6 @@
         <td class="point">{{event}}</td>
       </tr>
 
-      <tr class="total">
-        <td colspan="3">Jumlah Keaktifan</td>
-        <td class="point">{{jumlah_keaktifan}}</td>
-      </tr>
-
       <tr class="section-head">
         <td class="num">VII</td>
         <td colspan="2">Pelanggaran</td>
@@ -121,10 +111,6 @@
       <tr class="item"><td></td><td class="num2">1</td><td>Ringan</td><td class="point">{{pelanggaran_ringan}}</td></tr>
       <tr class="item"><td></td><td class="num2">2</td><td>Sedang</td><td class="point">{{pelanggaran_sedang}}</td></tr>
       <tr class="item"><td></td><td class="num2">3</td><td>Berat</td><td class="point">{{pelanggaran_berat}}</td></tr>
-      <tr class="total">
-        <td colspan="3">Jumlah Pelanggaran</td>
-        <td class="point">{{jumlah_pelanggaran}}</td>
-      </tr>
 
       <tr class="total">
         <td colspan="3" style="text-align:center;">TOTAL POINT IPC</td>
@@ -138,7 +124,7 @@
   <div class="ttd">
     <div class="kiri">
       Mengetahui,<br>
-      Kepala SMK Negeri Bali Mandara
+      Kepala {{school_name}}
       <div class="spasi"></div>
       <div class="nama-ttd">{{nama_kepala_sekolah}}</div>
       NIP. {{nip_kepala_sekolah}}
