@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
 import API_BASE_URL from '../config';
+import { useMinIpc, isBelowMinIpc } from '../utils/minIpc';
 import StudentRecordsHistory from './StudentRecordsHistory';
 
 const JABATAN_OPTIONS = ['Guru', 'Pegawai'];
 
 function Profile() {
+  const minIpc = useMinIpc();
   const [profile, setProfile] = useState(null);
   const [ipcHistory, setIpcHistory] = useState([]);
   const [summary, setSummary] = useState(null);
@@ -331,7 +333,7 @@ function Profile() {
         <>
           <div className="card" style={{ marginBottom: '24px' }}>
             <h3>IPC Anda</h3>
-            <p style={{ fontSize: '48px', fontWeight: 'bold', color: '#3498db' }}>{profile?.ipc_total || 0}</p>
+            <p style={{ fontSize: '48px', fontWeight: 'bold', color: isBelowMinIpc(profile?.ipc_total ?? 0, minIpc) ? '#dc2626' : '#3498db' }}>{profile?.ipc_total || 0}</p>
             <p>IPC Awal: {profile?.ipc_awal || 0}</p>
           </div>
 

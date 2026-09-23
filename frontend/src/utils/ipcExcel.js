@@ -23,6 +23,7 @@ const F_SIGN = { name: TNR, size: 12, bold: true, underline: true };
 // Merah untuk baris Pelanggaran (point negatif) — sama dengan warna merah
 // nilai negatif pada leger kelas (LaporanCetak).
 const F_TEXT_RED = { name: TNR, size: 12, color: { argb: 'FFC00000' } };
+const F_BOLD_RED = { name: TNR, size: 12, bold: true, color: { argb: 'FFC00000' } };
 
 const A_CENTER = { vertical: 'middle', horizontal: 'center', wrapText: true };
 const A_LEFT = { vertical: 'middle', horizontal: 'left', wrapText: true };
@@ -177,9 +178,13 @@ export async function createIndividualIpcExcelBuffer({
   tahunPelajaran = null,
   tanggal = null,
   kopImage = null,
+  minIpc = 0, // batas minimum Total IPC (0 = nonaktif)
 }) {
   const p = calcIndividualPoints(points);
   const total = ipcTotal ?? p.total;
+  // Total di bawah batas minimum diketak merah — hanya nilai Total (kolom H),
+  // label "TOTAL POINT IPC" tetap hitam.
+  const totalBelowMin = Number(minIpc) > 0 && Number(total) < Number(minIpc);
 
   // Baris Pelanggaran: SEMUA tingkat dari konfigurasi, urut dari point
   // terkecil (-1) ke terbesar. Fallback lama: Ringan/Sedang/Berat.
@@ -326,7 +331,7 @@ export async function createIndividualIpcExcelBuffer({
   });
 
   setCell(sheet, `A${totalRow}`, 'TOTAL POINT IPC', { font: F_BOLD, alignment: A_CENTER });
-  setCell(sheet, `H${totalRow}`, total, { font: F_BOLD, alignment: A_CENTER });
+  setCell(sheet, `H${totalRow}`, total, { font: totalBelowMin ? F_BOLD_RED : F_BOLD, alignment: A_CENTER });
 
   styleTableGrid(sheet, totalRow);
 

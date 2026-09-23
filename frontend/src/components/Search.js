@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../utils/api';
+import { useMinIpc, isBelowMinIpc } from '../utils/minIpc';
 
 function Search() {
+  const minIpc = useMinIpc();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [selectedStudent, setSelectedStudent] = useState(null);
@@ -88,7 +90,7 @@ function Search() {
                   <td>{student.nis}</td>
                   <td>{student.kelas}</td>
                   <td>{student.grha}</td>
-                  <td>{student.ipc_total}</td>
+                  <td style={isBelowMinIpc(student.ipc_total, minIpc) ? { color: '#dc2626', fontWeight: 'bold' } : undefined}>{student.ipc_total}</td>
                   <td>{student.total_prestasi_akademik}</td>
                   <td>{student.total_prestasi_nonakademik}</td>
                   <td>
@@ -112,7 +114,7 @@ function Search() {
             <p><strong>NIS:</strong> {selectedStudent.student.nis}</p>
             <p><strong>Kelas:</strong> {selectedStudent.student.kelas}</p>
             <p><strong>Grha:</strong> {selectedStudent.student.grha}</p>
-            <p><strong>IPC Total:</strong> {selectedStudent.student.ipc_total}</p>
+            <p><strong>IPC Total:</strong> <span style={isBelowMinIpc(selectedStudent.student.ipc_total, minIpc) ? { color: '#dc2626', fontWeight: 'bold' } : undefined}>{selectedStudent.student.ipc_total}</span></p>
           </div>
 
           <h4>Prestasi Akademik: {selectedStudent.total_prestasi_akademik}</h4>

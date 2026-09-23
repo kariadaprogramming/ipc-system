@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../utils/api';
+import { useMinIpc, isBelowMinIpc } from '../utils/minIpc';
 import './IpcReport.css';
 
 function formatTahunPelajaran(date = new Date()) {
@@ -17,6 +18,7 @@ function formatPrintDate(date = new Date()) {
 }
 
 function IpcReport({ studentId, onClose }) {
+  const minIpc = useMinIpc();
   const [studentData, setStudentData] = useState(null);
   const [ipcData, setIpcData] = useState(null);
   const [schoolConfig, setSchoolConfig] = useState(null);
@@ -52,7 +54,7 @@ function IpcReport({ studentId, onClose }) {
     } finally {
       setLoading(false);
     }
-  }, [studentId]);
+  };
 
   useEffect(() => {
     fetchReportData();
@@ -278,7 +280,7 @@ function IpcReport({ studentId, onClose }) {
 
               <tr className="total-row">
                 <td><strong>TOTAL POINT IPC</strong></td>
-                <td className={`point-value total ${total < 0 ? 'total-minus' : ''}`}><strong>{formatTotal(total)}</strong></td>
+                <td className={`point-value total ${total < 0 || isBelowMinIpc(total, minIpc) ? 'total-minus' : ''}`}><strong>{formatTotal(total)}</strong></td>
               </tr>
             </tbody>
           </table>

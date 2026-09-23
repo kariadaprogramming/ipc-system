@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../utils/api';
 import API_BASE_URL from '../config';
+import { useMinIpc, isBelowMinIpc } from '../utils/minIpc';
 
 function getCurrentAcademicYear() {
   const now = new Date();
@@ -42,6 +43,7 @@ function formatDisplayText(text) {
 
 
 function WaliKelas() {
+  const minIpc = useMinIpc();
   const [assignments, setAssignments] = useState([]);
   const [classStats, setClassStats] = useState([]);
   const [teachers, setTeachers] = useState([]);
@@ -703,7 +705,7 @@ function WaliKelas() {
                           </div>
                         </td>
                         <td style={{ padding: '13px 16px', fontSize: '.85rem', borderBottom: '1px solid #f1f5f9', color: '#334155' }}>
-                          <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '38px', height: '38px', borderRadius: '50%', background: '#0891b2', color: '#fff', fontWeight: 700, fontSize: '.85rem' }}>{student.ipc_total || 80}</span>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '38px', height: '38px', borderRadius: '50%', background: isBelowMinIpc(student.ipc_total || 80, minIpc) ? '#dc2626' : '#0891b2', color: '#fff', fontWeight: 700, fontSize: '.85rem' }}>{student.ipc_total || 80}</span>
                         </td>
                         <td style={{ padding: '13px 16px', fontSize: '.85rem', borderBottom: '1px solid #f1f5f9', color: '#334155' }}>
                           <button onClick={() => handleViewStudentDetail(student)} className="btn" style={{ border: 'none', borderRadius: '10px', padding: '6px 12px', fontSize: '.75rem', fontWeight: 600, cursor: 'pointer', background: '#2563eb', color: '#fff', transition: 'all 0.2s' }}>Detail</button>
@@ -827,7 +829,7 @@ function WaliKelas() {
 
               <div style={{ background: '#f8fafc', borderRadius: '10px', padding: '12px 16px' }}>
                 <div style={{ fontSize: '.72rem', fontWeight: 700, color: '#64748b', marginBottom: '4px' }}>Total IPC</div>
-                <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '44px', height: '44px', borderRadius: '50%', background: '#0891b2', color: '#fff', fontWeight: 700, fontSize: '1rem' }}>{selectedStudent.ipc_total || 80}</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '44px', height: '44px', borderRadius: '50%', background: isBelowMinIpc(selectedStudent.ipc_total || 80, minIpc) ? '#dc2626' : '#0891b2', color: '#fff', fontWeight: 700, fontSize: '1rem' }}>{selectedStudent.ipc_total || 80}</span>
               </div>
             </div>
           </div>

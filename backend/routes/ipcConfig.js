@@ -228,6 +228,66 @@ router.delete('/perilaku-ratings/:id', auth, superAdminOnly, async (req, res) =>
     }
 });
 
+// ---- Batas minimum Total IPC (bukan poin — hanya pengaturan tampilan) ----
+const MIN_IPC_CATEGORY = 'pengaturan';
+const MIN_IPC_FIELD1 = 'min_ipc';
+
+// Dibaca semua role yang login — dipakai untuk menandai total IPC di bawah batas (merah).
+router.get('/min-ipc', auth, async (req, res) => {
+    try {
+        const [rows] = await db.query(
+            `SELECT point_value FROM ipc_config
+             WHERE category = ? AND field1 = ?
+             ORDER BY id LIMIT 1`,
+            [MIN_IPC_CATEGORY, MIN_IPC_FIELD1]
+        );
+        const value = rows.length ? parseInt(rows[0].point_value, 10) : 0;
+        res.json({ min_ipc: Number.isFinite(value) && value > 0 ? value : 0 });
+    } catch (error) {
+        console.error('Error fetching min IPC config:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Hanya superadmin yang boleh mengubah batas. 0 = fitur nonaktif.
+router.put('/min-ipc', auth, superAdminOnly, async (req, res) => {
+    try {
+        const raw = req.body?.min_ipc;
+        const value = Number(raw);
+        if (raw === '' || raw === null || raw === undefined ||
+            !Number.isInteger(value) || value < 0 || value > 100000) {
+            return res.status(400).json({ message: 'Batas minimum harus bilangan bulat 0 - 100000' });
+        }
+
+        const userId = req.user.id;
+        const [existing] = await db.query(
+            'SELECT id FROM ipc_config WHERE category = ? AND field1 = ? ORDER BY id LIMIT 1',
+            [MIN_IPC_CATEGORY, MIN_IPC_FIELD1]
+        );
+
+        if (existing.length) {
+            await db.query(
+                'UPDATE ipc_config SET point_value = ?, is_active = TRUE, updated_by = ? WHERE id = ?',
+                [value, userId, existing[0].id]
+            );
+        } else {
+            await db.query(
+                `INSERT INTO ipc_config (category, field1, field2, field3, point_value, description, is_active, updated_by)
+                 VALUES (?, ?, NULL, NULL, ?, ?, TRUE, ?)`,
+                [MIN_IPC_CATEGORY, MIN_IPC_FIELD1, value,
+                 'Batas minimum Total IPC - total di bawah nilai ini ditampilkan merah (0 = nonaktif)',
+                 userId]
+            );
+        }
+
+        clearConfigCache();
+        res.json({ min_ipc: value });
+    } catch (error) {
+        console.error('Error updating min IPC config:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
 // Get single configuration
 router.get('/:id', auth, superAdminOnly, async (req, res) => {
     try {

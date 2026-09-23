@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
 import ExcelJS from 'exceljs';
 import { createIndividualIpcExcelBuffer, fetchKopImage } from '../utils/ipcExcel';
+import { fetchMinIpc, isBelowMinIpc } from '../utils/minIpc';
 import '../ipcPrint.css';
 
 // ------------------------------------------------------------------
@@ -279,6 +280,7 @@ function LaporanCetak({ user }) {
     } else if (reportType === 'class') {
       // For class report, generate Excel with leger format using ExcelJS
       try {
+        const minIpc = await fetchMinIpc();
         // Prepare student data in the format expected by the Excel generator
         const formattedStudents = classStudents.map((student, index) => {
           const points = student.points || {};
@@ -418,12 +420,13 @@ function LaporanCetak({ user }) {
             cell.value = values[def.key];
 
             const isNegative = typeof values[def.key] === "number" && values[def.key] < 0;
+            const isBelowMin = def.key === "totalIPC" && isBelowMinIpc(values[def.key], minIpc);
 
             styleCell(cell, {
               fill: def.jumlahFill ? EXCEL_COLORS[def.jumlahFill] : undefined,
               bold: !!def.jumlahFill,
               align: def.align || "center",
-              color: isNegative ? "FFC00000" : undefined,
+              color: isNegative || isBelowMin ? "FFC00000" : undefined,
             });
           });
         });
@@ -463,6 +466,7 @@ function LaporanCetak({ user }) {
       const cardData = await fetchIpcCard(selectedStudentId);
       const school = await getFreshSchoolConfig();
       const kopImage = await fetchKopImage(['/header.png']);
+      const minIpc = await fetchMinIpc();
       const buffer = await createIndividualIpcExcelBuffer({
         student: cardData.student,
         wali: cardData.wali,
@@ -472,6 +476,7 @@ function LaporanCetak({ user }) {
         semester,
         tahunPelajaran,
         kopImage,
+        minIpc,
       });
       const url = URL.createObjectURL(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
       const link = document.createElement('a');

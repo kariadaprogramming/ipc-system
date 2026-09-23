@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
+import { useMinIpc, isBelowMinIpc } from '../utils/minIpc';
 
 function EditIPCAwal() {
+  const minIpc = useMinIpc();
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
@@ -434,7 +436,7 @@ function GradeSection({ grade, students, selectedStudents, onSelectAll, onSelect
                   <td>{student.kelas || '-'}</td>
                   <td>{student.grha || '-'}</td>
                   <td className="num">{student.ipc_awal ?? '-'}</td>
-                  <td className="num">{student.ipc_total ?? 0}</td>
+                  <td className="num" style={isBelowMinIpc(student.ipc_total ?? 0, minIpc) ? { color: '#dc2626', fontWeight: 'bold' } : undefined}>{student.ipc_total ?? 0}</td>
                 </tr>
               ))}
             </tbody>

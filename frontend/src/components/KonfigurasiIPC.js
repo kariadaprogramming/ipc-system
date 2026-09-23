@@ -24,6 +24,8 @@ function KonfigurasiIPC() {
   const [excelFile, setExcelFile] = useState(null);
   const [importing, setImporting] = useState(false);
   const [importResults, setImportResults] = useState([]);
+  const [minIpcInput, setMinIpcInput] = useState('0');
+  const [minIpcSaving, setMinIpcSaving] = useState(false);
 
   const categories = [
     { key: 'prestasi', label: 'Prestasi', icon: '🏆' },
@@ -40,6 +42,7 @@ function KonfigurasiIPC() {
     fetchConfigs();
     fetchOrganisasiOptions();
     fetchPerilakuRatings();
+    fetchMinIpcConfig();
   }, []);
 
   const fetchOrganisasiOptions = async () => {
@@ -114,6 +117,34 @@ function KonfigurasiIPC() {
       fetchOrganisasiOptions();
     } catch (error) {
       setMessage(error.response?.data?.message || 'Gagal menghapus organisasi');
+    }
+  };
+
+  const fetchMinIpcConfig = async () => {
+    try {
+      const response = await api.get('/ipc-config/min-ipc');
+      setMinIpcInput(String(response.data?.min_ipc ?? 0));
+    } catch (error) {
+      console.error('Error fetching min IPC config:', error);
+    }
+  };
+
+  const saveMinIpcConfig = async () => {
+    const trimmed = String(minIpcInput).trim();
+    const value = Number(trimmed);
+    if (trimmed === '' || !Number.isInteger(value) || value < 0) {
+      setMessage('Batas minimum harus bilangan bulat 0 atau lebih (0 = nonaktif)');
+      return;
+    }
+    try {
+      setMinIpcSaving(true);
+      await api.put('/ipc-config/min-ipc', { min_ipc: value });
+      setMessage('Batas minimum Total IPC berhasil disimpan!');
+      setMinIpcInput(String(value));
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Gagal menyimpan batas minimum IPC');
+    } finally {
+      setMinIpcSaving(false);
     }
   };
 
@@ -471,6 +502,32 @@ function KonfigurasiIPC() {
           {message}
         </div>
       )}
+
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+          <div style={{ flex: '1 1 320px' }}>
+            <h3 style={{ margin: '0 0 4px' }}>Batas Minimum Total IPC</h3>
+            <p style={{ margin: 0, color: '#6B7080', fontSize: 13 }}>
+              Total IPC siswa di bawah batas ini ditampilkan <strong style={{ color: '#dc2626' }}>merah</strong> pada
+              cetakan Excel (laporan individual &amp; per kelas) dan halaman laporan. Isi <strong>0</strong> untuk
+              menonaktifkan.
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              value={minIpcInput}
+              onChange={(e) => setMinIpcInput(e.target.value)}
+              style={{ width: 130, padding: '9px 10px', borderRadius: 8, border: '1px solid #D7DBE4', fontSize: 14 }}
+            />
+            <button className="btn btn-primary" onClick={saveMinIpcConfig} disabled={minIpcSaving}>
+              {minIpcSaving ? 'Menyimpan...' : 'Simpan'}
+            </button>
+          </div>
+        </div>
+      </div>
 
       <div className="card" style={{ marginBottom: 20 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>

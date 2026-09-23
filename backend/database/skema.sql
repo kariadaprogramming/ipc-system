@@ -727,7 +727,9 @@ INSERT INTO ipc_config (category, field1, field2, field3, point_value, descripti
 ('event', 'kabupaten', NULL, NULL, 6, 'Event tingkat kabupaten'),
 ('event', 'provinsi', NULL, NULL, 8, 'Event tingkat provinsi'),
 ('event', 'nasional', NULL, NULL, 10, 'Event tingkat nasional'),
-('event', 'internasional', NULL, NULL, 12, 'Event tingkat internasional');
+('event', 'internasional', NULL, NULL, 12, 'Event tingkat internasional'),
+-- PENGATURAN (bukan poin: field1 = nama pengaturan, point_value = nilainya; 0 = nonaktif)
+('pengaturan', 'min_ipc', NULL, NULL, 0, 'Batas minimum Total IPC - total di bawah nilai ini ditampilkan merah (0 = nonaktif)');
 
 INSERT INTO ipc_organisasi (name)
 SELECT DISTINCT field1 FROM ipc_config

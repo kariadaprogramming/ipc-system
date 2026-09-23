@@ -181,6 +181,14 @@ FROM (
 ) AS v
 WHERE NOT EXISTS (SELECT 1 FROM ipc_config LIMIT 1);
 
+-- Pengaturan tampilan: batas minimum Total IPC (0 = nonaktif)
+INSERT INTO ipc_config (category, field1, field2, field3, point_value, description)
+SELECT 'pengaturan', 'min_ipc', NULL, NULL, 0,
+       'Batas minimum Total IPC - total di bawah nilai ini ditampilkan merah (0 = nonaktif)'
+WHERE NOT EXISTS (
+    SELECT 1 FROM ipc_config WHERE category = 'pengaturan' AND field1 = 'min_ipc'
+);
+
 INSERT INTO ipc_organisasi (name)
 SELECT DISTINCT field1 FROM ipc_config
 WHERE category = 'organisasi' AND field1 IS NOT NULL
