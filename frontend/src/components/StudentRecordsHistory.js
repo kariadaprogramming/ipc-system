@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { getRecordPhotoUrl } from '../utils/recordPhoto';
+import { toTitleCase } from '../utils/perilaku';
 
 const TABS = [
     { key: 'prestasi', label: 'Prestasi' },
@@ -126,7 +127,7 @@ function renderRecordDetails(item, type) {
                 <>
                     <strong>Perilaku Positif</strong>
                     <div style={{ fontSize: 13, color: 'var(--text-secondary, #666)', marginTop: 4 }}>
-                        {item.karakter_siswa}
+                        {toTitleCase(item.karakter_siswa)}
                     </div>
                     <div style={{ fontSize: 13, marginTop: 4 }}>
                         <span className="badge badge-success">+{item.point} poin</span>

@@ -216,7 +216,7 @@ function KonfigurasiIPC() {
       kepanitiaan: 'Jabatan',
       event: 'Tingkat Event',
       pelanggaran: 'Tingkat Pelanggaran',
-      perilaku: 'Nama Karakter'
+      perilaku: 'Tingkat Penilaian'
     };
     return labels[category] || 'Field 1';
   };
@@ -228,20 +228,10 @@ function KonfigurasiIPC() {
       kepanitiaan: '',
       event: '',
       pelanggaran: '',
-      perilaku: 'Tingkat Penilaian'
+      perilaku: ''
     };
     return labels[category] || 'Field 2';
   };
-
-  const FIXED_KARAKTER_OPTIONS = [
-    'tanggung_jawab',
-    'disiplin',
-    'kepedulian',
-    'kemandirian',
-    'spiritual',
-    'kejujuran',
-    'kepercayaan_diri'
-  ];
 
   const FIXED_TINGKAT_OPTIONS = [
     'sekolah',
@@ -275,11 +265,12 @@ function KonfigurasiIPC() {
       });
   };
 
-  const showAddField2 = ['prestasi', 'organisasi', 'perilaku'].includes(activeCategory) ||
+  const showAddField2 = ['prestasi', 'organisasi'].includes(activeCategory) ||
     (activeCategory === 'pelanggaran' && pelanggaranAddType === 'detail');
   const showTableField2 = !['kepanitiaan', 'event'].includes(activeCategory) &&
-    !(activeCategory === 'pelanggaran' && pelanggaranSection === 'severity');
-  const showEditField2 = ['prestasi', 'organisasi', 'perilaku'].includes(activeCategory) ||
+    !(activeCategory === 'pelanggaran' && pelanggaranSection === 'severity') &&
+    activeCategory !== 'perilaku';
+  const showEditField2 = ['prestasi', 'organisasi'].includes(activeCategory) ||
     (activeCategory === 'pelanggaran' && Boolean(editingConfig?.field2));
 
   const tableFields = [
@@ -734,10 +725,10 @@ function KonfigurasiIPC() {
                 )}
                 {activeCategory === 'perilaku' && (
                   <select name="field1" required className="form-control" style={{ fontSize: 14 }}>
-                    <option value="">Pilih Karakter</option>
-                    {FIXED_KARAKTER_OPTIONS.map(karakter => (
-                      <option key={karakter} value={karakter}>
-                        {formatDisplayText(karakter)}
+                    <option value="">Pilih Tingkat Penilaian</option>
+                    {perilakuRatings.filter(rating => rating.is_active).map(rating => (
+                      <option key={rating.id} value={rating.name}>
+                        {formatDisplayText(rating.name)}
                       </option>
                     ))}
                   </select>
@@ -813,16 +804,6 @@ function KonfigurasiIPC() {
                     {configuredPelanggaranLevels.map(level => (
                       <option key={level.id} value={level.field1}>{level.field1}</option>
                     ))}
-                    </select>
-                  )}
-                  {activeCategory === 'perilaku' && (
-                    <select name="field2" required className="form-control" style={{ fontSize: 14 }}>
-                      <option value="">Pilih Tingkat Penilaian</option>
-                      {perilakuRatings.filter(rating => rating.is_active).map(rating => (
-                        <option key={rating.id} value={rating.name}>
-                          {formatDisplayText(rating.name)}
-                        </option>
-                      ))}
                     </select>
                   )}
                   {activeCategory === 'organisasi' && (

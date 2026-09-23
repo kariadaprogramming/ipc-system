@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
 import API_BASE_URL from '../config';
+import { toTitleCase } from '../utils/perilaku';
 
 function ApprovalsV2() {
   const PAGE_BG = '#f3f5f9';
@@ -235,7 +236,7 @@ function ApprovalsV2() {
         if (col === 'Jenis') return item.jenis_pelanggaran;
       }
       if (type === 'perilaku') {
-        if (col === 'Karakter') return item.karakter_siswa;
+        if (col === 'Karakter') return toTitleCase(item.karakter_siswa);
       }
       return '';
     };
@@ -595,7 +596,7 @@ function ApprovalsV2() {
                     borderBottom: `1px solid ${BORDER}`,
                     verticalAlign: "middle",
                     color: TEXT
-                  }}>{item.karakter_siswa}</td>
+                  }}>{toTitleCase(item.karakter_siswa)}</td>
                 )}
                 {type === 'biodata' && (
                   <>

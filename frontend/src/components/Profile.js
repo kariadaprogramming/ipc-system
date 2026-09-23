@@ -3,7 +3,7 @@ import api from '../utils/api';
 import API_BASE_URL from '../config';
 import StudentRecordsHistory from './StudentRecordsHistory';
 
-const JABATAN_OPTIONS = ['Guru', 'Pegawai', 'Staff'];
+const JABATAN_OPTIONS = ['Guru', 'Pegawai'];
 
 function Profile() {
   const [profile, setProfile] = useState(null);

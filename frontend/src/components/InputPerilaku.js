@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
+import { parseKarakterSiswa, toTitleCase } from '../utils/perilaku';
 import Select from 'react-select';
 import EditModal from './EditModal';
 import useEditModal from '../hooks/useEditModal';
@@ -68,7 +69,12 @@ function InputPerilaku() {
     try {
       setLoadingIndex(true);
       const response = await api.get('/perilaku/all');
-      setAllPerilaku(response.data);
+      // Backend menyimpan 7 trait dalam 1 kolom `karakter_siswa`
+      // ("Label: nilai, ...") -> uraikan agar kolom tabel terisi
+      setAllPerilaku((response.data || []).map((item) => ({
+        ...item,
+        ...parseKarakterSiswa(item.karakter_siswa),
+      })));
     } catch (error) {
       console.error('Error fetching all perilaku:', error);
     } finally {
@@ -116,10 +122,12 @@ function InputPerilaku() {
     }
   };
 
+  // Point perilaku hanya bergantung pada tingkat penilaian (shared semua karakter).
+  // Cocokkan field1 (format baru) atau field2 (format lama, sebelum migrasi).
   const calculatePoint = (karakter, tingkat) => {
     const perilakuConfigs = ipcConfig['perilaku'] || [];
     const config = perilakuConfigs.find(
-      c => c.field1 === karakter && c.field2 === tingkat
+      c => c.field1 === tingkat || c.field2 === tingkat
     );
     return config ? config.point_value : 0;
   };
@@ -258,7 +266,7 @@ function InputPerilaku() {
   };
 
   const handleEdit = (item) => {
-    editModal.openEditModal(item);
+    editModal.openEditModal({ ...item, ...parseKarakterSiswa(item.karakter_siswa) });
   };
 
   const handleUpdate = async () => {
@@ -270,6 +278,9 @@ function InputPerilaku() {
           updateData[key] = editModal.editFormData[key];
         }
       });
+      // Buang string gabungan lama agar backend membangun ulang
+      // `karakter_siswa` dari 7 trait yang baru diedit
+      delete updateData.karakter_siswa;
 
       await api.put(`/perilaku/${editModal.editingItem.id}`, updateData);
 
@@ -330,13 +341,13 @@ function InputPerilaku() {
                       <td>{new Date(item.created_at).toLocaleDateString('id-ID')}</td>
                       <td>{item.nama}</td>
                       <td>{item.nis}</td>
-                      <td>{item.tanggung_jawab}</td>
-                      <td>{item.disiplin}</td>
-                      <td>{item.kepedulian}</td>
-                      <td>{item.kemandirian}</td>
-                      <td>{item.spiritual}</td>
-                      <td>{item.kejujuran}</td>
-                      <td>{item.kepercayaan_diri}</td>
+                      <td>{toTitleCase(item.tanggung_jawab)}</td>
+                      <td>{toTitleCase(item.disiplin)}</td>
+                      <td>{toTitleCase(item.kepedulian)}</td>
+                      <td>{toTitleCase(item.kemandirian)}</td>
+                      <td>{toTitleCase(item.spiritual)}</td>
+                      <td>{toTitleCase(item.kejujuran)}</td>
+                      <td>{toTitleCase(item.kepercayaan_diri)}</td>
                       <td>
                         <button 
                           className="btn btn-info" 

@@ -660,35 +660,11 @@ INSERT INTO ipc_config (category, field1, field2, field3, point_value, descripti
 ('prestasi', 'internasional', 'harapan_iii', NULL, 25, 'Harapan III tingkat internasional'),
 ('prestasi', 'internasional', 'finalis', NULL, 20, 'Finalis tingkat internasional'),
 ('prestasi', 'internasional', 'peserta', NULL, 15, 'Peserta tingkat internasional'),
--- PERILAKU
-('perilaku', 'tanggung_jawab', 'sangat baik', NULL, 4, 'Karakter tanggung jawab sangat baik'),
-('perilaku', 'tanggung_jawab', 'baik', NULL, 3, 'Karakter tanggung jawab baik'),
-('perilaku', 'tanggung_jawab', 'cukup baik', NULL, 2, 'Karakter tanggung jawab cukup baik'),
-('perilaku', 'tanggung_jawab', 'kurang baik', NULL, 1, 'Karakter tanggung jawab kurang baik'),
-('perilaku', 'disiplin', 'sangat baik', NULL, 4, 'Karakter disiplin sangat baik'),
-('perilaku', 'disiplin', 'baik', NULL, 3, 'Karakter disiplin baik'),
-('perilaku', 'disiplin', 'cukup baik', NULL, 2, 'Karakter disiplin cukup baik'),
-('perilaku', 'disiplin', 'kurang baik', NULL, 1, 'Karakter disiplin kurang baik'),
-('perilaku', 'kepedulian', 'sangat baik', NULL, 4, 'Karakter kepedulian sangat baik'),
-('perilaku', 'kepedulian', 'baik', NULL, 3, 'Karakter kepedulian baik'),
-('perilaku', 'kepedulian', 'cukup baik', NULL, 2, 'Karakter kepedulian cukup baik'),
-('perilaku', 'kepedulian', 'kurang baik', NULL, 1, 'Karakter kepedulian kurang baik'),
-('perilaku', 'kemandirian', 'sangat baik', NULL, 4, 'Karakter kemandirian sangat baik'),
-('perilaku', 'kemandirian', 'baik', NULL, 3, 'Karakter kemandirian baik'),
-('perilaku', 'kemandirian', 'cukup baik', NULL, 2, 'Karakter kemandirian cukup baik'),
-('perilaku', 'kemandirian', 'kurang baik', NULL, 1, 'Karakter kemandirian kurang baik'),
-('perilaku', 'spiritual', 'sangat baik', NULL, 4, 'Karakter spiritual sangat baik'),
-('perilaku', 'spiritual', 'baik', NULL, 3, 'Karakter spiritual baik'),
-('perilaku', 'spiritual', 'cukup baik', NULL, 2, 'Karakter spiritual cukup baik'),
-('perilaku', 'spiritual', 'kurang baik', NULL, 1, 'Karakter spiritual kurang baik'),
-('perilaku', 'kejujuran', 'sangat baik', NULL, 4, 'Karakter kejujuran sangat baik'),
-('perilaku', 'kejujuran', 'baik', NULL, 3, 'Karakter kejujuran baik'),
-('perilaku', 'kejujuran', 'cukup baik', NULL, 2, 'Karakter kejujuran cukup baik'),
-('perilaku', 'kejujuran', 'kurang baik', NULL, 1, 'Karakter kejujuran kurang baik'),
-('perilaku', 'kepercayaan_diri', 'sangat baik', NULL, 4, 'Karakter kepercayaan diri sangat baik'),
-('perilaku', 'kepercayaan_diri', 'baik', NULL, 3, 'Karakter kepercayaan diri baik'),
-('perilaku', 'kepercayaan_diri', 'cukup baik', NULL, 2, 'Karakter kepercayaan diri cukup baik'),
-('perilaku', 'kepercayaan_diri', 'kurang baik', NULL, 1, 'Karakter kepercayaan diri kurang baik'),
+-- PERILAKU (satu tingkat penilaian berlaku untuk semua karakter; tingkat di field1)
+('perilaku', 'sangat baik', NULL, NULL, 4, 'Penilaian sangat baik (semua karakter)'),
+('perilaku', 'baik', NULL, NULL, 3, 'Penilaian baik (semua karakter)'),
+('perilaku', 'cukup baik', NULL, NULL, 2, 'Penilaian cukup baik (semua karakter)'),
+('perilaku', 'kurang baik', NULL, NULL, 1, 'Penilaian kurang baik (semua karakter)'),
 -- KEPANITIAAN
 ('kepanitiaan', 'ketua', NULL, NULL, 5, 'Ketua kepanitiaan'),
 ('kepanitiaan', 'wakil ketua', NULL, NULL, 4, 'Wakil ketua kepanitiaan'),
@@ -758,9 +734,9 @@ SELECT DISTINCT field1 FROM ipc_config
 WHERE category = 'organisasi' AND field1 IS NOT NULL
 ON CONFLICT (name) DO NOTHING;
 
-INSERT INTO ipc_perilaku_karakter (name)
-SELECT DISTINCT field1 FROM ipc_config
-WHERE category = 'perilaku' AND field1 IS NOT NULL
+INSERT INTO ipc_perilaku_karakter (name) VALUES
+('tanggung_jawab'), ('disiplin'), ('kepedulian'), ('kemandirian'),
+('spiritual'), ('kejujuran'), ('kepercayaan_diri')
 ON CONFLICT (name) DO NOTHING;
 
 INSERT INTO ipc_perilaku_tingkat (name) VALUES

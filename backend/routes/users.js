@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const VALID_TEACHER_JABATAN = ['Guru', 'Pegawai', 'Staff'];
+const VALID_TEACHER_JABATAN = ['Guru', 'Pegawai'];
 const bcrypt = require('bcryptjs');
 const { auth, superAdminOnly, teacherOrSuperAdmin } = require('../middleware/auth');
 const db = require('../config/database');

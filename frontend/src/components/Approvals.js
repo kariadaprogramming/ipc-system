@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
+import { toTitleCase } from '../utils/perilaku';
 
 function Approvals() {
   const [approvals, setApprovals] = useState([]);
@@ -147,7 +148,7 @@ function Approvals() {
       case 'perilaku':
         return (
           <>
-            <p><strong>Karakter:</strong> {item.karakter_siswa}</p>
+            <p><strong>Karakter:</strong> {toTitleCase(item.karakter_siswa)}</p>
             <p><strong>Point:</strong> {item.point}</p>
           </>
         );

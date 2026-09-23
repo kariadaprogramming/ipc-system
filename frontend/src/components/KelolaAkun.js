@@ -5,7 +5,7 @@ import ExcelJS from 'exceljs';
 import StudentDetail from './StudentDetail';
 import { GRHA_OPTIONS, getRowField, normalizeGrha } from '../utils/excelImport';
 
-const JABATAN_OPTIONS = ['Guru', 'Pegawai', 'Staff'];
+const JABATAN_OPTIONS = ['Guru', 'Pegawai'];
 
 const KELAS_OPTIONS = [
   'X TKJ 1', 'X TKJ 2', 'X TKR 1', 'X TKR 2',
@@ -1283,7 +1283,7 @@ function KelolaAkun() {
                   </div>
                 ) : (
                   <div>
-                    <strong>Format Guru:</strong> nama, nip, jabatan (Guru/Pegawai/Staff), no_hp, password
+                    <strong>Format Guru:</strong> nama, nip, jabatan (Guru/Pegawai), no_hp, password
                   </div>
                 )}
               </div>

@@ -120,34 +120,10 @@ FROM (
     SELECT 'prestasi', 'kabupaten', 'juara harapan 3', NULL, 25, 'Juara Harapan 3 tingkat kabupaten' UNION ALL
     SELECT 'prestasi', 'kabupaten', 'finalis', NULL, 15, 'Finalis tingkat kabupaten' UNION ALL
     SELECT 'prestasi', 'kabupaten', 'peserta', NULL, 8, 'Peserta tingkat kabupaten' UNION ALL
-    SELECT 'perilaku', 'tanggung_jawab', 'sangat baik', NULL, 5, 'Karakter tanggung jawab sangat baik' UNION ALL
-    SELECT 'perilaku', 'tanggung_jawab', 'baik', NULL, 4, 'Karakter tanggung jawab baik' UNION ALL
-    SELECT 'perilaku', 'tanggung_jawab', 'cukup baik', NULL, 3, 'Karakter tanggung jawab cukup baik' UNION ALL
-    SELECT 'perilaku', 'tanggung_jawab', 'kurang baik', NULL, 1, 'Karakter tanggung jawab kurang baik' UNION ALL
-    SELECT 'perilaku', 'disiplin', 'sangat baik', NULL, 5, 'Karakter disiplin sangat baik' UNION ALL
-    SELECT 'perilaku', 'disiplin', 'baik', NULL, 4, 'Karakter disiplin baik' UNION ALL
-    SELECT 'perilaku', 'disiplin', 'cukup baik', NULL, 3, 'Karakter disiplin cukup baik' UNION ALL
-    SELECT 'perilaku', 'disiplin', 'kurang baik', NULL, 1, 'Karakter disiplin kurang baik' UNION ALL
-    SELECT 'perilaku', 'kepedulian', 'sangat baik', NULL, 5, 'Karakter kepedulian sangat baik' UNION ALL
-    SELECT 'perilaku', 'kepedulian', 'baik', NULL, 4, 'Karakter kepedulian baik' UNION ALL
-    SELECT 'perilaku', 'kepedulian', 'cukup baik', NULL, 3, 'Karakter kepedulian cukup baik' UNION ALL
-    SELECT 'perilaku', 'kepedulian', 'kurang baik', NULL, 1, 'Karakter kepedulian kurang baik' UNION ALL
-    SELECT 'perilaku', 'kemandirian', 'sangat baik', NULL, 5, 'Karakter kemandirian sangat baik' UNION ALL
-    SELECT 'perilaku', 'kemandirian', 'baik', NULL, 4, 'Karakter kemandirian baik' UNION ALL
-    SELECT 'perilaku', 'kemandirian', 'cukup baik', NULL, 3, 'Karakter kemandirian cukup baik' UNION ALL
-    SELECT 'perilaku', 'kemandirian', 'kurang baik', NULL, 1, 'Karakter kemandirian kurang baik' UNION ALL
-    SELECT 'perilaku', 'spiritual', 'sangat baik', NULL, 5, 'Karakter spiritual sangat baik' UNION ALL
-    SELECT 'perilaku', 'spiritual', 'baik', NULL, 4, 'Karakter spiritual baik' UNION ALL
-    SELECT 'perilaku', 'spiritual', 'cukup baik', NULL, 3, 'Karakter spiritual cukup baik' UNION ALL
-    SELECT 'perilaku', 'spiritual', 'kurang baik', NULL, 1, 'Karakter spiritual kurang baik' UNION ALL
-    SELECT 'perilaku', 'kejujuran', 'sangat baik', NULL, 5, 'Karakter kejujuran sangat baik' UNION ALL
-    SELECT 'perilaku', 'kejujuran', 'baik', NULL, 4, 'Karakter kejujuran baik' UNION ALL
-    SELECT 'perilaku', 'kejujuran', 'cukup baik', NULL, 3, 'Karakter kejujuran cukup baik' UNION ALL
-    SELECT 'perilaku', 'kejujuran', 'kurang baik', NULL, 1, 'Karakter kejujuran kurang baik' UNION ALL
-    SELECT 'perilaku', 'kepercayaan_diri', 'sangat baik', NULL, 5, 'Karakter kepercayaan diri sangat baik' UNION ALL
-    SELECT 'perilaku', 'kepercayaan_diri', 'baik', NULL, 4, 'Karakter kepercayaan diri baik' UNION ALL
-    SELECT 'perilaku', 'kepercayaan_diri', 'cukup baik', NULL, 3, 'Karakter kepercayaan diri cukup baik' UNION ALL
-    SELECT 'perilaku', 'kepercayaan_diri', 'kurang baik', NULL, 1, 'Karakter kepercayaan diri kurang baik' UNION ALL
+    SELECT 'perilaku', 'sangat baik', NULL, NULL, 5, 'Penilaian sangat baik (semua karakter)' UNION ALL
+    SELECT 'perilaku', 'baik', NULL, NULL, 4, 'Penilaian baik (semua karakter)' UNION ALL
+    SELECT 'perilaku', 'cukup baik', NULL, NULL, 3, 'Penilaian cukup baik (semua karakter)' UNION ALL
+    SELECT 'perilaku', 'kurang baik', NULL, NULL, 1, 'Penilaian kurang baik (semua karakter)' UNION ALL
     SELECT 'kepanitiaan', 'ketua', NULL, NULL, 10, 'Ketua kepanitiaan' UNION ALL
     SELECT 'kepanitiaan', 'wakil ketua', NULL, NULL, 8, 'Wakil ketua kepanitiaan' UNION ALL
     SELECT 'kepanitiaan', 'sekretaris', NULL, NULL, 7, 'Sekretaris kepanitiaan' UNION ALL
@@ -210,9 +186,9 @@ SELECT DISTINCT field1 FROM ipc_config
 WHERE category = 'organisasi' AND field1 IS NOT NULL
 ON CONFLICT (name) DO NOTHING;
 
-INSERT INTO ipc_perilaku_karakter (name)
-SELECT DISTINCT field1 FROM ipc_config
-WHERE category = 'perilaku' AND field1 IS NOT NULL
+INSERT INTO ipc_perilaku_karakter (name) VALUES
+('tanggung_jawab'), ('disiplin'), ('kepedulian'), ('kemandirian'),
+('spiritual'), ('kejujuran'), ('kepercayaan_diri')
 ON CONFLICT (name) DO NOTHING;
 
 INSERT INTO ipc_perilaku_tingkat (name) VALUES
