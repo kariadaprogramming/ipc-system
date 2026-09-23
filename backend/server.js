@@ -20,6 +20,18 @@ dotenv.config();
 
 const app = express();
 
+// Trust proxy: express-rate-limit needs this whenever an upstream proxy sets
+// X-Forwarded-For (CRA dev proxy, nginx, ...), otherwise it throws
+// ERR_ERL_UNEXPECTED_X_FORWARDED_FOR and can't identify users accurately.
+// - Development: ON (1 hop = CRA dev proxy).
+// - Production: OFF by default so clients can't spoof IPs to dodge rate
+//   limits; set TRUST_PROXY=1 (or hop count) only if actually behind a proxy.
+if (process.env.TRUST_PROXY !== undefined) {
+  app.set('trust proxy', /^\d+$/.test(process.env.TRUST_PROXY) ? parseInt(process.env.TRUST_PROXY, 10) : true);
+} else if (process.env.NODE_ENV !== 'production') {
+  app.set('trust proxy', 1);
+}
+
 // Security Middleware - Security headers (Helmet)
 app.use(securityHeaders);
 
