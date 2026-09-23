@@ -345,6 +345,18 @@ function KonfigurasiIPC() {
 
   const categoryConfigs = configs.filter(c => c.category === activeCategory);
   const configuredPelanggaranLevels = configs.filter(c => c.category === 'pelanggaran' && !c.field2 && c.is_active);
+  // Opsi tingkat untuk edit detail: semua tingkat aktif + tingkat saat ini (jika non-aktif/terhapus)
+  const editTingkatOptions = [...configuredPelanggaranLevels];
+  if (activeCategory === 'pelanggaran' && editingConfig?.field2 &&
+      !editTingkatOptions.some(level => level.field1 === editingConfig.field2)) {
+    const currentLevel = configs.find(c => c.category === 'pelanggaran' && !c.field2 && c.field1 === editingConfig.field2);
+    editTingkatOptions.push(currentLevel || {
+      id: `current-${editingConfig.field2}`,
+      field1: editingConfig.field2,
+      point_value: editingConfig.point_value,
+      is_active: false
+    });
+  }
   const pelanggaranSeverityConfigs = categoryConfigs.filter(c => !c.field2);
   const pelanggaranDetailConfigs = categoryConfigs.filter(c => Boolean(c.field2));
   const displayedConfigs = activeCategory === 'pelanggaran'
@@ -737,18 +749,21 @@ function KonfigurasiIPC() {
             <h3 style={{ marginBottom: 20 }}>Edit Konfigurasi</h3>
             <form onSubmit={(e) => {
               e.preventDefault();
-              // Point pelanggaran harus negatif (mengurangi IPC)
-              const pvRaw = e.target.point_value?.value;
-              if (activeCategory === 'pelanggaran' && pvRaw !== undefined && !(parseInt(pvRaw) < 0)) {
-                setMessage('Point pelanggaran harus negatif (< 0)');
-                return;
+              const isDetailRow = activeCategory === 'pelanggaran' && Boolean(editingConfig.field2);
+              // Point baris tingkat harus negatif; point baris detail diisi otomatis dari tingkat (read-only)
+              if (!isDetailRow) {
+                const pvRaw = e.target.point_value?.value;
+                if (activeCategory === 'pelanggaran' && pvRaw !== undefined && !(parseInt(pvRaw) < 0)) {
+                  setMessage('Point pelanggaran harus negatif (< 0)');
+                  return;
+                }
               }
               handleUpdateConfig(editingConfig.id, {
                 field2: e.target.field2?.value || editingConfig.field2,
-                point_value: activeCategory === 'pelanggaran' && pelanggaranAddType === 'detail'
-                  ? 0
+                point_value: isDetailRow
+                  ? Number(e.target.point_value.value)
                   : parseInt(e.target.point_value.value),
-                description: activeCategory === 'pelanggaran' && editingConfig.field2
+                description: isDetailRow
                   ? null
                   : e.target.description.value,
                 is_active: e.target.is_active.checked
@@ -768,14 +783,36 @@ function KonfigurasiIPC() {
               {showEditField2 && (
                 <div className="form-group">
                   <label>{activeCategory === 'pelanggaran' ? 'Tingkat Pelanggaran' : getHeaderLabel2(activeCategory)}</label>
-                  <input
-                    type="text"
-                    name="field2"
-                    defaultValue={editingConfig.field2 || '-'}
-                    disabled={activeCategory !== 'pelanggaran'}
-                    className="form-control"
-                    style={{ background: '#F7F8FB', color: '#6B7080' }}
-                  />
+                  {activeCategory === 'pelanggaran' ? (
+                    <select
+                      name="field2"
+                      defaultValue={editingConfig.field2 || ''}
+                      required
+                      className="form-control"
+                      onChange={(e) => {
+                        // Auto-fill Point Value sesuai tingkat yang dipilih
+                        const level = editTingkatOptions.find(l => l.field1 === e.target.value);
+                        const pointInput = e.target.form?.elements?.point_value;
+                        if (pointInput) pointInput.value = level?.point_value != null ? String(level.point_value) : '';
+                      }}
+                    >
+                      <option value="" disabled>Pilih Tingkat Pelanggaran</option>
+                      {editTingkatOptions.map(level => (
+                        <option key={level.id} value={level.field1}>
+                          {level.field1}{level.is_active ? '' : ' (non-aktif)'}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      name="field2"
+                      defaultValue={editingConfig.field2 || '-'}
+                      disabled
+                      className="form-control"
+                      style={{ background: '#F7F8FB', color: '#6B7080' }}
+                    />
+                  )}
                 </div>
               )}
               <div className="form-group">
@@ -785,12 +822,18 @@ function KonfigurasiIPC() {
                   name="point_value"
                   defaultValue={editingConfig.point_value}
                   required
+                  disabled={activeCategory === 'pelanggaran' && Boolean(editingConfig.field2)}
                   {...(activeCategory === 'pelanggaran' ? { max: -1 } : {})}
                   className="form-control"
                   placeholder="Masukkan nilai point"
+                  style={activeCategory === 'pelanggaran' && editingConfig.field2 ? { background: '#F7F8FB', color: '#6B7080' } : undefined}
                 />
                 {activeCategory === 'pelanggaran' && (
-                  <small style={{ color: '#666', fontSize: '12px' }}>Point pelanggaran harus negatif karena mengurangi IPC</small>
+                  <small style={{ color: '#666', fontSize: '12px' }}>
+                    {editingConfig.field2
+                      ? 'Point otomatis mengikuti Tingkat Pelanggaran yang dipilih'
+                      : 'Point pelanggaran harus negatif karena mengurangi IPC'}
+                  </small>
                 )}
               </div>
               {!(activeCategory === 'pelanggaran' && editingConfig.field2) && <div className="form-group">

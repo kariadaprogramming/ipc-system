@@ -642,7 +642,9 @@ async function handleLegacyApproval(type, id, status, notes, approverId, ipAddre
                 await applyIpcChange(
                     data.user_id,
                     'pelanggaran',
-                    -data.point_dikurangi,
+                    // point_dikurangi sudah negatif (hasil calculatePelanggaranPoints),
+                    // jadi langsung dijumlahkan — tanpa tanda minus.
+                    data.point_dikurangi,
                     `Pelanggaran: ${data.jenis_pelanggaran}`
                 );
             } else {

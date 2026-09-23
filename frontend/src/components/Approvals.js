@@ -142,7 +142,7 @@ function Approvals() {
           <>
             <p><strong>Keterangan:</strong> {item.keterangan}</p>
             <p><strong>Jenis:</strong> {item.jenis_pelanggaran}</p>
-            <p><strong>Point Dikurangi:</strong> -{item.point_dikurangi}</p>
+            <p><strong>Point Dikurangi:</strong> {typeof item.point_dikurangi === 'number' && item.point_dikurangi > 0 ? '-' : ''}{item.point_dikurangi}</p>
           </>
         );
       case 'perilaku':

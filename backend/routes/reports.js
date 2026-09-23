@@ -401,9 +401,9 @@ router.get('/ipc-card-pdf/:userId', auth, async (req, res) => {
         const pelanggaranRingan = Number(points.pelanggaran_ringan) || 0;
         const pelanggaranSedang = Number(points.pelanggaran_sedang) || 0;
         const pelanggaranBerat = Number(points.pelanggaran_berat) || 0;
-        const jumlahPelanggaran = pelanggaranRingan + pelanggaranSedang + pelanggaranBerat;
+        const jumlahPelanggaran = pelanggaranRingan + pelanggaranSedang + pelanggaranBerat + (Number(points.pelanggaran_lainnya) || 0);
         
-        const totalPointIPC = pointAwal + jumlahPrestasi + jumlahKarakter + jumlahKeaktifan - jumlahPelanggaran;
+        const totalPointIPC = pointAwal + jumlahPrestasi + jumlahKarakter + jumlahKeaktifan + jumlahPelanggaran;
 
         // Prepare data for template
         const templateData = {
@@ -538,9 +538,9 @@ router.get('/ipc-card-preview/:userId', auth, async (req, res) => {
         const pelanggaranRingan = Number(points.pelanggaran_ringan) || 0;
         const pelanggaranSedang = Number(points.pelanggaran_sedang) || 0;
         const pelanggaranBerat = Number(points.pelanggaran_berat) || 0;
-        const jumlahPelanggaran = pelanggaranRingan + pelanggaranSedang + pelanggaranBerat;
+        const jumlahPelanggaran = pelanggaranRingan + pelanggaranSedang + pelanggaranBerat + (Number(points.pelanggaran_lainnya) || 0);
         
-        const totalPointIPC = pointAwal + jumlahPrestasi + jumlahKarakter + jumlahKeaktifan - jumlahPelanggaran;
+        const totalPointIPC = pointAwal + jumlahPrestasi + jumlahKarakter + jumlahKeaktifan + jumlahPelanggaran;
 
         // Prepare data for template
         const templateData = {
@@ -654,9 +654,9 @@ router.get('/leger-pdf/:kelas', auth, async (req, res) => {
                 const pelanggaranRingan = Number(points.pelanggaran_ringan) || 0;
                 const pelanggaranSedang = Number(points.pelanggaran_sedang) || 0;
                 const pelanggaranBerat = Number(points.pelanggaran_berat) || 0;
-                const jumlahPelanggaran = pelanggaranRingan + pelanggaranSedang + pelanggaranBerat;
+                const jumlahPelanggaran = pelanggaranRingan + pelanggaranSedang + pelanggaranBerat + (Number(points.pelanggaran_lainnya) || 0);
                 
-                const totalPointIPC = pointAwal + jumlahPrestasi + jumlahKarakter + jumlahKeaktifan - jumlahPelanggaran;
+                const totalPointIPC = pointAwal + jumlahPrestasi + jumlahKarakter + jumlahKeaktifan + jumlahPelanggaran;
 
                 // Calculate current class
                 let calculatedClass = student.kelas;
@@ -792,9 +792,9 @@ router.get('/leger-preview/:kelas', auth, async (req, res) => {
                 const pelanggaranRingan = Number(points.pelanggaran_ringan) || 0;
                 const pelanggaranSedang = Number(points.pelanggaran_sedang) || 0;
                 const pelanggaranBerat = Number(points.pelanggaran_berat) || 0;
-                const jumlahPelanggaran = pelanggaranRingan + pelanggaranSedang + pelanggaranBerat;
+                const jumlahPelanggaran = pelanggaranRingan + pelanggaranSedang + pelanggaranBerat + (Number(points.pelanggaran_lainnya) || 0);
                 
-                const totalPointIPC = pointAwal + jumlahPrestasi + jumlahKarakter + jumlahKeaktifan - jumlahPelanggaran;
+                const totalPointIPC = pointAwal + jumlahPrestasi + jumlahKarakter + jumlahKeaktifan + jumlahPelanggaran;
 
                 // Calculate current class
                 let calculatedClass = student.kelas;

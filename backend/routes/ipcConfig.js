@@ -332,21 +332,46 @@ router.put('/:id', auth, superAdminOnly, async (req, res) => {
         const userId = req.user.id;
         const pelanggaranId = parsePelanggaranId(id);
         if (pelanggaranId) {
-            const table = pelanggaranId.type === 'level' ? 'ipc_pelanggaran_level' : 'ipc_pelanggaran_detail';
-            if (pelanggaranId.type === 'level' && point_value !== undefined) {
-                const lvlPoint = Number(point_value);
-                if (!Number.isFinite(lvlPoint) || lvlPoint >= 0) {
-                    return res.status(400).json({ message: 'Point pelanggaran harus negatif (< 0)' });
+            if (pelanggaranId.type === 'level') {
+                if (point_value !== undefined) {
+                    const lvlPoint = Number(point_value);
+                    if (!Number.isFinite(lvlPoint) || lvlPoint >= 0) {
+                        return res.status(400).json({ message: 'Point pelanggaran harus negatif (< 0)' });
+                    }
                 }
+                const sets = [];
+                const values = [];
+                if (point_value !== undefined) { sets.push('point_value = ?'); values.push(Number(point_value)); }
+                if (description !== undefined) { sets.push('description = ?'); values.push(description ?? null); }
+                if (is_active !== undefined) { sets.push('is_active = ?'); values.push(is_active); }
+                if (sets.length) {
+                    values.push(pelanggaranId.value);
+                    await db.query(`UPDATE ipc_pelanggaran_level SET ${sets.join(', ')} WHERE id = ?`, values);
+                    clearConfigCache();
+                }
+                return res.json((await getPelanggaranConfigs()).find(item => item.id === id));
             }
-            const fieldUpdates = pelanggaranId.type === 'level'
-                ? ['point_value = ?', 'description = ?', 'is_active = ?']
-                : ['is_active = ?'];
-            const values = pelanggaranId.type === 'level'
-                ? [point_value, description ?? null, is_active, pelanggaranId.value]
-                : [is_active, pelanggaranId.value];
-            await db.query(`UPDATE ${table} SET ${fieldUpdates.join(', ')} WHERE id = ?`, values);
-            clearConfigCache();
+
+            // Detail pelanggaran: boleh pindah tingkat (field2) dan/atau toggle aktif
+            const detailSets = [];
+            const detailValues = [];
+            if (field2 !== undefined && field2 !== null && String(field2).trim() !== '') {
+                const [lvl] = await db.query('SELECT id FROM ipc_pelanggaran_level WHERE name = ?', [String(field2).trim()]);
+                if (!lvl.length) {
+                    return res.status(400).json({ message: 'Tingkat pelanggaran tidak ditemukan' });
+                }
+                detailSets.push('level_id = ?');
+                detailValues.push(lvl[0].id);
+            }
+            if (is_active !== undefined) {
+                detailSets.push('is_active = ?');
+                detailValues.push(is_active);
+            }
+            if (detailSets.length) {
+                detailValues.push(pelanggaranId.value);
+                await db.query(`UPDATE ipc_pelanggaran_detail SET ${detailSets.join(', ')} WHERE id = ?`, detailValues);
+                clearConfigCache();
+            }
             return res.json((await getPelanggaranConfigs()).find(item => item.id === id));
         }
         

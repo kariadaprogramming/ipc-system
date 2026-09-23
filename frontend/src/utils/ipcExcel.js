@@ -5,6 +5,9 @@ import ExcelJS from 'exceljs';
 // Layout direplika dari dokumen resmi sekolah (format_ipc.xlsx):
 // kop di baris 1-8, judul 9-13, biodata 15-17, tabel point 19-39,
 // tanda tangan 42-48. Area cetak A1:L48, portrait A4.
+// Baris Pelanggaran mengikuti SEMUA tingkat yang dikonfigurasi
+// (urut point terkecil -> terbesar). Jika tingkat > 3, tabel memanjang:
+// baris TOTAL/tanda tangan & area cetak bergeser sebanyak delta.
 // ------------------------------------------------------------------
 
 const TNR = 'Times New Roman';
@@ -17,6 +20,9 @@ const F_TITLE = { name: TNR, size: 12, bold: true };
 const F_TEXT = { name: TNR, size: 12 };
 const F_BOLD = { name: TNR, size: 12, bold: true };
 const F_SIGN = { name: TNR, size: 12, bold: true, underline: true };
+// Merah untuk baris Pelanggaran (point negatif) — sama dengan warna merah
+// nilai negatif pada leger kelas (LaporanCetak).
+const F_TEXT_RED = { name: TNR, size: 12, color: { argb: 'FFC00000' } };
 
 const A_CENTER = { vertical: 'middle', horizontal: 'center', wrapText: true };
 const A_LEFT = { vertical: 'middle', horizontal: 'left', wrapText: true };
@@ -36,10 +42,9 @@ const MERGES = [
   'C28:G28', 'H28:K28', 'C29:G29', 'H29:K29', 'C30:G30', 'H30:K30',
   'C31:G31', 'H31:K31',
   'B32:G32', 'H32:K32', 'B33:G33', 'H33:K33', 'B34:G34', 'H34:K34',
-  'A35:A38', 'B35:G35', 'H35:K35',
-  'C36:G36', 'H36:K36', 'C37:G37', 'H37:K37', 'C38:G38', 'H38:K38',
-  'A39:G39', 'H39:K39',
 ];
+// Merge bagian bawah tabel (baris 35: header VII, item, dan TOTAL) dibangun
+// dinamis di createIndividualIpcExcelBuffer sesuai jumlah tingkat pelanggaran.
 
 const ROW_HEIGHTS = {
   9: 14.55, 10: 1.95, 11: 15.6, 12: 15.6, 13: 15.6, 14: 15.6,
@@ -61,17 +66,17 @@ function setCell(sheet, addr, value, { font, alignment } = {}) {
   return cell;
 }
 
-// Grid tabel A19:K39: garis horizontal medium, vertikal tipis di dalam,
+// Grid tabel A19:K{totalRow}: garis horizontal medium, vertikal tipis di dalam,
 // medium di tepi luar — sesuai dokumen asli.
-function styleTableGrid(sheet) {
+function styleTableGrid(sheet, totalRow = 39) {
   const thin = { style: 'thin', color: { argb: INK } };
   const medium = { style: 'medium', color: { argb: INK } };
-  for (let r = 19; r <= 39; r++) {
+  for (let r = 19; r <= totalRow; r++) {
     for (let c = 1; c <= 11; c++) {
       const cell = sheet.getCell(r, c);
       cell.border = {
         top: r === 19 ? medium : thin,
-        bottom: r === 39 ? medium : thin,
+        bottom: r === totalRow ? medium : thin,
         left: c === 1 ? medium : thin,
         right: c === 11 ? medium : thin,
       };
@@ -120,6 +125,10 @@ function fitImage(dims, maxW, maxH) {
 // Bentuk normalisasi nilai point dari breakdown API (string/null -> number)
 const num = (v) => Number(v) || 0;
 
+// 'sangat berat' -> 'Sangat Berat' (label resmi tingkat di cetakan)
+const titleCase = (s) =>
+  String(s).split(' ').map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1) : w)).join(' ');
+
 export function calcIndividualPoints(points = {}) {
   const pointAwal = num(points.point_awal) || 80;
   const prestasiAkademik = num(points.prestasi_akademik);
@@ -137,17 +146,20 @@ export function calcIndividualPoints(points = {}) {
   const pelanggaranRingan = num(points.pelanggaran_ringan);
   const pelanggaranSedang = num(points.pelanggaran_sedang);
   const pelanggaranBerat = num(points.pelanggaran_berat);
+  const pelanggaranLainnya = num(points.pelanggaran_lainnya);
+  // Pelanggaran disimpan negatif (pengurangan) — sama seperti users.ipc_total —
+  // jadi total di sini cukup penjumlahan biasa, bukan pengurangan.
   const total =
     pointAwal +
     prestasiAkademik + prestasiNonakademik +
     tanggungJawab + disiplin + kepedulian + kemandirian + spiritual + kejujuran + kepercayaanDiri +
-    organisasi + kepanitiaan + event -
-    (pelanggaranRingan + pelanggaranSedang + pelanggaranBerat);
+    organisasi + kepanitiaan + event +
+    pelanggaranRingan + pelanggaranSedang + pelanggaranBerat + pelanggaranLainnya;
   return {
     pointAwal, prestasiAkademik, prestasiNonakademik,
     tanggungJawab, disiplin, kepedulian, kemandirian, spiritual, kejujuran, kepercayaanDiri,
     organisasi, kepanitiaan, event,
-    pelanggaranRingan, pelanggaranSedang, pelanggaranBerat,
+    pelanggaranRingan, pelanggaranSedang, pelanggaranBerat, pelanggaranLainnya,
     total,
   };
 }
@@ -169,6 +181,23 @@ export async function createIndividualIpcExcelBuffer({
   const p = calcIndividualPoints(points);
   const total = ipcTotal ?? p.total;
 
+  // Baris Pelanggaran: SEMUA tingkat dari konfigurasi, urut dari point
+  // terkecil (-1) ke terbesar. Fallback lama: Ringan/Sedang/Berat.
+  const levelSource = Array.isArray(points.pelanggaran_levels) && points.pelanggaran_levels.length
+    ? points.pelanggaran_levels
+    : [
+        { name: 'Ringan', total: p.pelanggaranRingan },
+        { name: 'Sedang', total: p.pelanggaranSedang },
+        { name: 'Berat', total: p.pelanggaranBerat },
+      ];
+  const langgarRows = levelSource.map((l) => [titleCase(l.name), num(l.total)]);
+  while (langgarRows.length < 3) langgarRows.push(['', null]); // jaga format asli (3 baris)
+  const nRows = langgarRows.length;
+  const delta = nRows - 3;              // >0: tabel & blok bawah memanjang
+  const lastItemRow = 35 + nRows;       // baris item terakhir Pelanggaran
+  const totalRow = 39 + delta;          // baris TOTAL POINT IPC
+  const signRow = 42 + delta;           // baris awal blok tanda tangan
+
   const schoolName = school.school_name || 'SMK Negeri Bali Mandara';
   const principalName = school.principal_name || 'Nama Kepala Sekolah';
   const principalNip = school.principal_nip || '-';
@@ -183,11 +212,26 @@ export async function createIndividualIpcExcelBuffer({
     pageSetup: { paperSize: 9, orientation: 'portrait', scale: 115 },
   });
   sheet.pageMargins = { left: 0.53, right: 0.61, top: 0.18, bottom: 0.3, header: 0.12, footer: 0.12 };
-  sheet.pageSetup.printArea = 'A1:L48';
+  sheet.pageSetup.printArea = `A1:L${48 + delta}`;
 
   COL_WIDTHS.forEach((w, i) => { sheet.getColumn(i + 1).width = w; });
-  Object.entries(ROW_HEIGHTS).forEach(([r, h]) => { sheet.getRow(Number(r)).height = h; });
-  MERGES.forEach((m) => sheet.mergeCells(m));
+
+  // Tinggi baris: baris > 39 (spasi + tanda tangan) bergeser sebesar delta;
+  // baris item Pelanggaran memakai tinggi item, baris TOTAL tinggi TOTAL.
+  const heights = {};
+  Object.entries(ROW_HEIGHTS).forEach(([r, h]) => {
+    const rn = Number(r);
+    heights[rn > 39 ? rn + delta : rn] = h;
+  });
+  for (let r = 36; r <= lastItemRow; r++) heights[r] = 16.05;
+  heights[totalRow] = 15.45;
+  Object.entries(heights).forEach(([r, h]) => { sheet.getRow(Number(r)).height = h; });
+
+  // Merge baris 9-34 tetap; bagian bawah tabel mengikuti jumlah tingkat.
+  const tableTail = [`A35:A${lastItemRow}`, 'B35:G35', 'H35:K35'];
+  for (let r = 36; r <= lastItemRow; r++) tableTail.push(`C${r}:G${r}`, `H${r}:K${r}`);
+  tableTail.push(`A${totalRow}:G${totalRow}`, `H${totalRow}:K${totalRow}`);
+  [...MERGES, ...tableTail].forEach((m) => sheet.mergeCells(m));
 
   // Kop (baris 1-8 dikosongkan untuk gambar, seperti dokumen asli)
   if (kopImage) {
@@ -272,42 +316,43 @@ export async function createIndividualIpcExcelBuffer({
   setCell(sheet, 'B35', 'Pelanggaran', { font: F_BOLD, alignment: A_CENTER });
   setCell(sheet, 'H35', '', { font: F_BOLD, alignment: A_CENTER });
 
-  const langgarRows = [['Ringan', p.pelanggaranRingan], ['Sedang', p.pelanggaranSedang], ['Berat', p.pelanggaranBerat]];
+  // Satu baris per tingkat (sudah diurutkan; nilai negatif = pengurangan)
+  // — hanya nilai Point (kolom H) yang dicetak merah.
   langgarRows.forEach(([label, val], i) => {
     const r = 36 + i;
     setCell(sheet, `B${r}`, i + 1, { font: F_TEXT, alignment: A_CENTER });
     setCell(sheet, `C${r}`, label, { font: F_TEXT, alignment: A_CENTER });
-    setCell(sheet, `H${r}`, val, { font: F_TEXT, alignment: A_CENTER });
+    setCell(sheet, `H${r}`, val, { font: F_TEXT_RED, alignment: A_CENTER });
   });
 
-  setCell(sheet, 'A39', 'TOTAL POINT IPC', { font: F_BOLD, alignment: A_CENTER });
-  setCell(sheet, 'H39', total, { font: F_BOLD, alignment: A_CENTER });
+  setCell(sheet, `A${totalRow}`, 'TOTAL POINT IPC', { font: F_BOLD, alignment: A_CENTER });
+  setCell(sheet, `H${totalRow}`, total, { font: F_BOLD, alignment: A_CENTER });
 
-  styleTableGrid(sheet);
+  styleTableGrid(sheet, totalRow);
 
-  // Label tabel (A19:G38) rata kiri; kolom Point (H) tetap rata tengah.
-  for (let r = 19; r <= 38; r++) {
+  // Label tabel (A19:G{lastItemRow}) rata kiri; kolom Point (H) tetap rata tengah.
+  for (let r = 19; r <= lastItemRow; r++) {
     for (let c = 1; c <= 7; c++) {
       sheet.getCell(r, c).alignment = A_LEFT;
     }
   }
 
   // Tanda tangan (tanpa merge & tanpa wrap)
-  setCell(sheet, 'A42', 'Mengetahui.', { font: F_BOLD, alignment: A_LEFT_NW });
-  setCell(sheet, 'H42', `Kubutambahan, ${tgl}`, { font: F_BOLD, alignment: A_LEFT_NW });
-  setCell(sheet, 'A43', `Kepala ${schoolName}`, { font: F_BOLD, alignment: A_LEFT_NW });
-  setCell(sheet, 'H43', 'Wali Kelas', { font: F_BOLD, alignment: A_LEFT_NW });
-  setCell(sheet, 'A47', principalName, { font: F_SIGN, alignment: A_LEFT_NW });
-  setCell(sheet, 'H47', waliNama, { font: F_SIGN, alignment: A_LEFT_NW });
-  setCell(sheet, 'A48', `NIP. ${principalNip}`, { font: F_BOLD, alignment: A_LEFT_NW });
-  setCell(sheet, 'H48', `NIP. ${waliNip}`, { font: F_BOLD, alignment: A_LEFT_NW });
+  setCell(sheet, `A${signRow}`, 'Mengetahui.', { font: F_BOLD, alignment: A_LEFT_NW });
+  setCell(sheet, `H${signRow}`, `Kubutambahan, ${tgl}`, { font: F_BOLD, alignment: A_LEFT_NW });
+  setCell(sheet, `A${signRow + 1}`, `Kepala ${schoolName}`, { font: F_BOLD, alignment: A_LEFT_NW });
+  setCell(sheet, `H${signRow + 1}`, 'Wali Kelas', { font: F_BOLD, alignment: A_LEFT_NW });
+  setCell(sheet, `A${signRow + 5}`, principalName, { font: F_SIGN, alignment: A_LEFT_NW });
+  setCell(sheet, `H${signRow + 5}`, waliNama, { font: F_SIGN, alignment: A_LEFT_NW });
+  setCell(sheet, `A${signRow + 6}`, `NIP. ${principalNip}`, { font: F_BOLD, alignment: A_LEFT_NW });
+  setCell(sheet, `H${signRow + 6}`, `NIP. ${waliNip}`, { font: F_BOLD, alignment: A_LEFT_NW });
 
   // Kunci border tabel: ExcelJS menyalin referensi objek style dari sel master
   // merge ke semua anggotanya, sehingga penulisan border per-sel saling
   // menimpa antar-sel dalam satu merge (tepi kiri A19/A39 jadi thin).
   // Tulis ulang setiap sel tabel dengan objek style BARU yang lengkap agar
   // tidak lagi berbagi referensi.
-  for (let r = 19; r <= 39; r++) {
+  for (let r = 19; r <= totalRow; r++) {
     for (let c = 1; c <= 11; c++) {
       const cell = sheet.getCell(r, c);
       const st = cell.style || {};
@@ -317,7 +362,7 @@ export async function createIndividualIpcExcelBuffer({
         ...(st.alignment ? { alignment: { ...st.alignment } } : {}),
         border: {
           top: side(r === 19 ? 'medium' : 'thin'),
-          bottom: side(r === 39 ? 'medium' : 'thin'),
+          bottom: side(r === totalRow ? 'medium' : 'thin'),
           left: side(c === 1 ? 'medium' : 'thin'),
           right: side(c === 11 ? 'medium' : 'thin'),
         },
