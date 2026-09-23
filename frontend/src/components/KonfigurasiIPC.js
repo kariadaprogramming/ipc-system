@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
+import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
+import { getRowField } from '../utils/excelImport';
 
 function KonfigurasiIPC() {
   const [configs, setConfigs] = useState([]);
@@ -17,6 +20,10 @@ function KonfigurasiIPC() {
   const [organisasiName, setOrganisasiName] = useState('');
   const [perilakuRatings, setPerilakuRatings] = useState([]);
   const [perilakuRatingName, setPerilakuRatingName] = useState('');
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [excelFile, setExcelFile] = useState(null);
+  const [importing, setImporting] = useState(false);
+  const [importResults, setImportResults] = useState([]);
 
   const categories = [
     { key: 'prestasi', label: 'Prestasi', icon: '🏆' },
@@ -195,6 +202,147 @@ function KonfigurasiIPC() {
     setShowEditModal(true);
   };
 
+  const handleExcelFileChange = (e) => {
+    setExcelFile(e.target.files[0]);
+  };
+
+  const closeImportModal = () => {
+    setShowImportModal(false);
+    setExcelFile(null);
+    setImportResults([]);
+  };
+
+  const downloadDetailTemplate = async () => {
+    const levelNames = configuredPelanggaranLevels.map(level => level.field1);
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Template');
+    worksheet.columns = [
+      { header: 'Detail', key: 'Detail', width: 35 },
+      { header: 'TingkatPelanggaran', key: 'TingkatPelanggaran', width: 22 }
+    ];
+
+    if (levelNames.length) {
+      worksheet.dataValidations.add('B2:B1000', {
+        type: 'list',
+        allowBlank: false,
+        formulae: [`"${levelNames.join(',')}"`],
+        showErrorMessage: true,
+        errorTitle: 'Tingkat Pelanggaran tidak valid',
+        error: `Pilih salah satu: ${levelNames.join(', ')}`
+      });
+    }
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blobUrl = URL.createObjectURL(new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    }));
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = 'template_detail_pelanggaran.xlsx';
+    link.click();
+    URL.revokeObjectURL(blobUrl);
+  };
+
+  const handleDetailExcelImport = async () => {
+    if (!excelFile) {
+      setMessage('Pilih file Excel terlebih dahulu');
+      return;
+    }
+
+    const activeLevels = configuredPelanggaranLevels;
+    if (!activeLevels.length) {
+      setMessage('Gagal import: belum ada Tingkat Pelanggaran aktif. Buat dulu di tab "Tingkat Pelanggaran & Point"');
+      return;
+    }
+
+    setImporting(true);
+    setImportResults([]);
+    const results = [];
+
+    try {
+      const data = await excelFile.arrayBuffer();
+      const workbook = XLSX.read(data, { type: 'array' });
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+      const existingDetails = pelanggaranDetailConfigs.map(config => String(config.field1).toLowerCase());
+      const levelNames = activeLevels.map(level => level.field1).join(', ');
+
+      for (const row of jsonData) {
+        const detail = getRowField(row, 'Detail', 'detail', 'Detail Pelanggaran', 'DetailPelanggaran', 'Nama', 'nama', 'field1');
+        const tingkatRaw = getRowField(row, 'TingkatPelanggaran', 'tingkatpelanggaran', 'Tingkat Pelanggaran', 'Tingkat', 'tingkat', 'Level', 'level', 'field2');
+
+        // Lewati baris kosong / header
+        if (!detail && !tingkatRaw) {
+          continue;
+        }
+        if (!detail) {
+          results.push({ status: 'error', name: '(tanpa nama)', level: tingkatRaw, error: 'Detail pelanggaran kosong' });
+          continue;
+        }
+        if (!tingkatRaw) {
+          results.push({ status: 'error', name: detail, level: '-', error: 'Tingkat pelanggaran kosong' });
+          continue;
+        }
+
+        const level = activeLevels.find(l => String(l.field1).toLowerCase() === tingkatRaw.toLowerCase());
+        if (!level) {
+          results.push({
+            status: 'error',
+            name: detail,
+            level: tingkatRaw,
+            error: `Tingkat "${tingkatRaw}" tidak ditemukan. Pilih: ${levelNames}`
+          });
+          continue;
+        }
+
+        if (existingDetails.includes(detail.toLowerCase())) {
+          results.push({ status: 'error', name: detail, level: level.field1, error: 'Detail sudah ada di daftar' });
+          continue;
+        }
+
+        try {
+          await api.post('/ipc-config', {
+            category: 'pelanggaran',
+            field1: detail,
+            field2: level.field1,
+            point_value: 0,
+            description: null,
+            is_active: true
+          });
+          existingDetails.push(detail.toLowerCase());
+          results.push({ status: 'success', name: detail, level: level.field1 });
+        } catch (error) {
+          results.push({
+            status: 'error',
+            name: detail,
+            level: level.field1,
+            error: error.response?.data?.message || error.message
+          });
+        }
+      }
+
+      setImportResults(results);
+      const ok = results.filter(r => r.status === 'success').length;
+      const fail = results.filter(r => r.status === 'error').length;
+      if (!results.length) {
+        setMessage('Tidak ada baris data untuk diimport');
+      } else if (ok === 0 && fail > 0) {
+        setMessage(`Gagal import semua baris (${fail} error)`);
+      } else {
+        setMessage(`Import selesai: ${ok} berhasil, ${fail} gagal`);
+      }
+      if (ok > 0) {
+        fetchConfigs();
+      }
+    } catch (error) {
+      setMessage('Gagal membaca file Excel: ' + error.message);
+    } finally {
+      setImporting(false);
+      setExcelFile(null);
+    }
+  };
+
   const categoryConfigs = configs.filter(c => c.category === activeCategory);
   const configuredPelanggaranLevels = configs.filter(c => c.category === 'pelanggaran' && !c.field2 && c.is_active);
   const pelanggaranSeverityConfigs = categoryConfigs.filter(c => !c.field2);
@@ -367,16 +515,27 @@ function KonfigurasiIPC() {
           <h3 style={{ margin: 0 }}>
             {categories.find(c => c.key === activeCategory)?.label} Configuration
           </h3>
-          <button
-            onClick={() => {
-              setPelanggaranAddType(activeCategory === 'pelanggaran' ? pelanggaranSection : 'severity');
-              setShowAddModal(true);
-            }}
-            className="btn btn-primary"
-            style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-          >
-            ➕ Tambah Konfigurasi
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {activeCategory === 'pelanggaran' && pelanggaranSection === 'detail' && (
+              <button
+                onClick={() => { setExcelFile(null); setImportResults([]); setShowImportModal(true); }}
+                className="btn btn-info"
+                style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+              >
+                📥 Import Excel
+              </button>
+            )}
+            <button
+              onClick={() => {
+                setPelanggaranAddType(activeCategory === 'pelanggaran' ? pelanggaranSection : 'severity');
+                setShowAddModal(true);
+              }}
+              className="btn btn-primary"
+              style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+            >
+              ➕ Tambah Konfigurasi
+            </button>
+          </div>
         </div>
 
         {activeCategory === 'pelanggaran' && (
@@ -874,6 +1033,86 @@ function KonfigurasiIPC() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Import Detail Pelanggaran dari Excel */}
+      {showImportModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div className="card" style={{ width: 500, maxWidth: '90%', maxHeight: '90vh', overflowY: 'auto' }}>
+            <h4>Import Detail Pelanggaran dari Excel</h4>
+            <button className="btn btn-danger" onClick={closeImportModal} style={{ marginBottom: '10px' }}>Tutup</button>
+            <div style={{ marginBottom: '15px' }}>
+              <button
+                className="btn btn-secondary"
+                onClick={downloadDetailTemplate}
+                style={{ marginBottom: '10px' }}
+              >
+                📥 Download Template Detail
+              </button>
+              <input
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={handleExcelFileChange}
+                style={{ marginBottom: '10px' }}
+              />
+              <div style={{ fontSize: '12px', color: '#666', marginBottom: '10px' }}>
+                <strong>Format:</strong> Detail, TingkatPelanggaran
+                <br />
+                <small style={{ color: '#1976d2' }}>
+                  💡 Kolom TingkatPelanggaran harus sesuai daftar tingkat yang sudah dibuat
+                  {configuredPelanggaranLevels.length > 0 && ` (contoh: ${configuredPelanggaranLevels.slice(0, 3).map(l => l.field1).join(', ')})`}.
+                  Point diambil otomatis dari tingkatnya.
+                </small>
+              </div>
+              <button
+                className="btn btn-primary"
+                onClick={handleDetailExcelImport}
+                disabled={importing || !excelFile}
+              >
+                {importing ? 'Importing...' : 'Import'}
+              </button>
+            </div>
+
+            {importResults.length > 0 && (
+              <div style={{ maxHeight: '300px', overflowY: 'auto', border: '1px solid #ddd', padding: '10px', borderRadius: '4px' }}>
+                <h5>Import Results:</h5>
+                <table className="table" style={{ fontSize: '12px' }}>
+                  <thead>
+                    <tr>
+                      <th style={{ padding: '5px' }}>Detail</th>
+                      <th style={{ padding: '5px' }}>Tingkat</th>
+                      <th style={{ padding: '5px' }}>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {importResults.map((result, index) => (
+                      <tr key={index}>
+                        <td style={{ padding: '5px' }}>
+                          {result.status === 'success' ? '✅' : '❌'} {result.name}
+                        </td>
+                        <td style={{ padding: '5px' }}>{result.level || '-'}</td>
+                        <td style={{ padding: '5px' }}>
+                          {result.status === 'error' ? result.error : 'Berhasil'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       )}

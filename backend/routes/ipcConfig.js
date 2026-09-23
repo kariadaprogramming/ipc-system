@@ -273,14 +273,20 @@ router.post('/', auth, superAdminOnly, async (req, res) => {
         const userId = req.user.id;
         if (category === 'pelanggaran') {
             if (field2) {
+                if (!field1 || !String(field1).trim()) {
+                    return res.status(400).json({ message: 'Detail pelanggaran wajib diisi' });
+                }
                 const [level] = await db.query('SELECT id FROM ipc_pelanggaran_level WHERE name = ?', [field2]);
                 if (!level.length) return res.status(400).json({ message: 'Violation level not found' });
                 const [result] = await db.query(
                     'INSERT INTO ipc_pelanggaran_detail (name, level_id, is_active) VALUES (?, ?, ?)',
-                    [field1, level[0].id, is_active !== undefined ? is_active : true]
+                    [String(field1).trim(), level[0].id, is_active !== undefined ? is_active : true]
                 );
                 clearConfigCache();
                 return res.status(201).json((await getPelanggaranConfigs()).find(item => item.id === `detail-${result.insertId}`));
+            }
+            if (!field1 || !String(field1).trim()) {
+                return res.status(400).json({ message: 'Tingkat pelanggaran wajib diisi' });
             }
             const levelPoint = Number(point_value);
             if (!Number.isFinite(levelPoint) || levelPoint >= 0) {
@@ -288,7 +294,7 @@ router.post('/', auth, superAdminOnly, async (req, res) => {
             }
             const [result] = await db.query(
                 'INSERT INTO ipc_pelanggaran_level (name, point_value, description, is_active) VALUES (?, ?, ?, ?)',
-                [field1, levelPoint, description || null, is_active !== undefined ? is_active : true]
+                [String(field1).trim(), levelPoint, description || null, is_active !== undefined ? is_active : true]
             );
             clearConfigCache();
             return res.status(201).json((await getPelanggaranConfigs()).find(item => item.id === `level-${result.insertId}`));
@@ -309,6 +315,9 @@ router.post('/', auth, superAdminOnly, async (req, res) => {
     } catch (error) {
         console.error('Error creating IPC configuration:', error);
         if (error.code === '23505') {
+            if (req.body?.category === 'pelanggaran' && req.body?.field2) {
+                return res.status(400).json({ message: 'Detail pelanggaran sudah ada' });
+            }
             return res.status(400).json({ message: 'Configuration with this category, field1, and field2 already exists' });
         }
         res.status(500).json({ message: 'Server error' });
