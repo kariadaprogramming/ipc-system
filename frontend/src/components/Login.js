@@ -170,7 +170,7 @@ function Login() {
             margin: '0',
             color: '#1c2333'
           }}>
-            School System
+            Sistem IPC
           </h1>
           <p style={{
             margin: '.25rem 0 0',

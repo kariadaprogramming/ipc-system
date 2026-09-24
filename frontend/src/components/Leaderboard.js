@@ -304,6 +304,9 @@ function Leaderboard() {
           font-weight:700;
           font-size:clamp(12px, 2.5vw, 14px);
           flex:0 0 auto;
+          overflow:hidden;
+          position:relative;
+          z-index:0;
         }
         .student-name{
           font-weight:600;
