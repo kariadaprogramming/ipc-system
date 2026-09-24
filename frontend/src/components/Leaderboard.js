@@ -9,12 +9,15 @@ const SLATE = "#64748b";
 
 const BLUE = { bg: "#eff6ff", text: "#2563eb", border: "#c6dafc", solid: "#2563eb", dark: "#1d4ed8" };
 
+const MEDALS = { 1: "🥇", 2: "🥈", 3: "🥉" };
+
 function Leaderboard() {
   const [activeTab, setActiveTab] = useState('akademik');
   const [akademikData, setAkademikData] = useState([]);
   const [nonAkademikData, setNonAkademikData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [lastUpdated, setLastUpdated] = useState(null);
 
   useEffect(() => {
     fetchLeaderboardData();
@@ -30,6 +33,7 @@ function Leaderboard() {
 
       setAkademikData(akademikRes.data);
       setNonAkademikData(nonAkademikRes.data);
+      setLastUpdated(new Date());
     } catch (error) {
       console.error('Error fetching leaderboard:', error);
       setError('Gagal memuat data peringkat');
@@ -44,6 +48,8 @@ function Leaderboard() {
 
   const currentData = activeTab === 'akademik' ? akademikData : nonAkademikData;
   const title = activeTab === 'akademik' ? "Peringkat akademik" : "Peringkat non-akademik";
+  const top3 = currentData.filter((s) => s.rank <= 3).sort((a, b) => a.rank - b.rank);
+  const totalPrestasi = currentData.reduce((sum, s) => sum + (s.total_prestasi || 0), 0);
 
   if (loading) {
     return (
@@ -406,60 +412,172 @@ function Leaderboard() {
           color:var(--gray-500);
           margin-bottom:10px;
         }
-        .keterangan{
+        .podium-card .card-head{
+          background:linear-gradient(135deg, var(--amber-bg), var(--white));
+        }
+        .podium{
+          display:flex;
+          align-items:flex-end;
+          justify-content:center;
+          gap:clamp(8px, 3vw, 20px);
+          padding:clamp(20px, 4vw, 28px) clamp(16px, 3vw, 24px) 0;
+        }
+        .podium-slot{
+          display:flex;
+          flex-direction:column;
+          align-items:center;
+          text-align:center;
+          flex:1;
+          max-width:200px;
+          min-width:0;
+        }
+        .podium-slot.first{order:2;}
+        .podium-slot.second{order:1;}
+        .podium-slot.third{order:3;}
+        .podium-medal{
+          font-size:clamp(20px, 4vw, 26px);
+          margin-bottom:8px;
+          line-height:1;
+        }
+        .podium-avatar{
+          width:clamp(48px, 8vw, 64px);
+          height:clamp(48px, 8vw, 64px);
+          border-radius:50%;
+          background:var(--blue-light);
+          color:var(--blue);
+          display:flex;align-items:center;justify-content:center;
+          font-weight:700;
+          font-size:clamp(16px, 3vw, 20px);
+          flex:0 0 auto;
+          overflow:hidden;
+          margin-bottom:10px;
+          border:3px solid var(--white);
+          box-shadow:0 0 0 2px var(--amber-border), var(--shadow);
+        }
+        .podium-slot.second .podium-avatar,
+        .podium-slot.third .podium-avatar{
+          width:clamp(42px, 7vw, 56px);
+          height:clamp(42px, 7vw, 56px);
+          font-size:clamp(14px, 2.5vw, 18px);
+          box-shadow:0 0 0 2px var(--gray-200), var(--shadow);
+        }
+        .podium-name{
+          font-weight:700;
+          font-size:clamp(13px, 2.5vw, 14.5px);
+          color:var(--gray-900);
+          white-space:nowrap;
+          overflow:hidden;
+          text-overflow:ellipsis;
+          max-width:100%;
+          margin-bottom:2px;
+        }
+        .podium-meta{
+          font-size:clamp(11px, 2vw, 12px);
+          color:var(--gray-500);
+          margin-bottom:6px;
+        }
+        .podium-total{
+          display:inline-flex;
+          align-items:center;
+          gap:5px;
+          background:var(--blue-light);
+          color:var(--blue);
+          border-radius:999px;
+          padding:4px 12px;
+          font-size:clamp(11px, 2vw, 12.5px);
+          font-weight:700;
+          margin-bottom:12px;
+        }
+        .podium-step{
+          width:100%;
+          border-radius:10px 10px 0 0;
+          display:flex;
+          align-items:flex-start;
+          justify-content:center;
+          padding-top:clamp(8px, 2vw, 12px);
+          font-weight:800;
+          font-size:clamp(14px, 3vw, 18px);
+        }
+        .podium-slot.first .podium-step{
+          height:clamp(64px, 12vw, 88px);
+          background:linear-gradient(180deg, var(--amber-bg), #fffbeb);
+          color:var(--amber-text);
+          border:1px solid var(--amber-border);
+          border-bottom:none;
+        }
+        .podium-slot.second .podium-step{
+          height:clamp(44px, 9vw, 64px);
+          background:var(--gray-100);
+          color:var(--gray-700);
+          border:1px solid var(--gray-200);
+          border-bottom:none;
+        }
+        .podium-slot.third .podium-step{
+          height:clamp(32px, 7vw, 48px);
+          background:var(--gray-50);
+          color:var(--gray-500);
+          border:1px solid var(--gray-200);
+          border-bottom:none;
+        }
+        .stats-strip{
+          display:grid;
+          grid-template-columns:repeat(3, 1fr);
+          gap:clamp(8px, 2vw, 12px);
           background:var(--white);
           border-radius:var(--radius);
           box-shadow:var(--shadow);
-          padding:clamp(16px, 3vw, 18px) clamp(16px, 3vw, 20px);
+          padding:clamp(14px, 3vw, 18px) clamp(16px, 3vw, 20px);
+          margin-bottom:20px;
         }
-        .keterangan h3{
-          display:flex;align-items:center;gap:8px;
-          margin:0 0 14px;
-          font-size:clamp(14px, 3vw, 15px);
+        .stat-item{
+          display:flex;
+          flex-direction:column;
+          align-items:center;
+          text-align:center;
+          gap:3px;
+          padding:clamp(6px, 1.5vw, 10px) clamp(6px, 1.5vw, 10px);
+          border-right:1px solid var(--gray-100);
         }
-        .keterangan-grid{
-          display:grid;
-          grid-template-columns:repeat(auto-fit, minmax(140px, 1fr));
-          gap:clamp(8px, 2vw, 12px);
-          margin-bottom:16px;
+        .stat-item:last-child{border-right:none;}
+        .stat-value{
+          font-weight:800;
+          font-size:clamp(18px, 4vw, 24px);
+          color:var(--gray-900);
+          line-height:1.2;
+          display:flex;
+          align-items:center;
+          gap:6px;
         }
-        .k-item{
-          border:1px solid var(--gray-200);
-          border-radius:10px;
-          padding:clamp(10px, 2vw, 12px) clamp(12px, 2vw, 14px);
-        }
-        .k-item .k-title{
-          display:flex;align-items:center;gap:6px;
-          font-weight:700;
-          font-size:clamp(12px, 2.5vw, 13px);
-          color:var(--blue);
-          margin-bottom:2px;
-          line-height:1.3;
-        }
-        .k-item .k-sub{
-          font-size:clamp(11px, 2vw, 12px);
+        .stat-label{
+          font-size:clamp(11px, 2vw, 12.5px);
           color:var(--gray-500);
           line-height:1.3;
         }
-        .note{
-          background:var(--amber-bg);
-          border:1px solid var(--amber-border);
-          border-left:4px solid var(--amber-text);
-          border-radius:8px;
-          padding:clamp(10px, 2vw, 12px) clamp(12px, 2vw, 16px);
-          font-size:clamp(12px, 2.5vw, 13px);
-          color:var(--amber-text);
-          line-height:1.4;
+        .empty-podium{
+          background:var(--white);
+          border-radius:var(--radius);
+          box-shadow:var(--shadow);
+          padding:clamp(24px, 5vw, 36px);
+          text-align:center;
+          color:var(--gray-500);
+          font-size:clamp(13px, 2.5vw, 14px);
+          margin-bottom:20px;
         }
         @media (max-width: 768px){
           .table-wrap{display:none;}
           .mobile-list{display:block;}
         }
-        @media (max-width: 480px){
-          .keterangan-grid{grid-template-columns:repeat(2,1fr);}
-        }
-        @media (max-width: 360px){
-          .keterangan-grid{grid-template-columns:1fr;}
+        @media (max-width: 560px){
+          .stats-strip{grid-template-columns:1fr;gap:0;}
+          .stat-item{
+            flex-direction:row;
+            justify-content:space-between;
+            border-right:none;
+            border-bottom:1px solid var(--gray-100);
+            padding:10px 4px;
+          }
+          .stat-item:last-child{border-bottom:none;}
+          .stat-value{font-size:clamp(16px, 4vw, 20px);}
         }
       `}</style>
 
@@ -502,6 +620,63 @@ function Leaderboard() {
           </svg>
           Refresh data
         </button>
+      </div>
+
+      {/* Podium top 3 */}
+      {top3.length > 0 ? (
+        <div className="card podium-card" style={{ marginBottom: '12px' }}>
+          <div className="card-head">
+            <h2>🏆 Podium Top 3</h2>
+            <p>{title} — siswa dengan prestasi terbanyak</p>
+          </div>
+          <div className="podium">
+            {[
+              { student: top3.find((s) => s.rank === 2), cls: 'second', medal: MEDALS[2] },
+              { student: top3.find((s) => s.rank === 1), cls: 'first', medal: MEDALS[1] },
+              { student: top3.find((s) => s.rank === 3), cls: 'third', medal: MEDALS[3] },
+            ].filter((slot) => slot.student).map((slot) => {
+              const s = slot.student;
+              return (
+                <div key={s.id} className={`podium-slot ${slot.cls}`}>
+                  <div className="podium-medal">{slot.medal}</div>
+                  <div className="podium-avatar">
+                    {s.foto ? (
+                      <img
+                        src={`${API_BASE_URL.replace('/api', '')}${s.foto}`}
+                        alt={s.nama}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    ) : (
+                      <span>{initials(s.nama)}</span>
+                    )}
+                  </div>
+                  <div className="podium-name" title={s.nama}>{s.nama}</div>
+                  <div className="podium-meta">{s.kelas} · {s.grha || '-'}</div>
+                  <div className="podium-total">🏅 {s.total_prestasi} prestasi</div>
+                  <div className="podium-step">{s.rank}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        <div className="empty-podium">Belum ada data peringkat untuk ditampilkan.</div>
+      )}
+
+      {/* Stats strip */}
+      <div className="stats-strip">
+        <div className="stat-item">
+          <div className="stat-value">👥 {currentData.length}</div>
+          <div className="stat-label">Siswa dalam peringkat</div>
+        </div>
+        <div className="stat-item">
+          <div className="stat-value">🏅 {totalPrestasi}</div>
+          <div className="stat-label">Total prestasi</div>
+        </div>
+        <div className="stat-item">
+          <div className="stat-value">🕒 {lastUpdated ? lastUpdated.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-'}</div>
+          <div className="stat-label">Terakhir diperbarui</div>
+        </div>
       </div>
 
       {/* Ranking card */}
@@ -628,34 +803,6 @@ function Leaderboard() {
             })
           )}
         </div>
-      </div>
-
-      {/* Keterangan */}
-      <div className="keterangan">
-        <h3>📄 Keterangan</h3>
-        <div className="keterangan-grid">
-          <div className="k-item">
-            <div className="k-title">👤 Nama</div>
-            <div className="k-sub">Nama siswa</div>
-          </div>
-          <div className="k-item">
-            <div className="k-title">🏷️ Kelas</div>
-            <div className="k-sub">Kelas siswa</div>
-          </div>
-          <div className="k-item">
-            <div className="k-title">🏅 Grha</div>
-            <div className="k-sub">Asrama siswa</div>
-          </div>
-          <div className="k-item">
-            <div className="k-title">📋 Total</div>
-            <div className="k-sub">Jumlah prestasi</div>
-          </div>
-          <div className="k-item">
-            <div className="k-title">📄 Detail</div>
-            <div className="k-sub">Info lomba & juara</div>
-          </div>
-        </div>
-        <div className="note">Lingkaran bernomor menandai peringkat 1 sampai 3. Data diperbarui otomatis.</div>
       </div>
     </div>
   );

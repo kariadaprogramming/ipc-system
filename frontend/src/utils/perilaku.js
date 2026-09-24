@@ -63,4 +63,4 @@ function parseKarakterSiswa(karakterSiswa) {  const result = emptyTraits();
   return result;
 }
 
-module.exports = { KARAKTER_FIELDS, KARAKTER_LABELS, parseKarakterSiswa, toTitleCase };
+export { KARAKTER_FIELDS, KARAKTER_LABELS, parseKarakterSiswa, toTitleCase };
