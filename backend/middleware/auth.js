@@ -23,6 +23,47 @@ const auth = (req, res, next) => {
     }
 };
 
+// Middleware to check if user has permission for specific input type
+const checkPermission = (permissionType) => {
+  return async (req, res, next) => {
+    try {
+      const userId = req.user.id;
+      const userRole = req.user.role;
+      
+      // Superadmin always has access
+      if (userRole === 'superadmin') {
+        return next();
+      }
+      
+      // For students, they don't have access to pelanggaran/perilaku
+      if (userRole === 'siswa' && (permissionType === 'pelanggaran' || permissionType === 'perilaku')) {
+        return res.status(403).json({ message: 'Anda tidak memiliki izin untuk mengakses halaman ini.' });
+      }
+      
+      // For teachers, check individual permission
+      if (userRole === 'guru' && (permissionType === 'pelanggaran' || permissionType === 'perilaku')) {
+        const [permissions] = await db.query(
+          `SELECT can_input_${permissionType} as has_permission FROM permissions WHERE user_id = ?`,
+          [userId]
+        );
+        
+        const hasPermission = permissions.length > 0 ? permissions[0].has_permission : false;
+        
+        if (!hasPermission) {
+          return res.status(403).json({ 
+            message: `Anda tidak memiliki izin untuk input data ${permissionType}. Silakan hubungi SuperAdmin.` 
+          });
+        }
+      }
+      
+      next();
+    } catch (error) {
+      console.error('Error checking permission:', error);
+      res.status(500).json({ message: 'Server error' });
+    }
+  };
+};
+
 const superAdminOnly = (req, res, next) => {
     if (req.user.role !== 'superadmin') {
         return res.status(403).json({ message: 'Access denied. Superadmin only.' });
@@ -115,4 +156,4 @@ const checkInputAccess = (jenisInput) => {
   };
 };
 
-module.exports = { auth, superAdminOnly, teacherOrSuperAdmin, teacherOnly, checkInputAccess };
+module.exports = { auth, superAdminOnly, teacherOrSuperAdmin, teacherOnly, checkInputAccess, checkPermission };

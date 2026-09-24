@@ -22,6 +22,8 @@ function InputPelanggaran() {
   const [allPelanggaran, setAllPelanggaran] = useState([]);
   const [loadingIndex, setLoadingIndex] = useState(false);
   const [userRole, setUserRole] = useState('');
+  const [hasPermission, setHasPermission] = useState(false);
+  const [permissionLoading, setPermissionLoading] = useState(true);
   const editModal = useEditModal();
   const [ipcConfig, setIpcConfig] = useState([]);
   const [calculatedPoint, setCalculatedPoint] = useState(0);
@@ -43,6 +45,22 @@ function InputPelanggaran() {
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     setUserRole(user.role || '');
+
+    // Check permission for pelanggaran access
+    const checkPermission = async () => {
+      try {
+        const response = await api.get('/permissions/my-permissions');
+        const canAccess = user.role === 'superadmin' || (user.role === 'guru' && response.data.can_input_pelanggaran);
+        setHasPermission(canAccess);
+      } catch (error) {
+        console.error('Error checking permission:', error);
+        setHasPermission(false);
+      } finally {
+        setPermissionLoading(false);
+      }
+    };
+
+    checkPermission();
 
     // Auto-fill biodata for siswa
     if (user.role === 'siswa') {
@@ -322,6 +340,19 @@ function InputPelanggaran() {
       editModal.setIsLoading(false);
     }
   };
+
+  if (permissionLoading) {
+    return <div className="loading"><div className="spinner"></div></div>;
+  }
+
+  if (!hasPermission) {
+    return (
+      <div className="card">
+        <h2>Akses Ditolak</h2>
+        <p>Anda tidak memiliki izin untuk mengakses halaman ini. Silakan hubungi SuperAdmin.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="card">

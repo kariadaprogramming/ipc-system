@@ -45,16 +45,56 @@ router.get('/user/:userId', auth, async (req, res) => {
     }
 });
 
+// Get current user's permissions
+router.get('/my-permissions', auth, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const [permissions] = await db.query(
+            'SELECT id, user_id, can_input_prestasi, can_input_organisasi, can_input_kepanitiaan, can_input_event, can_input_pelanggaran, can_input_perilaku FROM permissions WHERE user_id = ?',
+            [userId]
+        );
+        
+        if (permissions.length === 0) {
+            return res.json({
+                can_input_prestasi: false,
+                can_input_organisasi: false,
+                can_input_kepanitiaan: false,
+                can_input_event: false,
+                can_input_pelanggaran: false,
+                can_input_perilaku: false,
+                can_view_all_data: false
+            });
+        }
+        
+        res.json(permissions[0]);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
 // Update user permissions
 router.put('/user/:userId', auth, superAdminOnly, async (req, res) => {
     try {
         const userId = req.params.userId;
         const { can_input_prestasi, can_input_organisasi, can_input_kepanitiaan, can_input_event, can_input_pelanggaran, can_input_perilaku, can_view_all_data } = req.body;
 
-        await db.query(
-            'UPDATE permissions SET can_input_prestasi = ?, can_input_organisasi = ?, can_input_kepanitiaan = ?, can_input_event = ?, can_input_pelanggaran = ?, can_input_perilaku = ?, can_view_all_data = ? WHERE user_id = ?',
-            [can_input_prestasi, can_input_organisasi, can_input_kepanitiaan, can_input_event, can_input_pelanggaran, can_input_perilaku, can_view_all_data, userId]
-        );
+        // Check if permissions exist for this user
+        const [existing] = await db.query('SELECT id FROM permissions WHERE user_id = ?', [userId]);
+        
+        if (existing.length === 0) {
+            // Create new permissions record
+            await db.query(
+                'INSERT INTO permissions (user_id, can_input_prestasi, can_input_organisasi, can_input_kepanitiaan, can_input_event, can_input_pelanggaran, can_input_perilaku, can_view_all_data) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                [userId, can_input_prestasi, can_input_organisasi, can_input_kepanitiaan, can_input_event, can_input_pelanggaran, can_input_perilaku, can_view_all_data]
+            );
+        } else {
+            // Update existing permissions
+            await db.query(
+                'UPDATE permissions SET can_input_prestasi = ?, can_input_organisasi = ?, can_input_kepanitiaan = ?, can_input_event = ?, can_input_pelanggaran = ?, can_input_perilaku = ?, can_view_all_data = ? WHERE user_id = ?',
+                [can_input_prestasi, can_input_organisasi, can_input_kepanitiaan, can_input_event, can_input_pelanggaran, can_input_perilaku, can_view_all_data, userId]
+            );
+        }
 
         // Log activity
         await db.query(

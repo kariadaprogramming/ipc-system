@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { auth, checkInputAccess, superAdminOnly } = require('../middleware/auth');
+const { auth, checkInputAccess, superAdminOnly, checkPermission } = require('../middleware/auth');
 const db = require('../config/database');
 const multer = require('multer');
 const path = require('path');
@@ -52,7 +52,7 @@ router.get('/user/:userId', auth, async (req, res) => {
 });
 
 // Create pelanggaran
-router.post('/', auth, checkInputAccess('pelanggaran'), upload.single('foto'), async (req, res) => {
+router.post('/', auth, checkPermission('pelanggaran'), upload.single('foto'), async (req, res) => {
     try {
         const { nama, nis, kelas, grha, keterangan, jenis_pelanggaran } = req.body;
         let foto = req.file ? req.file.filename : null;

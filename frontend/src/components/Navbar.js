@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 
 function Navbar({ user, onLogout, isMobileMenuOpen, toggleMobileMenu }) {
   const [pendingCount, setPendingCount] = useState(0);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [permissions, setPermissions] = useState(null);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -58,6 +59,23 @@ function Navbar({ user, onLogout, isMobileMenuOpen, toggleMobileMenu }) {
     }
   };
 
+  const fetchPermissions = useCallback(async () => {
+    if (!user) return;
+    try {
+      const response = await api.get('/permissions/my-permissions');
+      setPermissions(response.data);
+      console.log('Navbar - Permissions:', response.data);
+    } catch (error) {
+      console.error('Error fetching permissions:', error);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      fetchPermissions();
+    }
+  }, [user, fetchPermissions]);
+
   // Permission fetching disabled for now
   // const fetchPermissions = useCallback(async () => {
   //   if (!user) return;
@@ -84,9 +102,9 @@ function Navbar({ user, onLogout, isMobileMenuOpen, toggleMobileMenu }) {
     { path: '/input-organisasi', label: 'Organisasi', show: true },
     { path: '/input-kepanitiaan', label: 'Kepanitiaan', show: true },
     { path: '/input-event', label: 'Event', show: true },
-    // Pelanggaran and Perilaku only for superadmin
-    { path: '/input-pelanggaran', label: 'Pelanggaran', show: user?.role === 'superadmin' },
-    { path: '/input-perilaku', label: 'Perilaku', show: user?.role === 'superadmin' },
+    // Pelanggaran and Perilaku: superadmin always has access, guru needs permission
+    { path: '/input-pelanggaran', label: 'Pelanggaran', show: user?.role === 'superadmin' || (user?.role === 'guru' && permissions?.can_input_pelanggaran) },
+    { path: '/input-perilaku', label: 'Perilaku', show: user?.role === 'superadmin' || (user?.role === 'guru' && permissions?.can_input_perilaku) },
     // Kelola Akun for superadmin
     { path: '/kelola-akun', label: 'Kelola Akun', show: user?.role === 'superadmin' },
     { path: '/edit-ipc-awal', label: 'Edit IPC Awal', show: user?.role === 'superadmin' },
