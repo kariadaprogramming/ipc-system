@@ -22,9 +22,12 @@ jobs:
           # Single-line cmd.exe chain (NOT PowerShell/bash). cmd.exe gotchas handled:
           # - `if` WITHOUT parentheses swallows the rest of the line (false condition
           #   silently skips everything AND exits 0), so every conditional is wrapped: (if ... )
-          # - `timeout /t` fails over non-TTY SSH -> use `ping` as the sleep before the smoke test
+          # - `timeout /t` fails over non-TTY SSH, and System32 is NOT on the server's PATH
+          #   (ping/curl "not recognized") -> reference %SystemRoot%\System32 binaries by full path;
+          #   PING acts as the sleep before the smoke test
           # - `call` before npm/pm2 so control returns (.cmd shims)
           # - `npm install`, NOT `npm ci` (package-lock.json is gitignored)
           # - backend/uploads and .env are gitignored and never touched
           # - PM2 app name is `ipc-system` from ecosystem.config.js (repo root)
-          script: 'cd /d "${{ secrets.PROJECT_PATH }}" && git pull && node --version && call npm --version && (if not exist logs mkdir logs) && call npm install --no-audit --no-fund && cd backend && call npm install --no-audit --no-fund && cd ..\frontend && (if exist build rmdir /s /q build) && call npm install --no-audit --no-fund && call npm run build && dir build\index.html >nul 2>nul && cd .. && (call pm2 restart ipc-system --update-env || call pm2 start ecosystem.config.js --env production) && call pm2 save && call pm2 list && ping -n 16 127.0.0.1 >nul && curl.exe -f -s -o nul http://localhost:5000/ && echo SMOKE TEST OK && echo Deployment completed successfully'
+          # - no `--env production`: ecosystem.config.js only defines base `env` (already NODE_ENV=production)
+          script: 'cd /d "${{ secrets.PROJECT_PATH }}" && git pull && node --version && call npm --version && (if not exist logs mkdir logs) && call npm install --no-audit --no-fund && cd backend && call npm install --no-audit --no-fund && cd ..\frontend && (if exist build rmdir /s /q build) && call npm install --no-audit --no-fund && call npm run build && dir build\index.html >nul 2>nul && cd .. && (call pm2 restart ipc-system --update-env || call pm2 start ecosystem.config.js) && call pm2 save && call pm2 list && "%SystemRoot%\System32\PING.EXE" -n 16 127.0.0.1 >nul && "%SystemRoot%\System32\curl.exe" -f -s -o nul http://localhost:5000/ && echo SMOKE TEST OK && echo Deployment completed successfully'
