@@ -5,12 +5,21 @@ const jwt = require('jsonwebtoken');
 const db = require('../config/database');
 const { logoutLimiter } = require('../middleware/security');
 
-// Helper function to set secure HTTP-only cookie
-const setAuthCookie = (res, token) => {
-    const isProduction = process.env.NODE_ENV === 'production';
+// Helper: true when the request actually arrived over HTTPS (direct or via proxy)
+const isRequestSecure = (req) => {
+    if (!req) return false;
+    if (req.secure) return true;
+    return String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim() === 'https';
+};
+
+// Helper function to set secure HTTP-only cookie.
+// `secure` follows the real connection: a Secure cookie set over plain HTTP
+// is rejected by browsers, which would break login entirely on HTTP deployments.
+// Once HTTPS terminates in front of the app, Secure flips back on automatically.
+const setAuthCookie = (res, token, req) => {
     res.cookie('token', token, {
         httpOnly: true,
-        secure: isProduction, // true in production, false in development
+        secure: isRequestSecure(req),
         sameSite: 'lax',
         maxAge: 24 * 60 * 60 * 1000, // 24 hours
         path: '/'
@@ -59,7 +68,7 @@ const user = users[0];
         );
 
         // Set token in HTTP-only cookie
-        setAuthCookie(res, token);
+        setAuthCookie(res, token, req);
 
         // Log activity (try-catch to prevent login failure if logs table doesn't exist)
         try {
@@ -91,11 +100,11 @@ const user = users[0];
     }
 });
 
-// Logout - clear the HTTP-only cookie
+// Logout - clear the HTTP-only cookie (same Secure policy as login, so it actually clears)
 router.post('/logout', logoutLimiter, (req, res) => {
     res.clearCookie('token', {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
+        secure: isRequestSecure(req),
         sameSite: 'lax',
         path: '/'
     });
