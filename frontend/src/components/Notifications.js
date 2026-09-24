@@ -7,12 +7,6 @@ function Notifications() {
   const [message, setMessage] = useState('');
   const [unreadCount, setUnreadCount] = useState(0);
 
-  useEffect(() => {
-    fetchNotifications();
-    fetchUnreadCount();
-    markAllAsRead();
-  }, [markAllAsRead, fetchUnreadCount]);
-
   const markAllAsRead = useCallback(async () => {
     try {
       await api.put('/approvals-v2/notifications/read-all', {});
@@ -43,6 +37,12 @@ function Notifications() {
       console.error('Error fetching unread count:', error);
     }
   }, []);
+
+  useEffect(() => {
+    fetchNotifications();
+    fetchUnreadCount();
+    markAllAsRead();
+  }, [markAllAsRead, fetchUnreadCount]);
 
   const markAsRead = async (id) => {
     try {

@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 
+// Default support link shown on the login page when school config has none set.
+const DEFAULT_SUPPORT_LINK = 'google.com';
+
 function Login() {
   const [formData, setFormData] = useState({
     username: '',
@@ -361,7 +364,7 @@ function Login() {
             color: '#5b6478',
             marginTop: '.4rem'
           }}>
-            Butuh bantuan? <a href="https://chat.whatsapp.com/KXKKoHbVJzlE0ARqcBz1Cw" style={{ color: '#28396b', fontWeight: '600', textDecoration: 'none' }}>Hubungi admin sekolah</a>
+            Butuh bantuan? <a href={schoolConfig?.support_link || DEFAULT_SUPPORT_LINK} style={{ color: '#28396b', fontWeight: '600', textDecoration: 'none' }}>Hubungi admin sekolah</a>
           </p>
         </form>
       </div>
