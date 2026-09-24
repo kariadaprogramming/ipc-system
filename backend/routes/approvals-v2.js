@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const path = require('path');
-const fs = require('fs');
 const { auth, superAdminOnly, checkInputAccess } = require('../middleware/auth');
 const db = require('../config/database');
 const { logActivity } = require('../utils/logger');
@@ -23,29 +22,28 @@ const {
     rejectSubmission
 } = require('../utils/approvalSchema');
 const { movePhotoToApprovedFolder } = require('../utils/fileUtils');
+const { ensureUploadSubdir, UPLOAD_DIR } = require('../utils/paths');
 // Local file storage only - Google Drive removed
 
 // Configure multer for file uploads - use type-specific folders
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        // Determine upload folder based on route
-        let uploadDir = 'uploads/approvals';
+        // Determine upload subfolder based on route
+        let subdir = 'approvals';
         if (req.originalUrl.includes('/prestasi/')) {
-            uploadDir = 'uploads/prestasi';
+            subdir = 'prestasi';
         } else if (req.originalUrl.includes('/event/')) {
-            uploadDir = 'uploads/event';
+            subdir = 'event';
         } else if (req.originalUrl.includes('/organisasi/')) {
-            uploadDir = 'uploads/organisasi';
+            subdir = 'organisasi';
         } else if (req.originalUrl.includes('/kepanitiaan/')) {
-            uploadDir = 'uploads/kepanitiaan';
+            subdir = 'kepanitiaan';
         } else if (req.originalUrl.includes('/pelanggaran/')) {
-            uploadDir = 'uploads/pelanggaran';
+            subdir = 'pelanggaran';
         }
-        
-        if (!fs.existsSync(uploadDir)) {
-            fs.mkdirSync(uploadDir, { recursive: true });
-        }
-        cb(null, uploadDir);
+
+        // Absolute path (<backend>/uploads/...) + auto-create, independent of cwd
+        cb(null, ensureUploadSubdir(subdir));
     },
     filename: (req, file, cb) => {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
@@ -55,24 +53,20 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage });
 
-// Helper function to save file locally - extracts the relative path from full file path
+// Helper function to save file locally - extracts the DB-relative path from the absolute file path
 const saveFileLocally = (filePath) => {
-    // The file is already saved in the type-specific folder by multer
-    // Extract the relative path from the absolute path
-    // filePath is absolute like: c:\Users\...\backend\uploads\prestasi\filename.jpg
+    // filePath is absolute (multer destinations are absolute).
+    // DB format stays 'uploads/<type>/<file>' no matter where UPLOAD_DIR lives.
+    // filePath is absolute like: c:\...\backend\uploads\prestasi\filename.jpg
     // We want: uploads/prestasi/filename.jpg
-    
-    // Normalize path separators
-    const normalizedPath = filePath.replace(/\\/g, '/');
-    
-    // Find 'uploads' in the path
-    const uploadsIndex = normalizedPath.indexOf('uploads');
-    if (uploadsIndex !== -1) {
-        return normalizedPath.substring(uploadsIndex);
+
+    const rel = path.relative(UPLOAD_DIR, filePath).replace(/\\/g, '/');
+    if (rel && !rel.startsWith('..')) {
+        return `uploads/${rel}`;
     }
-    
-    // If uploads not found, use the filename and default to approvals folder
-    console.warn('Uploads not found in path, using fallback:', filePath);
+
+    // If file is outside UPLOAD_DIR, use the filename and default to approvals folder
+    console.warn('Upload file outside UPLOAD_DIR, using fallback:', filePath);
     const filename = path.basename(filePath);
     return `uploads/approvals/${filename}`;
 };

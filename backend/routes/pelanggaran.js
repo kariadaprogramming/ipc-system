@@ -8,11 +8,12 @@ const fs = require('fs');
 const { calculatePelanggaranPoints } = require('../constants/points');
 const { resolveStudentIdByNis, applyIpcChange } = require('../utils/ipc');
 const { movePhotoToApprovedFolder } = require('../utils/fileUtils');
+const { ensureUploadSubdir, resolveUploadPath } = require('../utils/paths');
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, 'uploads/pelanggaran/');
+        cb(null, ensureUploadSubdir('pelanggaran'));
     },
     filename: (req, file, cb) => {
         cb(null, Date.now() + path.extname(file.originalname));
@@ -59,11 +60,11 @@ router.post('/', auth, checkPermission('pelanggaran'), upload.single('foto'), as
 
         // Rename file to NIS_Keterangan_UniqueId format
         if (req.file && foto) {
-            const oldPath = path.join('uploads/pelanggaran', foto);
+            const oldPath = resolveUploadPath(path.join('uploads/pelanggaran', foto));
             const ext = path.extname(req.file.originalname);
             const uniqueId = Date.now().toString(36);
             const newFileName = `${nis}_${keterangan}_${uniqueId}${ext}`;
-            const newPath = path.join('uploads/pelanggaran', newFileName);
+            const newPath = resolveUploadPath(path.join('uploads/pelanggaran', newFileName));
 
             // Rename the file
             fs.renameSync(oldPath, newPath);
@@ -176,7 +177,7 @@ router.put('/:id', auth, upload.single('foto'), async (req, res) => {
         if (req.file) {
             // Delete old photo if exists
             if (foto) {
-                const oldPath = path.join('uploads/pelanggaran', foto);
+                const oldPath = resolveUploadPath(path.join('uploads/pelanggaran', foto));
                 if (fs.existsSync(oldPath)) {
                     fs.unlinkSync(oldPath);
                 }
@@ -186,8 +187,8 @@ router.put('/:id', auth, upload.single('foto'), async (req, res) => {
             const ext = path.extname(req.file.originalname);
             const uniqueId = Date.now().toString(36);
             const newFileName = `${nis}_${keterangan}_${uniqueId}${ext}`;
-            const oldPath = path.join('uploads/pelanggaran', req.file.filename);
-            const newPath = path.join('uploads/pelanggaran', newFileName);
+            const oldPath = resolveUploadPath(path.join('uploads/pelanggaran', req.file.filename));
+            const newPath = resolveUploadPath(path.join('uploads/pelanggaran', newFileName));
             fs.renameSync(oldPath, newPath);
             foto = newFileName;
         }
@@ -257,7 +258,7 @@ router.delete('/:id', auth, superAdminOnly, async (req, res) => {
 
         // Delete photo file if exists
         if (pelanggaranData.foto) {
-            const photoPath = path.join('uploads', pelanggaranData.foto);
+            const photoPath = resolveUploadPath(path.join('uploads', pelanggaranData.foto));
             if (fs.existsSync(photoPath)) {
                 fs.unlinkSync(photoPath);
             }

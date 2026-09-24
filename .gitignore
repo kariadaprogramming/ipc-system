@@ -13,6 +13,7 @@ test.html
 # Uploads
 backend/uploads/*
 !backend/uploads/.gitkeep
+*/patches/
 
 TODO
 # Logs

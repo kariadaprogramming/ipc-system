@@ -2,18 +2,13 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/database');
 const { auth } = require('../middleware/auth');
-const path = require('path');
-const fs = require('fs');
 const multer = require('multer');
+const { ensureUploadSubdir } = require('../utils/paths');
 
 // Configure multer for logo uploads
 const logoStorage = multer.diskStorage({
     destination: (req, file, cb) => {
-        const uploadDir = path.join(__dirname, '../uploads/logos');
-        if (!fs.existsSync(uploadDir)) {
-            fs.mkdirSync(uploadDir, { recursive: true });
-        }
-        cb(null, uploadDir);
+        cb(null, ensureUploadSubdir('logos'));
     },
     filename: (req, file, cb) => {
         const timestamp = Date.now();

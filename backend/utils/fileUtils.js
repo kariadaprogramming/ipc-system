@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { UPLOAD_DIR, resolveUploadPath } = require('./paths');
 
 // Helper function to sanitize file paths
 const sanitizePath = (inputPath) => {
@@ -68,9 +69,9 @@ const movePhotoToApprovedFolder = (currentFilePath, recordType) => {
             return null;
         }
 
-        // Create organized folder path: uploads/approved/[type]/
-        const approvedDir = path.join('uploads', 'approved', recordType);
-        const uploadsBase = path.join('uploads');
+        // Absolute folder path: <backend>/uploads/approved/[type]/ (cwd-independent)
+        const approvedDir = path.join(UPLOAD_DIR, 'approved', recordType);
+        const uploadsBase = UPLOAD_DIR;
         
         // Ensure directory exists
         if (!fs.existsSync(approvedDir)) {
@@ -80,9 +81,9 @@ const movePhotoToApprovedFolder = (currentFilePath, recordType) => {
         // Get filename from current path
         const filename = path.basename(sanitizedPath);
         
-        // Full paths
-        const oldFullPath = path.resolve(sanitizedPath);
-        const newFullPath = path.resolve(approvedDir, filename);
+        // Full paths (DB stores 'uploads/...' relative strings; resolve against UPLOAD_DIR)
+        const oldFullPath = resolveUploadPath(sanitizedPath);
+        const newFullPath = path.join(approvedDir, filename);
 
         // Validate source path is within uploads directory
         if (!validatePath(oldFullPath, uploadsBase)) {
@@ -130,8 +131,8 @@ const deletePhotoFile = (filePath) => {
             return false;
         }
 
-        const fullPath = path.resolve(sanitizedPath);
-        const uploadsBase = path.join('uploads');
+        const fullPath = resolveUploadPath(sanitizedPath);
+        const uploadsBase = UPLOAD_DIR;
         
         // Validate path is within uploads directory
         if (!validatePath(fullPath, uploadsBase)) {
