@@ -84,9 +84,9 @@ router.post('/', auth, checkInputAccess('perilaku'), async (req, res) => {
 
         if (userRole === 'superadmin') {
             const [result] = await db.query(
-                `INSERT INTO perilaku (user_id, nama, nis, kelas, grha, karakter_siswa, point, status)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, 'approved')`,
-                [userId, nama, nis, kelas, grha, karakter, point]
+                `INSERT INTO perilaku (user_id, submitted_by, nama, nis, kelas, grha, karakter_siswa, point, status)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'approved')`,
+                [userId, req.user.id, nama, nis, kelas, grha, karakter, point]
             );
 
             await applyPerilakuIpcChange(
@@ -106,8 +106,8 @@ router.post('/', auth, checkInputAccess('perilaku'), async (req, res) => {
         }
 
         const [result] = await db.query(
-            'INSERT INTO perilaku (user_id, nama, nis, kelas, grha, karakter_siswa, point, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            [userId, nama, nis, kelas, grha, karakter, point, 'pending']
+            'INSERT INTO perilaku (user_id, submitted_by, nama, nis, kelas, grha, karakter_siswa, point, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [userId, req.user.id, nama, nis, kelas, grha, karakter, point, 'pending']
         );
 
         // Log activity

@@ -244,8 +244,10 @@ CREATE TABLE pelanggaran (
     point_dikurangi INTEGER NOT NULL,
     status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
     rejection_reason TEXT,
+    submitted_by INTEGER NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (submitted_by) REFERENCES users(id) ON DELETE SET NULL
 );
 
 -- Perilaku Table
@@ -261,8 +263,10 @@ CREATE TABLE perilaku (
     point INTEGER NOT NULL,
     status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
     rejection_reason TEXT,
+    submitted_by INTEGER NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (submitted_by) REFERENCES users(id) ON DELETE SET NULL
 );
 
 -- ==================== LOGGING & HISTORY TABLES ====================
@@ -332,10 +336,12 @@ CREATE TABLE prestasi_approvals (
     superadmin_approved_at TIMESTAMP NULL,
     pembina_notes TEXT,
     superadmin_notes TEXT,
+    submitted_by INTEGER NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id),
-    FOREIGN KEY (pembina_id) REFERENCES users(id)
+    FOREIGN KEY (pembina_id) REFERENCES users(id),
+    FOREIGN KEY (submitted_by) REFERENCES users(id) ON DELETE SET NULL
 );
 CREATE TRIGGER trg_prestasi_approvals_updated BEFORE UPDATE ON prestasi_approvals
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
@@ -360,10 +366,12 @@ CREATE TABLE event_approvals (
     superadmin_approved_at TIMESTAMP NULL,
     pembina_notes TEXT,
     superadmin_notes TEXT,
+    submitted_by INTEGER NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id),
-    FOREIGN KEY (pembina_id) REFERENCES users(id)
+    FOREIGN KEY (pembina_id) REFERENCES users(id),
+    FOREIGN KEY (submitted_by) REFERENCES users(id) ON DELETE SET NULL
 );
 CREATE TRIGGER trg_event_approvals_updated BEFORE UPDATE ON event_approvals
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
@@ -388,10 +396,12 @@ CREATE TABLE organisasi_approvals (
     superadmin_approved_at TIMESTAMP NULL,
     pembina_notes TEXT,
     superadmin_notes TEXT,
+    submitted_by INTEGER NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id),
-    FOREIGN KEY (pembina_id) REFERENCES users(id)
+    FOREIGN KEY (pembina_id) REFERENCES users(id),
+    FOREIGN KEY (submitted_by) REFERENCES users(id) ON DELETE SET NULL
 );
 CREATE TRIGGER trg_organisasi_approvals_updated BEFORE UPDATE ON organisasi_approvals
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
@@ -416,10 +426,12 @@ CREATE TABLE kepanitiaan_approvals (
     superadmin_approved_at TIMESTAMP NULL,
     pembina_notes TEXT,
     superadmin_notes TEXT,
+    submitted_by INTEGER NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id),
-    FOREIGN KEY (pembina_id) REFERENCES users(id)
+    FOREIGN KEY (pembina_id) REFERENCES users(id),
+    FOREIGN KEY (submitted_by) REFERENCES users(id) ON DELETE SET NULL
 );
 CREATE TRIGGER trg_kepanitiaan_approvals_updated BEFORE UPDATE ON kepanitiaan_approvals
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();

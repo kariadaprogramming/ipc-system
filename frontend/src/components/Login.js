@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 
 function Login() {
-  const [activeTab, setActiveTab] = useState('siswa');
   const [formData, setFormData] = useState({
     username: '',
     password: ''
@@ -12,8 +11,6 @@ function Login() {
   const [loading, setLoading] = useState(false);
   const [schoolConfig, setSchoolConfig] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
-  const [shake, setShake] = useState(false);
-  const [focusedField, setFocusedField] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -47,17 +44,9 @@ function Login() {
       navigate('/dashboard');
     } catch (error) {
       setError(error.response?.data?.message || 'Login failed');
-      setShake(true);
-      setTimeout(() => setShake(false), 450);
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleTabChange = (tab) => {
-    setActiveTab(tab);
-    setFormData({ username: '', password: '' });
-    setError('');
   };
 
   return (
@@ -110,12 +99,6 @@ function Login() {
           0%, 100% { transform: translate(0, 0) scale(1); }
           50% { transform: translate(-30px, -25px) scale(1.15); }
         }
-        @keyframes shake {
-          10%, 90% { transform: translateX(-1px); }
-          20%, 80% { transform: translateX(2px); }
-          30%, 50%, 70% { transform: translateX(-4px); }
-          40%, 60% { transform: translateX(4px); }
-        }
         @keyframes cardIn {
           from { opacity: 0; transform: translateY(18px) scale(0.98); }
           to { opacity: 1; transform: translateY(0) scale(1); }
@@ -135,7 +118,7 @@ function Login() {
         padding: 'clamp(1.8rem, 4vw, 2.6rem)',
         boxShadow: '0 25px 60px -15px rgba(20,20,60,.45)',
         animation: 'cardIn .7s cubic-bezier(.2,.9,.25,1) both',
-        transform: shake ? 'translateX(-4px)' : 'none',
+        transform: 'none',
         transition: 'transform 0.1s'
       }}>
         {/* Logo / Brand */}
@@ -195,35 +178,6 @@ function Login() {
           </p>
         </div>
 
-        {/* Tabs */}
-        <div style={{
-          display: 'flex',
-          marginBottom: '1.2rem',
-          borderBottom: '1px solid #e1ddd0'
-        }}>
-          {['siswa', 'guru', 'superadmin'].map((tab) => (
-            <button
-              key={tab}
-              onClick={() => handleTabChange(tab)}
-              style={{
-                flex: 1,
-                padding: '12px',
-                border: 'none',
-                background: 'transparent',
-                color: activeTab === tab ? '#354a86' : '#5b6478',
-                fontWeight: '600',
-                cursor: 'pointer',
-                borderBottom: activeTab === tab ? '2px solid #354a86' : '2px solid transparent',
-                transition: 'all 0.2s',
-                fontSize: '0.9rem',
-                textTransform: 'capitalize'
-              }}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
-
         {error && (
           <div style={{
             marginBottom: '1rem',
@@ -246,8 +200,6 @@ function Login() {
               name="username"
               value={formData.username}
               onChange={handleChange}
-              onFocus={() => setFocusedField('username')}
-              onBlur={() => setFocusedField(null)}
               placeholder=" "
               required
               autoComplete="username"
@@ -261,24 +213,23 @@ function Login() {
                 background: '#fbfaf6',
                 color: '#1c2333',
                 outline: 'none',
-                transition: 'border-color .25s ease, box-shadow .25s ease',
-                borderColor: focusedField === 'username' || formData.username ? '#354a86' : '#e1ddd0',
-                boxShadow: focusedField === 'username' ? '0 0 0 4px rgba(53,74,134,.12)' : 'none'
+                transition: 'border-color .25s ease',
+                borderColor: formData.username ? '#354a86' : '#e1ddd0'
               }}
             />
             <label style={{
               position: 'absolute',
               left: '.95rem',
-              top: focusedField === 'username' || formData.username ? '.5rem' : '1.05rem',
-              fontSize: focusedField === 'username' || formData.username ? '.68rem' : '.98rem',
-              color: focusedField === 'username' || formData.username ? '#28396b' : '#5b6478',
+              top: formData.username ? '.5rem' : '1.05rem',
+              fontSize: formData.username ? '.68rem' : '.98rem',
+              color: formData.username ? '#28396b' : '#5b6478',
               pointerEvents: 'none',
               transition: 'all .2s cubic-bezier(.4, 0, .2, 1)',
-              fontWeight: focusedField === 'username' || formData.username ? '600' : 'normal',
-              letterSpacing: focusedField === 'username' || formData.username ? '.03em' : 'normal',
-              transform: focusedField === 'username' || formData.username ? 'translateY(-2px)' : 'translateY(0)'
+              fontWeight: formData.username ? '600' : 'normal',
+              letterSpacing: '.03em',
+              transform: formData.username ? 'translateY(-2px)' : 'translateY(0)'
             }}>
-              {activeTab === 'siswa' ? 'NIS' : activeTab === 'guru' ? 'NIP' : 'Username'}
+              Username
             </label>
           </div>
 
@@ -288,8 +239,6 @@ function Login() {
               name="password"
               value={formData.password}
               onChange={handleChange}
-              onFocus={() => setFocusedField('password')}
-              onBlur={() => setFocusedField(null)}
               placeholder=" "
               required
               autoComplete="current-password"
@@ -303,22 +252,20 @@ function Login() {
                 background: '#fbfaf6',
                 color: '#1c2333',
                 outline: 'none',
-                transition: 'border-color .25s ease, box-shadow .25s ease',
-                borderColor: focusedField === 'password' || formData.password ? '#354a86' : '#e1ddd0',
-                boxShadow: focusedField === 'password' ? '0 0 0 4px rgba(53,74,134,.12)' : 'none'
+                transition: 'border-color .25s ease',
+                borderColor: formData.password ? '#354a86' : '#e1ddd0'
               }}
             />
             <label style={{
               position: 'absolute',
               left: '.95rem',
-              top: focusedField === 'password' || formData.password ? '.5rem' : '1.05rem',
-              fontSize: focusedField === 'password' || formData.password ? '.68rem' : '.98rem',
-              color: focusedField === 'password' || formData.password ? '#28396b' : '#5b6478',
+              top: formData.password ? '.5rem' : '1.05rem',
+              fontSize: formData.password ? '.68rem' : '.98rem',
+              color: formData.password ? '#28396b' : '#5b6478',
               pointerEvents: 'none',
               transition: 'all .2s cubic-bezier(.4, 0, .2, 1)',
-              fontWeight: focusedField === 'password' || formData.password ? '600' : 'normal',
-              letterSpacing: focusedField === 'password' || formData.password ? '.03em' : 'normal',
-              transform: focusedField === 'password' || formData.password ? 'translateY(-2px)' : 'translateY(0)'
+              fontWeight: formData.password ? '600' : 'normal',
+              letterSpacing: '.03em'
             }}>
               Password
             </label>

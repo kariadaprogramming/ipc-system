@@ -126,9 +126,9 @@ router.post('/prestasi/submit', auth, checkInputAccess('prestasi'), upload.singl
         // SISWA/GURU: Submit for approval (superadmin only)
         const [result] = await db.query(
             `INSERT INTO prestasi_approvals
-            (user_id, nama, nis, jenis, nama_lomba, kelas, pembina, grha, juara, kategori, foto)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [userId, nama, nis, jenis, nama_lomba, calculatedClass, pembina, grha, juara, kategori, fotoPath]
+            (user_id, submitted_by, nama, nis, jenis, nama_lomba, kelas, pembina, grha, juara, kategori, foto)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [userId, req.user.id, nama, nis, jenis, nama_lomba, calculatedClass, pembina, grha, juara, kategori, fotoPath]
         );
 
         // Log activity
@@ -188,9 +188,9 @@ router.post('/pelanggaran/submit', auth, checkInputAccess('pelanggaran'), upload
 
             const [result] = await db.query(
                 `INSERT INTO pelanggaran
-                (user_id, nama, nis, kelas, grha, keterangan, foto, jenis_pelanggaran, point_dikurangi, status)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'approved')`,
-                [userId, nama, nis, calculatedClass, grha, keterangan, finalFotoPath, jenis_pelanggaran, point]
+                (user_id, submitted_by, nama, nis, kelas, grha, keterangan, foto, jenis_pelanggaran, point_dikurangi, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'approved')`,
+                [userId, req.user.id, nama, nis, calculatedClass, grha, keterangan, finalFotoPath, jenis_pelanggaran, point]
             );
 
             await applyIpcChange(userId, 'pelanggaran', point, `Pelanggaran: ${jenis_pelanggaran}`);
@@ -209,9 +209,9 @@ router.post('/pelanggaran/submit', auth, checkInputAccess('pelanggaran'), upload
         // SISWA/GURU: Submit for approval with pending status
         const [result] = await db.query(
             `INSERT INTO pelanggaran
-            (user_id, nama, nis, kelas, grha, keterangan, foto, jenis_pelanggaran, point_dikurangi, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
-            [userId, nama, nis, calculatedClass, grha, keterangan, foto_path, jenis_pelanggaran, point]
+            (user_id, submitted_by, nama, nis, kelas, grha, keterangan, foto, jenis_pelanggaran, point_dikurangi, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+            [userId, req.user.id, nama, nis, calculatedClass, grha, keterangan, foto_path, jenis_pelanggaran, point]
         );
 
         // Log activity
@@ -276,9 +276,9 @@ router.post('/event/submit', auth, checkInputAccess('event'), upload.single('fot
         // SISWA/GURU: Submit for approval (superadmin only)
         const [result] = await db.query(
             `INSERT INTO event_approvals
-            (user_id, nama, nis, kelas, grha, pembina, nama_event, tingkat, foto)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [userId, nama, nis, calculatedClass, grha, pembina, nama_event, tingkat, foto_path]
+            (user_id, submitted_by, nama, nis, kelas, grha, pembina, nama_event, tingkat, foto)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [userId, req.user.id, nama, nis, calculatedClass, grha, pembina, nama_event, tingkat, foto_path]
         );
 
         // Log activity
@@ -358,9 +358,9 @@ router.post('/organisasi/submit', auth, checkInputAccess('organisasi'), upload.s
         // SISWA/GURU: Submit for approval (superadmin only)
         const [result] = await db.query(
             `INSERT INTO organisasi_approvals
-            (user_id, nama, nis, kelas, grha, pembina, jabatan_organisasi, kategori_organisasi, foto)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [userId, nama, nis, calculatedClass, grha, pembina, jabatan_organisasi, kategori_organisasi, foto_path]
+            (user_id, submitted_by, nama, nis, kelas, grha, pembina, jabatan_organisasi, kategori_organisasi, foto)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [userId, req.user.id, nama, nis, calculatedClass, grha, pembina, jabatan_organisasi, kategori_organisasi, foto_path]
         );
 
         // Log activity
@@ -440,9 +440,9 @@ router.post('/kepanitiaan/submit', auth, checkInputAccess('kepanitiaan'), upload
         // SISWA/GURU: Submit for approval (superadmin only)
         const [result] = await db.query(
             `INSERT INTO kepanitiaan_approvals
-            (user_id, nama, nis, kelas, grha, pembina, jabatan_kepanitiaan, kategori_kepanitiaan, foto)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [userId, nama, nis, calculatedClass, grha, pembina, jabatan_kepanitiaan, kategori_kepanitiaan, foto_path]
+            (user_id, submitted_by, nama, nis, kelas, grha, pembina, jabatan_kepanitiaan, kategori_kepanitiaan, foto)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [userId, req.user.id, nama, nis, calculatedClass, grha, pembina, jabatan_kepanitiaan, kategori_kepanitiaan, foto_path]
         );
 
         // Log activity
@@ -492,25 +492,25 @@ router.put('/superadmin/:type/:id', auth, superAdminOnly, async (req, res) => {
                 table = 'prestasi_approvals';
                 pointField = 'juara';
                 pointType = 'Prestasi';
-                allowedColumns = ['id', 'user_id', 'nama', 'nis', 'jenis', 'nama_lomba', 'foto', 'kelas', 'pembina', 'grha', 'juara', 'kategori', 'point', 'status', 'rejection_reason', 'created_at'];
+                allowedColumns = ['id', 'user_id', 'nama', 'nis', 'jenis', 'nama_lomba', 'foto', 'kelas', 'pembina', 'grha', 'juara', 'kategori', 'superadmin_status', 'created_at'];
                 break;
             case 'event':
                 table = 'event_approvals';
                 pointField = 'tingkat';
                 pointType = 'Event';
-                allowedColumns = ['id', 'user_id', 'nama', 'nis', 'kelas', 'grha', 'pembina', 'nama_event', 'tingkat', 'foto', 'point', 'status', 'rejection_reason', 'created_at'];
+                allowedColumns = ['id', 'user_id', 'nama', 'nis', 'kelas', 'grha', 'pembina', 'nama_event', 'tingkat', 'foto', 'superadmin_status', 'created_at'];
                 break;
             case 'organisasi':
                 table = 'organisasi_approvals';
                 pointField = 'jabatan_organisasi';
                 pointType = 'Organisasi';
-                allowedColumns = ['id', 'user_id', 'nama', 'nis', 'kelas', 'grha', 'jabatan_organisasi', 'foto', 'kategori_organisasi', 'point', 'status', 'rejection_reason', 'created_at'];
+                allowedColumns = ['id', 'user_id', 'nama', 'nis', 'kelas', 'grha', 'jabatan_organisasi', 'foto', 'kategori_organisasi', 'superadmin_status', 'created_at'];
                 break;
             case 'kepanitiaan':
                 table = 'kepanitiaan_approvals';
                 pointField = 'jabatan_kepanitiaan';
                 pointType = 'Kepanitiaan';
-                allowedColumns = ['id', 'user_id', 'nama', 'nis', 'kelas', 'grha', 'jabatan_kepanitiaan', 'foto', 'point', 'status', 'rejection_reason', 'created_at'];
+                allowedColumns = ['id', 'user_id', 'nama', 'nis', 'kelas', 'grha', 'jabatan_kepanitiaan', 'foto', 'kategori_kepanitiaan', 'superadmin_status', 'created_at'];
                 break;
             default:
                 return res.status(400).json({ message: 'Invalid type' });
@@ -786,54 +786,54 @@ router.get('/user-submissions', auth, async (req, res) => {
                    superadmin_status as status,
                    'prestasi' as type
             FROM prestasi_approvals
-            WHERE user_id = ?
+            WHERE user_id = ? OR submitted_by = ?
             ORDER BY created_at DESC
-        `, [userId]);
+        `, [userId, userId]);
 
         const [event] = await db.query(`
             SELECT *,
                    superadmin_status as status,
                    'event' as type
             FROM event_approvals
-            WHERE user_id = ?
+            WHERE user_id = ? OR submitted_by = ?
             ORDER BY created_at DESC
-        `, [userId]);
+        `, [userId, userId]);
 
         const [organisasi] = await db.query(`
             SELECT *,
                    superadmin_status as status,
                    'organisasi' as type
             FROM organisasi_approvals
-            WHERE user_id = ?
+            WHERE user_id = ? OR submitted_by = ?
             ORDER BY created_at DESC
-        `, [userId]);
+        `, [userId, userId]);
 
         const [kepanitiaan] = await db.query(`
             SELECT *,
                    superadmin_status as status,
                    'kepanitiaan' as type
             FROM kepanitiaan_approvals
-            WHERE user_id = ?
+            WHERE user_id = ? OR submitted_by = ?
             ORDER BY created_at DESC
-        `, [userId]);
+        `, [userId, userId]);
 
         const [pelanggaran] = await db.query(`
             SELECT *,
                    status,
                    'pelanggaran' as type
             FROM pelanggaran
-            WHERE user_id = ?
+            WHERE user_id = ? OR submitted_by = ?
             ORDER BY created_at DESC
-        `, [userId]);
+        `, [userId, userId]);
 
         const [perilaku] = await db.query(`
             SELECT *,
                    status,
                    'perilaku' as type
             FROM perilaku
-            WHERE user_id = ?
+            WHERE user_id = ? OR submitted_by = ?
             ORDER BY created_at DESC
-        `, [userId]);
+        `, [userId, userId]);
 
         res.json({
             prestasi,

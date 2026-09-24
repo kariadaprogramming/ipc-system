@@ -74,8 +74,8 @@ router.post('/', auth, checkInputAccess('pelanggaran'), upload.single('foto'), a
         const userId = await resolveStudentIdByNis(nis, req.user.id);
 
         const [result] = await db.query(
-            'INSERT INTO pelanggaran (user_id, nama, nis, kelas, grha, keterangan, foto, jenis_pelanggaran, point_dikurangi) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [userId, nama, nis, kelas, grha, keterangan, foto, jenis_pelanggaran, point_dikurangi]
+            'INSERT INTO pelanggaran (user_id, submitted_by, nama, nis, kelas, grha, keterangan, foto, jenis_pelanggaran, point_dikurangi) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [userId, req.user.id, nama, nis, kelas, grha, keterangan, foto, jenis_pelanggaran, point_dikurangi]
         );
 
         await db.query(

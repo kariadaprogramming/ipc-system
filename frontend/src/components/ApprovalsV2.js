@@ -246,7 +246,7 @@ function ApprovalsV2() {
       const isPending = status === 'pending';
 
       return (
-        <div style={{
+        <div key={item.id} style={{
           borderBottom: `1px solid ${BORDER}`,
           padding: '16px',
           animation: 'fadeSlide 0.28s ease'
