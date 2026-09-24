@@ -3,6 +3,7 @@ const router = express.Router();
 const { auth } = require('../middleware/auth');
 const db = require('../config/database');
 const { getStudentRecords } = require('../utils/studentRecords');
+const { logActivity } = require('../utils/logger');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -45,7 +46,7 @@ const upload = multer({
 router.get('/', auth, async (req, res) => {
     try {
         const [user] = await db.query(
-            'SELECT id, nama, nis, nip, role, kelas, grha, wali_kelas, ipc_total, ipc_awal, alamat, no_hp, detail, detail AS jabatan, foto, created_at FROM users WHERE id = ?',
+            'SELECT id, nama, nis, nip, role, kelas, grha, wali_kelas, ipc_total, ipc_awal, alamat, no_hp, detail, detail AS jabatan, foto, created_at, tahun_pelajaran, is_graduated, jurusan FROM users WHERE id = ?',
             [req.user.id]
         );
 
@@ -61,7 +62,7 @@ router.get('/', auth, async (req, res) => {
                 SELECT u.nama as wali_kelas_nama, u.nip as wali_kelas_nip
                 FROM wali_kelas_assignment wka
                 JOIN users u ON wka.guru_id = u.id
-                WHERE wka.kelas = ? AND wka.tahun_ajaran = YEAR(CURDATE())
+                WHERE wka.kelas = ? AND SPLIT_PART(wka.tahun_ajaran, '-', 1)::INT = EXTRACT(YEAR FROM CURRENT_DATE)::INT
                 ORDER BY wka.id DESC
                 LIMIT 1
             `, [userData.kelas]);
@@ -216,7 +217,7 @@ router.post('/change-password', auth, async (req, res) => {
         }
 
         // Get user with current password
-        const [user] = await db.query('SELECT password FROM users WHERE id = ?', [req.user.id]);
+        const [user] = await db.query('SELECT password, nama, role FROM users WHERE id = ?', [req.user.id]);
 
         if (user.length === 0) {
             return res.status(404).json({ message: 'User not found' });
@@ -234,6 +235,9 @@ router.post('/change-password', auth, async (req, res) => {
 
         // Update password
         await db.query('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, req.user.id]);
+
+        // Log activity
+        await logActivity(req.user.id, 'CHANGE_PASSWORD', `User ${user[0].nama} (${user[0].role}) changed password`, req.ip);
 
         res.json({ message: 'Password changed successfully' });
     } catch (error) {

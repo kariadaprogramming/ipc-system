@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import API_BASE_URL from '../config';
+import { toTitleCase } from '../utils/perilaku';
+import { formatDisplayText } from '../utils/formatDisplayText';
 
 function ApprovalsV2() {
   const PAGE_BG = '#f3f5f9';
@@ -39,17 +41,10 @@ function ApprovalsV2() {
 
   const fetchApprovals = async () => {
     try {
-      const token = localStorage.getItem('token');
       const [approvalsRes, biodataRes, studentCreationRes] = await Promise.all([
-        axios.get('/approvals-v2/all', {
-          headers: { Authorization: `Bearer ${token}` }
-        }),
-        axios.get('/users/biodata-approvals', {
-          headers: { Authorization: `Bearer ${token}` }
-        }),
-        axios.get('/users/student-creation-approvals', {
-          headers: { Authorization: `Bearer ${token}` }
-        })
+        api.get('/approvals-v2/all'),
+        api.get('/users/biodata-approvals'),
+        api.get('/users/student-creation-approvals')
       ]);
       setApprovals({
         ...approvalsRes.data,
@@ -66,28 +61,20 @@ function ApprovalsV2() {
 
   const handleApprove = async (type, id) => {
     try {
-      const token = localStorage.getItem('token');
-      
       if (type === 'biodata') {
-        await axios.put(`/users/biodata-approvals/${id}`, {
+        await api.put(`/users/biodata-approvals/${id}`, {
           status: 'approved',
           notes: notes || 'Disetujui'
-        }, {
-          headers: { Authorization: `Bearer ${token}` }
         });
       } else if (type === 'student_creation') {
-        await axios.put(`/users/student-creation-approvals/${id}`, {
+        await api.put(`/users/student-creation-approvals/${id}`, {
           status: 'approved',
           notes: notes || 'Disetujui'
-        }, {
-          headers: { Authorization: `Bearer ${token}` }
         });
       } else {
-        await axios.put(`/approvals-v2/superadmin/${type}/${id}`, {
+        await api.put(`/approvals-v2/superadmin/${type}/${id}`, {
           status: 'approved',
           notes: notes || 'Disetujui'
-        }, {
-          headers: { Authorization: `Bearer ${token}` }
         });
       }
       
@@ -112,28 +99,20 @@ function ApprovalsV2() {
 
   const handleReject = async (type, id) => {
     try {
-      const token = localStorage.getItem('token');
-      
       if (type === 'biodata') {
-        await axios.put(`/users/biodata-approvals/${id}`, {
+        await api.put(`/users/biodata-approvals/${id}`, {
           status: 'rejected',
           notes: notes || 'Ditolak'
-        }, {
-          headers: { Authorization: `Bearer ${token}` }
         });
       } else if (type === 'student_creation') {
-        await axios.put(`/users/student-creation-approvals/${id}`, {
+        await api.put(`/users/student-creation-approvals/${id}`, {
           status: 'rejected',
           notes: notes || 'Ditolak'
-        }, {
-          headers: { Authorization: `Bearer ${token}` }
         });
       } else {
-        await axios.put(`/approvals-v2/superadmin/${type}/${id}`, {
+        await api.put(`/approvals-v2/superadmin/${type}/${id}`, {
           status: 'rejected',
           notes: notes || 'Ditolak'
-        }, {
-          headers: { Authorization: `Bearer ${token}` }
         });
       }
       
@@ -199,16 +178,25 @@ function ApprovalsV2() {
         cleanPath = path.split('\\').pop();
         cleanPath = `/uploads/${uploadFolder}/${cleanPath}`;
       } else if (!cleanPath.startsWith('/')) {
-        cleanPath = `/uploads/${uploadFolder}/${cleanPath}`;
+        // Paths saved by the backend are already relative to the uploads root
+        // (e.g. "uploads/event/filename.jpg") — just root them, don't nest
+        // them under the fallback folder again.
+        cleanPath = cleanPath.startsWith('uploads/')
+          ? `/${cleanPath}`
+          : `/uploads/${uploadFolder}/${cleanPath}`;
       }
       return `${API_BASE_URL.replace('/api', '')}${cleanPath}`;
     };
 
     const getItemPhoto = (item, itemType) => {
+      // `foto` is the actual column name returned by the approvals API
+      // (`foto_path` kept as fallback for legacy rows).
+      const foto = item.foto || item.foto_path;
+      if (!foto) return null;
       if (itemType === 'pelanggaran') {
-        return item.foto ? getPhotoUrl(item.foto, 'pelanggaran') : null;
+        return getPhotoUrl(foto, 'pelanggaran');
       }
-      return item.foto_path ? getPhotoUrl(item.foto_path) : null;
+      return getPhotoUrl(foto);
     };
 
     const usesApprovalStatus = !['biodata', 'student_creation'].includes(type);
@@ -238,12 +226,12 @@ function ApprovalsV2() {
     const getFieldValue = (item, col, type) => {
       if (type === 'prestasi') {
         if (col === 'Lomba') return item.nama_lomba;
-        if (col === 'Juara') return item.juara;
-        if (col === 'Kategori') return item.kategori;
+        if (col === 'Juara') return formatDisplayText(item.juara);
+        if (col === 'Kategori') return formatDisplayText(item.kategori);
       }
       if (type === 'event') {
         if (col === 'Event') return item.nama_event;
-        if (col === 'Tingkat') return item.tingkat;
+        if (col === 'Tingkat') return formatDisplayText(item.tingkat);
       }
       if (type === 'organisasi') {
         if (col === 'Organisasi') return item.kategori_organisasi;
@@ -258,7 +246,7 @@ function ApprovalsV2() {
         if (col === 'Jenis') return item.jenis_pelanggaran;
       }
       if (type === 'perilaku') {
-        if (col === 'Karakter') return item.karakter_siswa;
+        if (col === 'Karakter') return toTitleCase(item.karakter_siswa);
       }
       return '';
     };
@@ -268,7 +256,7 @@ function ApprovalsV2() {
       const isPending = status === 'pending';
 
       return (
-        <div style={{
+        <div key={item.id} style={{
           borderBottom: `1px solid ${BORDER}`,
           padding: '16px',
           animation: 'fadeSlide 0.28s ease'
@@ -539,13 +527,13 @@ function ApprovalsV2() {
                       borderBottom: `1px solid ${BORDER}`,
                       verticalAlign: "middle",
                       color: TEXT
-                    }}>{item.juara}</td>
+                    }}>{formatDisplayText(item.juara)}</td>
                     <td style={{
                       padding: "16px 18px",
                       borderBottom: `1px solid ${BORDER}`,
                       verticalAlign: "middle",
                       color: TEXT
-                    }}>{item.kategori}</td>
+                    }}>{formatDisplayText(item.kategori)}</td>
                   </>
                 )}
                 {type === 'event' && (
@@ -561,7 +549,7 @@ function ApprovalsV2() {
                       borderBottom: `1px solid ${BORDER}`,
                       verticalAlign: "middle",
                       color: TEXT
-                    }}>{item.tingkat}</td>
+                    }}>{formatDisplayText(item.tingkat)}</td>
                   </>
                 )}
                 {type === 'organisasi' && (
@@ -618,7 +606,7 @@ function ApprovalsV2() {
                     borderBottom: `1px solid ${BORDER}`,
                     verticalAlign: "middle",
                     color: TEXT
-                  }}>{item.karakter_siswa}</td>
+                  }}>{toTitleCase(item.karakter_siswa)}</td>
                 )}
                 {type === 'biodata' && (
                   <>
@@ -747,6 +735,31 @@ function ApprovalsV2() {
                     </td>
                   </>
                 )}
+                {usesApprovalStatus && type !== 'perilaku' && (
+                  <td style={{
+                    padding: "16px 18px",
+                    borderBottom: `1px solid ${BORDER}`,
+                    verticalAlign: "middle"
+                  }}>
+                    {getItemPhoto(item, type) ? (
+                      <div>
+                        <img
+                          src={getItemPhoto(item, type)}
+                          alt="Foto Bukti"
+                          style={{ width: '60px', height: '60px', objectFit: 'cover', borderRadius: '5px', cursor: 'pointer' }}
+                          onClick={() => window.open(getItemPhoto(item, type), '_blank')}
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            e.currentTarget.insertAdjacentHTML('afterend', '<span style="color:#6b7280;font-size:12.5px">Foto tidak ditemukan</span>');
+                          }}
+                          title="Klik untuk memperbesar"
+                        />
+                      </div>
+                    ) : (
+                      <span style={{ color: MUTED }}>-</span>
+                    )}
+                  </td>
+                )}
                 {usesApprovalStatus && (
                   <td style={{
                     padding: "16px 18px",
@@ -801,27 +814,6 @@ function ApprovalsV2() {
                         background: '#fdeaea',
                         color: RED_DARK
                       }}>❌ DITOLAK</span>
-                    )}
-                  </td>
-                )}
-                {usesApprovalStatus && type !== 'perilaku' && (
-                  <td style={{
-                    padding: "16px 18px",
-                    borderBottom: `1px solid ${BORDER}`,
-                    verticalAlign: "middle"
-                  }}>
-                    {getItemPhoto(item, type) ? (
-                      <div>
-                        <img
-                          src={getItemPhoto(item, type)}
-                          alt="Foto Bukti"
-                          style={{ width: '60px', height: '60px', objectFit: 'cover', borderRadius: '5px', cursor: 'pointer' }}
-                          onClick={() => window.open(getItemPhoto(item, type), '_blank')}
-                          title="Klik untuk memperbesar"
-                        />
-                      </div>
-                    ) : (
-                      <span style={{ color: MUTED }}>-</span>
                     )}
                   </td>
                 )}

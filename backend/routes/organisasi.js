@@ -40,7 +40,7 @@ router.get('/all', auth, async (req, res) => {
 router.get('/user/:userId', auth, async (req, res) => {
     try {
         const [organisasi] = await db.query(
-            'SELECT * FROM organisasi WHERE user_id = ? AND status = ? ORDER BY created_at DESC',
+            'SELECT id, user_id, nama, nis, kelas, grha, jabatan_organisasi, foto, kategori_organisasi, point, status, rejection_reason, created_at FROM organisasi WHERE user_id = ? AND status = ? ORDER BY created_at DESC',
             [req.params.userId, 'approved']
         );
         res.json(organisasi);
@@ -78,7 +78,7 @@ router.post('/', auth, upload.single('foto'), async (req, res) => {
         // Log activity
         await db.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Submit Organisasi', `Submitted organisasi: ${jabatan_organisasi}`]
+            [req.user.id, 'SUBMIT_ORGANISASI', `Submitted organisasi: ${jabatan_organisasi}`]
         );
 
         res.status(201).json({ message: 'Organisasi submitted for approval', id: result.insertId });
@@ -88,12 +88,12 @@ router.post('/', auth, upload.single('foto'), async (req, res) => {
     }
 });
 
-// Approve organisasi
-router.put('/:id/approve', auth, async (req, res) => {
+// Approve organisasi (superadmin only)
+router.put('/:id/approve', auth, superAdminOnly, async (req, res) => {
     try {
         const organisasiId = req.params.id;
         
-        const [organisasi] = await db.query('SELECT * FROM organisasi WHERE id = ?', [organisasiId]);
+        const [organisasi] = await db.query('SELECT id, user_id, nama, nis, kelas, grha, jabatan_organisasi, foto, kategori_organisasi, point, status, rejection_reason, created_at FROM organisasi WHERE id = ?', [organisasiId]);
         if (organisasi.length === 0) {
             return res.status(404).json({ message: 'Organisasi not found' });
         }
@@ -126,7 +126,7 @@ router.put('/:id/approve', auth, async (req, res) => {
 
         await db.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Approve Organisasi', `Approved organisasi ID ${organisasiId}`]
+            [req.user.id, 'APPROVE_ORGANISASI', `Approved organisasi ID ${organisasiId}`]
         );
 
         res.json({ message: 'Organisasi approved successfully' });
@@ -136,8 +136,8 @@ router.put('/:id/approve', auth, async (req, res) => {
     }
 });
 
-// Reject organisasi
-router.put('/:id/reject', auth, async (req, res) => {
+// Reject organisasi (superadmin only)
+router.put('/:id/reject', auth, superAdminOnly, async (req, res) => {
     try {
         const { rejection_reason } = req.body;
         const organisasiId = req.params.id;
@@ -146,7 +146,7 @@ router.put('/:id/reject', auth, async (req, res) => {
 
         await db.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Reject Organisasi', `Rejected organisasi ID ${organisasiId}`]
+            [req.user.id, 'REJECT_ORGANISASI', `Rejected organisasi ID ${organisasiId}`]
         );
 
         res.json({ message: 'Organisasi rejected' });
@@ -162,7 +162,7 @@ router.put('/:id', auth, upload.single('foto'), async (req, res) => {
         const organisasiId = req.params.id;
         const { nama, nis, kelas, grha, jabatan_organisasi, kategori_organisasi } = req.body;
         
-        const [organisasi] = await db.query('SELECT * FROM organisasi WHERE id = ?', [organisasiId]);
+        const [organisasi] = await db.query('SELECT id, user_id, nama, nis, kelas, grha, jabatan_organisasi, foto, kategori_organisasi, point, status, rejection_reason, created_at FROM organisasi WHERE id = ?', [organisasiId]);
         if (organisasi.length === 0) {
             return res.status(404).json({ message: 'Organisasi not found' });
         }
@@ -215,7 +215,7 @@ router.put('/:id', auth, upload.single('foto'), async (req, res) => {
         // Log activity
         await db.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Update Organisasi', `Updated organisasi ID ${organisasiId}`]
+            [req.user.id, 'UPDATE_ORGANISASI', `Updated organisasi ID ${organisasiId}`]
         );
 
         res.json({ message: 'Organisasi updated successfully' });
@@ -230,7 +230,7 @@ router.delete('/:id', auth, superAdminOnly, async (req, res) => {
     try {
         const organisasiId = req.params.id;
         
-        const [organisasi] = await db.query('SELECT * FROM organisasi WHERE id = ?', [organisasiId]);
+        const [organisasi] = await db.query('SELECT id, user_id, nama, nis, kelas, grha, jabatan_organisasi, foto, kategori_organisasi, point, status, rejection_reason, created_at FROM organisasi WHERE id = ?', [organisasiId]);
         if (organisasi.length === 0) {
             return res.status(404).json({ message: 'Organisasi not found' });
         }
@@ -266,7 +266,7 @@ router.delete('/:id', auth, superAdminOnly, async (req, res) => {
         // Log activity
         await db.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Delete Organisasi', `Deleted organisasi ID ${organisasiId}`]
+            [req.user.id, 'DELETE_ORGANISASI', `Deleted organisasi ID ${organisasiId}`]
         );
 
         res.json({ message: 'Organisasi deleted successfully' });

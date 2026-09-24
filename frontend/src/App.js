@@ -24,19 +24,7 @@ import Notifications from './components/Notifications';
 import LaporanCetak from './components/LaporanCetak';
 import KonfigurasiIPC from './components/KonfigurasiIPC';
 import SchoolConfig from './components/SchoolConfig';
-import axios from 'axios';
-import API_BASE_URL from './config';
-
-axios.defaults.baseURL = API_BASE_URL;
-
-// Axios interceptor to add Authorization header automatically
-axios.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+import api from './utils/api';
 
 function ProtectedRoute({ children, allowedRoles }) {
   const [loading, setLoading] = useState(true);
@@ -44,14 +32,12 @@ function ProtectedRoute({ children, allowedRoles }) {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
     const userData = localStorage.getItem('user');
     
-    console.log('ProtectedRoute - Token:', token);
     console.log('ProtectedRoute - UserData:', userData);
     
-    if (!token || !userData) {
-      console.log('Redirecting to login - no token or user data');
+    if (!userData) {
+      console.log('Redirecting to login - no user data');
       navigate('/login');
       return;
     }
@@ -72,7 +58,7 @@ function ProtectedRoute({ children, allowedRoles }) {
     // Fetch fresh user data from server to get latest wali_kelas status (background)
     const fetchFreshUserData = async () => {
       try {
-        const response = await axios.get('/profile');
+        const response = await api.get('/profile');
         
         // Merge fresh data with existing user data
         const freshUser = { ...parsedUser, ...response.data };
@@ -83,7 +69,12 @@ function ProtectedRoute({ children, allowedRoles }) {
         setUser(freshUser);
       } catch (error) {
         console.error('Error fetching fresh user data:', error);
-        // Keep using stored data if fetch fails
+        // If auth fails, redirect to login
+        if (error.response?.status === 401) {
+          localStorage.removeItem('user');
+          navigate('/login');
+        }
+        // Keep using stored data if fetch fails for other reasons
       }
     };
 
@@ -226,10 +217,18 @@ function App() {
 function MainLayout({ user, children }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    window.location.href = '/login';
+  const handleLogout = async () => {
+    try {
+      // Call backend logout endpoint to clear HTTP-only cookie
+      await api.post('/auth/logout');
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      // Clear local storage regardless of API call success
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = '/login';
+    }
   };
 
   const toggleMobileMenu = () => {

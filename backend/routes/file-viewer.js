@@ -4,6 +4,42 @@ const fs = require('fs');
 const path = require('path');
 const { auth, superAdminOnly } = require('../middleware/auth');
 
+// Helper function to sanitize and validate file paths
+const sanitizePath = (inputPath) => {
+    // Remove any null bytes
+    const sanitized = inputPath.replace(/\0/g, '');
+    
+    // Remove directory traversal attempts
+    const withoutTraversal = sanitized.replace(/\.\./g, '').replace(/\\/g, '/');
+    
+    // Remove URL-encoded traversal attempts
+    const decoded = decodeURIComponent(withoutTraversal);
+    const finalSanitized = decoded.replace(/\.\./g, '');
+    
+    return finalSanitized;
+};
+
+// Helper function to validate path is within allowed directory
+const validatePath = (requestedPath, allowedBase) => {
+    const resolvedRequested = path.resolve(requestedPath);
+    const resolvedAllowed = path.resolve(allowedBase);
+    
+    // Ensure the resolved path starts with the allowed base directory
+    if (!resolvedRequested.startsWith(resolvedAllowed)) {
+        return false;
+    }
+    
+    // Additional check: ensure no symbolic links escape the allowed directory
+    try {
+        const realRequested = fs.realpathSync(resolvedRequested);
+        const realAllowed = fs.realpathSync(resolvedAllowed);
+        return realRequested.startsWith(realAllowed);
+    } catch (error) {
+        // If realpath fails (file doesn't exist), use the resolved path check
+        return true;
+    }
+};
+
 // Get all folders in uploads directory
 router.get('/folders', auth, superAdminOnly, async (req, res) => {
     try {
@@ -33,14 +69,21 @@ router.get('/folders', auth, superAdminOnly, async (req, res) => {
 router.get('/files/:folderName', auth, superAdminOnly, async (req, res) => {
     try {
         const { folderName } = req.params;
-        const folderPath = path.join(__dirname, '..', 'uploads', folderName);
-
-        // Security check: ensure the folder is within uploads directory
+        
+        // Sanitize folder name to prevent path traversal
+        const sanitizedFolderName = sanitizePath(folderName);
+        
+        // Whitelist of allowed folder names
+        const allowedFolders = ['prestasi', 'pelanggaran', 'organisasi', 'kepanitiaan', 'event', 'perilaku', 'avatars', 'approved'];
+        if (!allowedFolders.includes(sanitizedFolderName)) {
+            return res.status(403).json({ message: 'Invalid folder name' });
+        }
+        
+        const folderPath = path.join(__dirname, '..', 'uploads', sanitizedFolderName);
         const uploadsDir = path.join(__dirname, '..', 'uploads');
-        const resolvedFolder = path.resolve(folderPath);
-        const resolvedUploads = path.resolve(uploadsDir);
 
-        if (!resolvedFolder.startsWith(resolvedUploads)) {
+        // Validate path is within uploads directory
+        if (!validatePath(folderPath, uploadsDir)) {
             return res.status(403).json({ message: 'Access denied' });
         }
 
@@ -56,7 +99,7 @@ router.get('/files/:folderName', auth, superAdminOnly, async (req, res) => {
                 const stats = fs.statSync(filePath);
                 return {
                     name: file.name,
-                    path: `/uploads/${folderName}/${file.name}`,
+                    path: `/uploads/${sanitizedFolderName}/${file.name}`,
                     size: stats.size,
                     created: stats.birthtime,
                     type: 'file'
@@ -74,14 +117,22 @@ router.get('/files/:folderName', auth, superAdminOnly, async (req, res) => {
 router.delete('/file/:folderName/:fileName', auth, superAdminOnly, async (req, res) => {
     try {
         const { folderName, fileName } = req.params;
-        const filePath = path.join(__dirname, '..', 'uploads', folderName, fileName);
-
-        // Security check
+        
+        // Sanitize inputs to prevent path traversal
+        const sanitizedFolderName = sanitizePath(folderName);
+        const sanitizedFileName = sanitizePath(fileName);
+        
+        // Whitelist of allowed folder names
+        const allowedFolders = ['prestasi', 'pelanggaran', 'organisasi', 'kepanitiaan', 'event', 'perilaku', 'avatars', 'approved'];
+        if (!allowedFolders.includes(sanitizedFolderName)) {
+            return res.status(403).json({ message: 'Invalid folder name' });
+        }
+        
+        const filePath = path.join(__dirname, '..', 'uploads', sanitizedFolderName, sanitizedFileName);
         const uploadsDir = path.join(__dirname, '..', 'uploads');
-        const resolvedFile = path.resolve(filePath);
-        const resolvedUploads = path.resolve(uploadsDir);
 
-        if (!resolvedFile.startsWith(resolvedUploads)) {
+        // Validate path is within uploads directory
+        if (!validatePath(filePath, uploadsDir)) {
             return res.status(403).json({ message: 'Access denied' });
         }
 

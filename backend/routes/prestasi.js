@@ -54,7 +54,7 @@ router.get('/teachers', auth, async (req, res) => {
 router.get('/user/:userId', auth, async (req, res) => {
     try {
         const [prestasi] = await db.query(
-            'SELECT * FROM prestasi WHERE user_id = ? AND status = ? ORDER BY created_at DESC',
+            'SELECT id, user_id, nama, nis, jenis, nama_lomba, foto, kelas, pembina, grha, juara, kategori, point, status, rejection_reason, created_at FROM prestasi WHERE user_id = ? AND status = ? ORDER BY created_at DESC',
             [req.params.userId, 'approved']
         );
         res.json(prestasi);
@@ -92,7 +92,7 @@ router.post('/', auth, upload.single('foto'), async (req, res) => {
         // Log activity
         await db.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Submit Prestasi', `Submitted prestasi: ${nama_lomba}`]
+            [req.user.id, 'SUBMIT_PRESTASI', `Submitted prestasi: ${nama_lomba}`]
         );
 
         res.status(201).json({ message: 'Prestasi submitted for approval', id: result.insertId });
@@ -102,12 +102,12 @@ router.post('/', auth, upload.single('foto'), async (req, res) => {
     }
 });
 
-// Approve prestasi
-router.put('/:id/approve', auth, async (req, res) => {
+// Approve prestasi (superadmin only)
+router.put('/:id/approve', auth, superAdminOnly, async (req, res) => {
     try {
         const prestasiId = req.params.id;
         
-        const [prestasi] = await db.query('SELECT * FROM prestasi WHERE id = ?', [prestasiId]);
+        const [prestasi] = await db.query('SELECT id, user_id, nama, nis, jenis, nama_lomba, foto, kelas, pembina, grha, juara, kategori, point, status, rejection_reason, created_at FROM prestasi WHERE id = ?', [prestasiId]);
         if (prestasi.length === 0) {
             return res.status(404).json({ message: 'Prestasi not found' });
         }
@@ -142,7 +142,7 @@ router.put('/:id/approve', auth, async (req, res) => {
         // Log activity
         await db.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Approve Prestasi', `Approved prestasi ID ${prestasiId}`]
+            [req.user.id, 'APPROVE_PRESTASI', `Approved prestasi ID ${prestasiId}`]
         );
 
         res.json({ message: 'Prestasi approved successfully' });
@@ -152,8 +152,8 @@ router.put('/:id/approve', auth, async (req, res) => {
     }
 });
 
-// Reject prestasi
-router.put('/:id/reject', auth, async (req, res) => {
+// Reject prestasi (superadmin only)
+router.put('/:id/reject', auth, superAdminOnly, async (req, res) => {
     try {
         const { rejection_reason } = req.body;
         const prestasiId = req.params.id;
@@ -163,7 +163,7 @@ router.put('/:id/reject', auth, async (req, res) => {
         // Log activity
         await db.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Reject Prestasi', `Rejected prestasi ID ${prestasiId}`]
+            [req.user.id, 'REJECT_PRESTASI', `Rejected prestasi ID ${prestasiId}`]
         );
 
         res.json({ message: 'Prestasi rejected' });
@@ -179,7 +179,7 @@ router.put('/:id', auth, upload.single('foto'), async (req, res) => {
         const prestasiId = req.params.id;
         const { nama, nis, jenis, nama_lomba, kelas, pembina, grha, juara, kategori } = req.body;
         
-        const [prestasi] = await db.query('SELECT * FROM prestasi WHERE id = ?', [prestasiId]);
+        const [prestasi] = await db.query('SELECT id, user_id, nama, nis, jenis, nama_lomba, foto, kelas, pembina, grha, juara, kategori, point, status, rejection_reason, created_at FROM prestasi WHERE id = ?', [prestasiId]);
         if (prestasi.length === 0) {
             return res.status(404).json({ message: 'Prestasi not found' });
         }
@@ -228,7 +228,7 @@ router.put('/:id', auth, upload.single('foto'), async (req, res) => {
         // Log activity
         await db.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Update Prestasi', `Updated prestasi ID ${prestasiId}`]
+            [req.user.id, 'UPDATE_PRESTASI', `Updated prestasi ID ${prestasiId}`]
         );
 
         res.json({ message: 'Prestasi updated successfully' });
@@ -243,7 +243,7 @@ router.delete('/:id', auth, superAdminOnly, async (req, res) => {
     try {
         const prestasiId = req.params.id;
         
-        const [prestasi] = await db.query('SELECT * FROM prestasi WHERE id = ?', [prestasiId]);
+        const [prestasi] = await db.query('SELECT id, user_id, nama, nis, jenis, nama_lomba, foto, kelas, pembina, grha, juara, kategori, point, status, rejection_reason, created_at FROM prestasi WHERE id = ?', [prestasiId]);
         if (prestasi.length === 0) {
             return res.status(404).json({ message: 'Prestasi not found' });
         }
@@ -279,7 +279,7 @@ router.delete('/:id', auth, superAdminOnly, async (req, res) => {
         // Log activity
         await db.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Delete Prestasi', `Deleted prestasi ID ${prestasiId}`]
+            [req.user.id, 'DELETE_PRESTASI', `Deleted prestasi ID ${prestasiId}`]
         );
 
         res.json({ message: 'Prestasi deleted successfully' });

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import API_BASE_URL from '../config';
+import { useMinIpc, isBelowMinIpc } from '../utils/minIpc';
 import {
   BarChart,
   Bar,
@@ -15,6 +16,7 @@ import {
 } from 'recharts';
 
 function Dashboard() {
+  const minIpc = useMinIpc();
   // CSS Variables
   const BG = '#eef1f7';
   const CARD = '#ffffff';
@@ -33,7 +35,6 @@ function Dashboard() {
   const [user, setUser] = useState(null);
   const [showLabels, setShowLabels] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [noteExpanded, setNoteExpanded] = useState(false);
   const [schoolConfig, setSchoolConfig] = useState(null);
   
   // Chart colors
@@ -65,10 +66,7 @@ function Dashboard() {
 
   const fetchStats = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/dashboard/stats', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/dashboard/stats');
       setStats(response.data);
     } catch (error) {
       console.error('Error fetching stats:', error);
@@ -80,10 +78,7 @@ function Dashboard() {
 
   const fetchSchoolConfig = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/school-config', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/school-config');
       setSchoolConfig(response.data);
     } catch (error) {
       console.error('Error fetching school config:', error);
@@ -732,59 +727,6 @@ function Dashboard() {
         </div>
       </div>
 
-      {/* PRINCIPAL NOTE */}
-      <div style={{
-        background: CARD,
-        border: `1px solid ${BORDER}`,
-        borderRadius: RADIUS,
-        boxShadow: SHADOW,
-        padding: '20px 22px',
-        marginBottom: '22px',
-        display: 'flex',
-        gap: '16px',
-        alignItems: 'flex-start'
-      }}>
-        <div style={{
-          fontSize: '34px',
-          lineHeight: '1',
-          color: BLUE,
-          fontWeight: '800',
-          flexShrink: 0,
-          marginTop: '-4px'
-        }}>&ldquo;</div>
-        <div>
-          <button 
-            onClick={() => setNoteExpanded(!noteExpanded)}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: BLUE,
-              fontWeight: '700',
-              fontSize: '13px',
-              cursor: 'pointer',
-              padding: '8px 0 0',
-              fontFamily: 'inherit'
-            }}
-          >
-            {noteExpanded ? 'Tutup' : 'Baca selengkapnya'}
-          </button>
-          <div style={{
-            marginTop: '10px',
-            fontSize: '12.5px',
-            color: TEXT,
-            fontWeight: '700'
-          }}>
-            {schoolConfig?.principal_name || 'Nama Kepala Sekolah'}
-            <span style={{
-              display: 'block',
-              fontWeight: '500',
-              color: MUTED,
-              fontSize: '11.5px'
-            }}>{schoolConfig?.principal_nip ? `NIP: ${schoolConfig.principal_nip}` : 'Kepala SMK Negeri Bali Mandara'}</span>
-          </div>
-        </div>
-      </div>
-
       {!user && (
         <div style={{
           background: '#fff4e2',
@@ -803,8 +745,8 @@ function Dashboard() {
       {user?.role === 'siswa' && (
         <div className="student-dashboard">
           <div className="student-info">
-            <h3>🎯 IPC Anda: {user?.ipc_total || 0}</h3>
-            <p>Point Indeks Prestasi dan Karakter</p>
+            <h3>🎯 IPC Anda: <span style={{ color: isBelowMinIpc(user?.ipc_total ?? 0, minIpc) ? RED : undefined }}>{user?.ipc_total || 0}</span></h3>
+            <p>Point Invidual Point Card</p>
           </div>
           
           <div className="student-details">
@@ -970,7 +912,7 @@ function Dashboard() {
                       <td style={{ padding: '11px 14px', borderTop: `1px solid ${BORDER}`, verticalAlign: 'middle' }}>{student.nis || '-'}</td>
                       <td style={{ padding: '11px 14px', borderTop: `1px solid ${BORDER}`, verticalAlign: 'middle' }}>{student.kelas || '-'}</td>
                       <td style={{ padding: '11px 14px', borderTop: `1px solid ${BORDER}`, verticalAlign: 'middle' }}>{student.grha || '-'}</td>
-                      <td style={{ padding: '11px 14px', borderTop: `1px solid ${BORDER}`, verticalAlign: 'middle', fontWeight: '800', color: BLUE, fontSize: '14.5px' }}>{student.ipc_total}</td>
+                      <td style={{ padding: '11px 14px', borderTop: `1px solid ${BORDER}`, verticalAlign: 'middle', fontWeight: '800', color: isBelowMinIpc(student.ipc_total, minIpc) ? RED : BLUE, fontSize: '14.5px' }}>{student.ipc_total}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -7,40 +7,41 @@ const db = require('../config/database');
 router.get('/students', auth, async (req, res) => {
     try {
         const { query } = req.query;
-        
+
         if (!query) {
             return res.status(400).json({ message: 'Query parameter is required' });
         }
 
+        // Optimized single query with subqueries instead of N+1
         const [students] = await db.query(`
-            SELECT id, nama, nis, kelas, grha, ipc_total
-            FROM users 
-            WHERE role = 'siswa' 
-            AND (nama LIKE ? OR nis LIKE ?)
+            SELECT
+                u.id,
+                u.nama,
+                u.nis,
+                u.kelas,
+                u.grha,
+                u.ipc_total,
+                COALESCE(akademik.count, 0) as total_prestasi_akademik,
+                COALESCE(nonakademik.count, 0) as total_prestasi_nonakademik
+            FROM users u
+            LEFT JOIN (
+                SELECT user_id, COUNT(*) as count
+                FROM prestasi
+                WHERE jenis = 'akademik' AND status = 'approved'
+                GROUP BY user_id
+            ) akademik ON u.id = akademik.user_id
+            LEFT JOIN (
+                SELECT user_id, COUNT(*) as count
+                FROM prestasi
+                WHERE jenis = 'nonakademik' AND status = 'approved'
+                GROUP BY user_id
+            ) nonakademik ON u.id = nonakademik.user_id
+            WHERE u.role = 'siswa'
+            AND (u.nama LIKE ? OR u.nis LIKE ?)
             LIMIT 20
-        `, [`%${query}%`, `%${query}%`, `%${query}%`]);
+        `, [`%${query}%`, `%${query}%`]);
 
-        // Get prestasi counts for each student
-        const studentsWithPrestasi = await Promise.all(
-            students.map(async (student) => {
-                const [akademik] = await db.query(
-                    'SELECT COUNT(*) as count FROM prestasi WHERE user_id = ? AND jenis = ? AND status = ?',
-                    [student.id, 'akademik', 'approved']
-                );
-                const [nonakademik] = await db.query(
-                    'SELECT COUNT(*) as count FROM prestasi WHERE user_id = ? AND jenis = ? AND status = ?',
-                    [student.id, 'nonakademik', 'approved']
-                );
-                
-                return {
-                    ...student,
-                    total_prestasi_akademik: akademik[0].count,
-                    total_prestasi_nonakademik: nonakademik[0].count
-                };
-            })
-        );
-
-        res.json(studentsWithPrestasi);
+        res.json(students);
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error' });
@@ -96,67 +97,53 @@ router.get('/student/:userId', auth, async (req, res) => {
 // Get leaderboard - Akademik (Top 20)
 router.get('/leaderboard/akademik', auth, async (req, res) => {
     try {
-        // Get students with total counts
+        // Optimized single query instead of N+1 with subquery for details
         const [students] = await db.query(`
-            SELECT 
+            SELECT
                 u.id,
                 u.nama,
                 u.nis,
                 u.kelas,
                 u.grha,
                 u.foto,
-                COUNT(p.id) as total_prestasi,
-                SUM(p.point) as total_point
+                COUNT(DISTINCT p.id) as total_prestasi,
+                COALESCE(SUM(p.point), 0) as total_point,
+                STRING_AGG(
+                    CONCAT(p.nama_lomba, '|', p.kategori, '|', p.juara),
+                    '|||' ORDER BY p.created_at DESC
+                ) as competition_details
             FROM users u
-            LEFT JOIN prestasi p ON u.id = p.user_id 
-                AND p.jenis = 'akademik' 
+            LEFT JOIN prestasi p ON u.id = p.user_id
+                AND p.jenis = 'akademik'
                 AND p.status = 'approved'
             WHERE u.role = 'siswa'
             GROUP BY u.id, u.nama, u.nis, u.kelas, u.grha, u.foto
-            HAVING total_prestasi > 0
+            HAVING COUNT(DISTINCT p.id) > 0
             ORDER BY total_prestasi DESC, total_point DESC, u.nama ASC
             LIMIT 20
         `);
 
-        console.log('Akademik students:', students.length);
+        // Parse competition details on the server (much faster than N+1 queries)
+        const studentsWithDetails = students.map((student, index) => {
+            let competitions = [];
+            if (student.competition_details) {
+                competitions = student.competition_details.split('|||').map(detail => {
+                    const [nama_lomba, kategori, juara] = detail.split('|');
+                    return { nama_lomba, kategori, juara };
+                });
+            }
 
-        // Get detailed competition info for each student
-        const studentsWithDetails = await Promise.all(
-            students.map(async (student, index) => {
-                const [competitions] = await db.query(`
-                    SELECT 
-                        nama_lomba,
-                        kategori,
-                        juara
-                    FROM prestasi
-                    WHERE user_id = ? 
-                        AND jenis = 'akademik' 
-                        AND status = 'approved'
-                    ORDER BY created_at DESC
-                `, [student.id]);
+            const kategoriSet = new Set(competitions.map(c => c.kategori));
+            const kategoriList = Array.from(kategoriSet).join(', ');
 
-                console.log(`Student ${student.nama} (${student.id}) has ${competitions.length} competitions`);
+            return {
+                ...student,
+                rank: index + 1,
+                kategori: kategoriList,
+                detail_prestasi: competitions
+            };
+        });
 
-                // Format competitions list
-                const keterangan = competitions.map(c => 
-                    `${c.nama_lomba} (${c.kategori}) - ${c.juara}`
-                ).join(', ');
-
-                // Get unique kategori levels
-                const kategoriSet = new Set(competitions.map(c => c.kategori));
-                const kategoriList = Array.from(kategoriSet).join(', ');
-
-                return {
-                    ...student,
-                    rank: index + 1,
-                    kategori: kategoriList,
-                    keterangan: keterangan,
-                    detail_prestasi: competitions
-                };
-            })
-        );
-
-        console.log('Final akademik data:', studentsWithDetails);
         res.json(studentsWithDetails);
     } catch (error) {
         console.error('Error fetching akademik leaderboard:', error);
@@ -167,61 +154,52 @@ router.get('/leaderboard/akademik', auth, async (req, res) => {
 // Get leaderboard - Non-Akademik (Top 20)
 router.get('/leaderboard/nonakademik', auth, async (req, res) => {
     try {
-        // Get students with total counts
+        // Optimized single query instead of N+1 with subquery for details
         const [students] = await db.query(`
-            SELECT 
+            SELECT
                 u.id,
                 u.nama,
                 u.nis,
                 u.kelas,
                 u.grha,
                 u.foto,
-                COUNT(p.id) as total_prestasi,
-                SUM(p.point) as total_point
+                COUNT(DISTINCT p.id) as total_prestasi,
+                COALESCE(SUM(p.point), 0) as total_point,
+                STRING_AGG(
+                    CONCAT(p.nama_lomba, '|', p.kategori, '|', p.juara),
+                    '|||' ORDER BY p.created_at DESC
+                ) as competition_details
             FROM users u
-            LEFT JOIN prestasi p ON u.id = p.user_id 
-                AND p.jenis = 'nonakademik' 
+            LEFT JOIN prestasi p ON u.id = p.user_id
+                AND p.jenis = 'nonakademik'
                 AND p.status = 'approved'
             WHERE u.role = 'siswa'
             GROUP BY u.id, u.nama, u.nis, u.kelas, u.grha, u.foto
-            HAVING total_prestasi > 0
+            HAVING COUNT(DISTINCT p.id) > 0
             ORDER BY total_prestasi DESC, total_point DESC, u.nama ASC
             LIMIT 20
         `);
 
-        // Get detailed competition info for each student
-        const studentsWithDetails = await Promise.all(
-            students.map(async (student, index) => {
-                const [competitions] = await db.query(`
-                    SELECT 
-                        nama_lomba,
-                        kategori,
-                        juara
-                    FROM prestasi
-                    WHERE user_id = ? 
-                        AND jenis = 'nonakademik' 
-                        AND status = 'approved'
-                    ORDER BY created_at DESC
-                `, [student.id]);
+        // Parse competition details on the server (much faster than N+1 queries)
+        const studentsWithDetails = students.map((student, index) => {
+            let competitions = [];
+            if (student.competition_details) {
+                competitions = student.competition_details.split('|||').map(detail => {
+                    const [nama_lomba, kategori, juara] = detail.split('|');
+                    return { nama_lomba, kategori, juara };
+                });
+            }
 
-                // Format competitions list
-                const keterangan = competitions.map(c => 
-                    `${c.nama_lomba} (${c.kategori}) - Juara ${c.juara}`
-                ).join(', ');
+            const kategoriSet = new Set(competitions.map(c => c.kategori));
+            const kategoriList = Array.from(kategoriSet).join(', ');
 
-                // Get unique kategori levels
-                const kategoriSet = new Set(competitions.map(c => c.kategori));
-                const kategoriList = Array.from(kategoriSet).join(', ');
-
-                return {
-                    ...student,
-                    rank: index + 1,
-                    tingkat: kategoriList,
-                    keterangan: keterangan,
-                    detail_prestasi: competitions
-                };
-            })
-        );
+            return {
+                ...student,
+                rank: index + 1,
+                tingkat: kategoriList,
+                detail_prestasi: competitions
+            };
+        });
 
         res.json(studentsWithDetails);
     } catch (error) {

@@ -1,20 +1,78 @@
 const jwt = require('jsonwebtoken');
 const db = require('../config/database');
 
-const auth = (req, res, next) => {
+const auth = async (req, res, next) => {
     try {
-        const token = req.header('Authorization')?.replace('Bearer ', '');
+        // First try to get token from HTTP-only cookie
+        let token = req.cookies.token;
+        
+        // Fallback to Authorization header for backward compatibility during transition
+        if (!token) {
+            token = req.header('Authorization')?.replace('Bearer ', '');
+        }
         
         if (!token) {
             return res.status(401).json({ message: 'No token, authorization denied' });
         }
 
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+        // Tokens issued before 'nama' was added to the JWT payload don't have it;
+        // fetch it once from the DB so req.user.nama is never undefined.
+        // (New tokens include nama, so this query only runs for old tokens.)
+        if (decoded.nama === undefined) {
+            const [rows] = await db.query('SELECT nama FROM users WHERE id = ?', [decoded.id]);
+            if (rows.length > 0) {
+                decoded.nama = rows[0].nama;
+            }
+        }
+
         req.user = decoded;
         next();
     } catch (error) {
         res.status(401).json({ message: 'Token is not valid' });
     }
+};
+
+// Middleware to check if user has permission for specific input type
+const checkPermission = (permissionType) => {
+  return async (req, res, next) => {
+    try {
+      const userId = req.user.id;
+      const userRole = req.user.role;
+      
+      // Superadmin always has access
+      if (userRole === 'superadmin') {
+        return next();
+      }
+      
+      // For students, they don't have access to pelanggaran/perilaku
+      if (userRole === 'siswa' && (permissionType === 'pelanggaran' || permissionType === 'perilaku')) {
+        return res.status(403).json({ message: 'Anda tidak memiliki izin untuk mengakses halaman ini.' });
+      }
+      
+      // For teachers, check individual permission
+      if (userRole === 'guru' && (permissionType === 'pelanggaran' || permissionType === 'perilaku')) {
+        const [permissions] = await db.query(
+          `SELECT can_input_${permissionType} as has_permission FROM permissions WHERE user_id = ?`,
+          [userId]
+        );
+        
+        const hasPermission = permissions.length > 0 ? permissions[0].has_permission : false;
+        
+        if (!hasPermission) {
+          return res.status(403).json({ 
+            message: `Anda tidak memiliki izin untuk input data ${permissionType}. Silakan hubungi SuperAdmin.` 
+          });
+        }
+      }
+      
+      next();
+    } catch (error) {
+      console.error('Error checking permission:', error);
+      res.status(500).json({ message: 'Server error' });
+    }
+  };
 };
 
 const superAdminOnly = (req, res, next) => {
@@ -48,6 +106,14 @@ const checkInputAccess = (jenisInput) => {
       // Superadmin always has access
       if (userRole === 'superadmin') {
         return next();
+      }
+      
+      // Students never get access to pelanggaran/perilaku (guru-only input),
+      // mirroring checkPermission above — regardless of any stored permission flags.
+      if (userRole === 'siswa' && (jenisInput === 'pelanggaran' || jenisInput === 'perilaku')) {
+        return res.status(403).json({ 
+          message: `Anda tidak memiliki izin untuk input data ${jenisInput}. Silakan hubungi SuperAdmin.` 
+        });
       }
       
       // Check global access status
@@ -109,4 +175,4 @@ const checkInputAccess = (jenisInput) => {
   };
 };
 
-module.exports = { auth, superAdminOnly, teacherOrSuperAdmin, teacherOnly, checkInputAccess };
+module.exports = { auth, superAdminOnly, teacherOrSuperAdmin, teacherOnly, checkInputAccess, checkPermission };

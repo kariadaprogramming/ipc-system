@@ -1,21 +1,25 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import React, { useState, useEffect, useCallback } from 'react';
+import api from '../utils/api';
 
 function Notifications() {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
+  const [unreadCount, setUnreadCount] = useState(0);
 
-  useEffect(() => {
-    fetchNotifications();
+  const markAllAsRead = useCallback(async () => {
+    try {
+      await api.put('/approvals-v2/notifications/read-all', {});
+      const response = await api.get('/approvals-v2/notifications/count');
+      setUnreadCount(response.data.count || 0);
+    } catch (error) {
+      console.error('Error marking all as read:', error);
+    }
   }, []);
 
   const fetchNotifications = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/approvals-v2/notifications', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/approvals-v2/notifications');
       setNotifications(response.data);
     } catch (error) {
       console.error('Error fetching notifications:', error);
@@ -25,13 +29,26 @@ function Notifications() {
     }
   };
 
+  const fetchUnreadCount = useCallback(async () => {
+    try {
+      const response = await api.get('/approvals-v2/notifications/count');
+      setUnreadCount(response.data.count || 0);
+    } catch (error) {
+      console.error('Error fetching unread count:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchNotifications();
+    fetchUnreadCount();
+    markAllAsRead();
+  }, [markAllAsRead, fetchUnreadCount]);
+
   const markAsRead = async (id) => {
     try {
-      const token = localStorage.getItem('token');
-      await axios.put(`/approvals-v2/notifications/${id}/read`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.put(`/approvals-v2/notifications/${id}/read`, {});
       fetchNotifications();
+      fetchUnreadCount();
     } catch (error) {
       console.error('Error marking as read:', error);
     }
@@ -76,7 +93,26 @@ function Notifications() {
 
   return (
     <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
-      <h2 style={{ marginBottom: '20px' }}>📢 Notifikasi</h2>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+        <h2 style={{ margin: 0 }}>📢 Notifikasi</h2>
+        {unreadCount > 0 && (
+          <span style={{
+            backgroundColor: '#ef4444',
+            color: 'white',
+            borderRadius: '50%',
+            minWidth: '24px',
+            height: '24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '12px',
+            fontWeight: 'bold',
+            padding: '0 8px'
+          }}>
+            {unreadCount}
+          </span>
+        )}
+      </div>
       
       {message && (
         <div style={{

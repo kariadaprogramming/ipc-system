@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import API_BASE_URL from '../config';
 
 const buildAssetUrl = (path) => {
@@ -14,6 +14,7 @@ function SchoolConfig() {
     school_description: '',
     principal_name: '',
     principal_nip: '',
+    support_link: '',
     logo_url: null
   });
   const [loading, setLoading] = useState(true);
@@ -45,7 +46,7 @@ function SchoolConfig() {
 
   const fetchConfig = async () => {
     try {
-      const response = await axios.get('/school-config');
+      const response = await api.get('/school-config');
       if (mountedRef.current) {
         setConfig(response.data);
       }
@@ -73,6 +74,10 @@ function SchoolConfig() {
       setMessage({ type: 'error', text: 'NIP kepala sekolah wajib diisi' });
       return false;
     }
+    if (config.support_link && !/^https?:\/\//i.test(config.support_link.trim())) {
+      setMessage({ type: 'error', text: 'Link bantuan harus diawali http:// atau https://' });
+      return false;
+    }
     return true;
   };
 
@@ -81,7 +86,7 @@ function SchoolConfig() {
     setSaving(true);
     setMessage(null);
     try {
-      await axios.put('/school-config', config);
+      await api.put('/school-config', { ...config, support_link: (config.support_link || '').trim() });
       if (mountedRef.current) {
         await fetchConfig();
         setMessage({ type: 'success', text: 'Konfigurasi sekolah berhasil disimpan!' });
@@ -128,7 +133,7 @@ function SchoolConfig() {
     setUploading(true);
     setMessage(null);
     try {
-      await axios.post('/school-config/upload-logo', formData);
+      await api.post('/school-config/upload-logo', formData);
       if (mountedRef.current) {
         await fetchConfig();
         setMessage({ type: 'success', text: 'Logo berhasil diupload!' });
@@ -305,6 +310,38 @@ function SchoolConfig() {
               onFocus={(e) => e.currentTarget.style.borderColor = BLUE}
               onBlur={(e) => e.currentTarget.style.borderColor = BORDER}
             />
+          </div>
+
+          <div style={{ marginBottom: 0 }}>
+            <label htmlFor="support-link" style={{
+              display: 'block',
+              fontSize: '13px',
+              fontWeight: '600',
+              color: TEXT,
+              marginBottom: '6px'
+            }}>Link Bantuan</label>
+            <input
+              id="support-link"
+              type="url"
+              value={config.support_link || ''}
+              onChange={(e) => setConfig({ ...config, support_link: e.target.value })}
+              placeholder="https://chat.whatsapp.com/..."
+              style={{
+                width: '100%',
+                padding: '10px 14px',
+                border: `1px solid ${BORDER}`,
+                borderRadius: '10px',
+                fontSize: '14px',
+                fontFamily: 'inherit',
+                outline: 'none',
+                transition: 'border-color 0.15s ease'
+              }}
+              onFocus={(e) => e.currentTarget.style.borderColor = BLUE}
+              onBlur={(e) => e.currentTarget.style.borderColor = BORDER}
+            />
+            <div style={{ fontSize: '12px', color: MUTED, marginTop: '6px' }}>
+              Ditampilkan di halaman login pada teks "Butuh bantuan? Hubungi admin sekolah". Biarkan kosong untuk memakai link default.
+            </div>
           </div>
         </div>
 

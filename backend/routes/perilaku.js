@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const { auth, checkInputAccess, superAdminOnly } = require('../middleware/auth');
+const { auth, checkInputAccess, superAdminOnly, checkPermission } = require('../middleware/auth');
 const db = require('../config/database');
+const { logActivity } = require('../utils/logger');
 const {
     calculatePerilakuPoints,
     calculatePerilakuPointsFromFields,
@@ -30,7 +31,7 @@ router.get('/all', auth, async (req, res) => {
 router.get('/user/:userId', auth, async (req, res) => {
     try {
         const [perilaku] = await db.query(
-            'SELECT * FROM perilaku WHERE user_id = ? AND status = ? ORDER BY created_at DESC',
+            'SELECT id, user_id, nama, nis, kelas, grha, karakter_siswa, point, status, rejection_reason, created_at FROM perilaku WHERE user_id = ? AND status = ? ORDER BY created_at DESC',
             [req.params.userId, 'approved']
         );
         res.json(perilaku);
@@ -41,7 +42,7 @@ router.get('/user/:userId', auth, async (req, res) => {
 });
 
 // Create perilaku
-router.post('/', auth, checkInputAccess('perilaku'), async (req, res) => {
+router.post('/', auth, checkPermission('perilaku'), async (req, res) => {
     try {
         const userRole = req.user.role;
         const {
@@ -83,9 +84,9 @@ router.post('/', auth, checkInputAccess('perilaku'), async (req, res) => {
 
         if (userRole === 'superadmin') {
             const [result] = await db.query(
-                `INSERT INTO perilaku (user_id, nama, nis, kelas, grha, karakter_siswa, point, status)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, 'approved')`,
-                [userId, nama, nis, kelas, grha, karakter, point]
+                `INSERT INTO perilaku (user_id, submitted_by, nama, nis, kelas, grha, karakter_siswa, point, status)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'approved')`,
+                [userId, req.user.id, nama, nis, kelas, grha, karakter, point]
             );
 
             await applyPerilakuIpcChange(
@@ -95,10 +96,8 @@ router.post('/', auth, checkInputAccess('perilaku'), async (req, res) => {
                 result.insertId
             );
 
-            await db.query(
-                'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-                [req.user.id, 'Submit Perilaku', `Directly added perilaku: ${karakter}`]
-            );
+            // Log activity
+            await logActivity(req.user.id, 'SUBMIT_PERILAKU', `SuperAdmin ${req.user.nama} directly submitted perilaku for ${nama} (${nis}): ${karakter}`, req.ip);
 
             return res.status(201).json({
                 message: 'Perilaku berhasil ditambahkan',
@@ -107,11 +106,14 @@ router.post('/', auth, checkInputAccess('perilaku'), async (req, res) => {
         }
 
         const [result] = await db.query(
-            'INSERT INTO perilaku (user_id, nama, nis, kelas, grha, karakter_siswa, point) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [userId, nama, nis, kelas, grha, karakter, point]
+            'INSERT INTO perilaku (user_id, submitted_by, nama, nis, kelas, grha, karakter_siswa, point, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [userId, req.user.id, nama, nis, kelas, grha, karakter, point, 'pending']
         );
 
-        const [superadmins] = await db.query('SELECT id FROM users WHERE role = "superadmin"');
+        // Log activity
+        await logActivity(req.user.id, 'SUBMIT_PERILAKU', `User ${req.user.nama} (${req.user.role}) submitted perilaku for ${nama} (${nis}): ${karakter}`, req.ip);
+
+        const [superadmins] = await db.query("SELECT id FROM users WHERE role = 'superadmin'");
         for (const admin of superadmins) {
             await db.query(
                 `INSERT INTO notifications (user_id, type, title, message, related_id, related_type)
@@ -119,11 +121,6 @@ router.post('/', auth, checkInputAccess('perilaku'), async (req, res) => {
                 [admin.id, `${nama} (${nis}) mengajukan perilaku`, result.insertId]
             );
         }
-
-        await db.query(
-            'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Submit Perilaku', `Submitted perilaku: ${karakter}`]
-        );
 
         res.status(201).json({ message: 'Perilaku berhasil diajukan untuk persetujuan', id: result.insertId });
     } catch (error) {
@@ -138,7 +135,7 @@ router.put('/:id/approve', auth, superAdminOnly, async (req, res) => {
         const perilakuId = req.params.id;
         
         const [perilaku] = await db.query(
-            'SELECT * FROM perilaku WHERE id = ? AND status = ?',
+            'SELECT id, user_id, nama, nis, kelas, grha, karakter_siswa, point, status, rejection_reason, created_at FROM perilaku WHERE id = ? AND status = ?',
             [perilakuId, 'pending']
         );
         if (perilaku.length === 0) {
@@ -159,10 +156,8 @@ router.put('/:id/approve', auth, superAdminOnly, async (req, res) => {
             perilakuId
         );
 
-        await db.query(
-            'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Approve Perilaku', `Approved perilaku ID ${perilakuId}`]
-        );
+        // Log activity
+        await logActivity(req.user.id, 'APPROVE_PERILAKU', `SuperAdmin ${req.user.nama} approved perilaku for ${perilakuData.nama} (${perilakuData.nis}): ${perilakuData.karakter_siswa}`, req.ip);
 
         await db.query(
             `INSERT INTO notifications (user_id, type, title, message, related_id, related_type)
@@ -182,13 +177,13 @@ router.put('/:id/reject', auth, superAdminOnly, async (req, res) => {
     try {
         const { rejection_reason } = req.body;
         const perilakuId = req.params.id;
-        
+
+        const [perilaku] = await db.query('SELECT * FROM perilaku WHERE id = ?', [perilakuId]);
+
         await db.query('UPDATE perilaku SET status = ?, rejection_reason = ? WHERE id = ?', ['rejected', rejection_reason, perilakuId]);
 
-        await db.query(
-            'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Reject Perilaku', `Rejected perilaku ID ${perilakuId}`]
-        );
+        // Log activity
+        await logActivity(req.user.id, 'REJECT_PERILAKU', `SuperAdmin ${req.user.nama} rejected perilaku for ${perilaku[0]?.nama || 'unknown'} (${perilaku[0]?.nis || 'unknown'}): ${rejection_reason || 'No reason'}`, req.ip);
 
         res.json({ message: 'Perilaku rejected' });
     } catch (error) {
@@ -203,7 +198,7 @@ router.put('/:id', auth, async (req, res) => {
         const perilakuId = req.params.id;
         const { nama, nis, kelas, grha, karakter_siswa, tanggung_jawab, disiplin, kepedulian, kemandirian, spiritual, kejujuran, kepercayaan_diri } = req.body;
         
-        const [perilaku] = await db.query('SELECT * FROM perilaku WHERE id = ?', [perilakuId]);
+        const [perilaku] = await db.query('SELECT id, user_id, nama, nis, kelas, grha, karakter_siswa, point, status, rejection_reason, created_at FROM perilaku WHERE id = ?', [perilakuId]);
         if (perilaku.length === 0) {
             return res.status(404).json({ message: 'Perilaku not found' });
         }
@@ -252,10 +247,7 @@ router.put('/:id', auth, async (req, res) => {
         }
 
         // Log activity
-        await db.query(
-            'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Update Perilaku', `Updated perilaku ID ${perilakuId}`]
-        );
+        await logActivity(req.user.id, 'UPDATE_PERILAKU', `User ${req.user.nama} (${req.user.role}) updated perilaku ID ${perilakuId}`, req.ip);
 
         res.json({ message: 'Perilaku updated successfully' });
     } catch (error) {
@@ -269,7 +261,7 @@ router.delete('/:id', auth, superAdminOnly, async (req, res) => {
     try {
         const perilakuId = req.params.id;
         
-        const [perilaku] = await db.query('SELECT * FROM perilaku WHERE id = ?', [perilakuId]);
+        const [perilaku] = await db.query('SELECT id, user_id, nama, nis, kelas, grha, karakter_siswa, point, status, rejection_reason, created_at FROM perilaku WHERE id = ?', [perilakuId]);
         if (perilaku.length === 0) {
             return res.status(404).json({ message: 'Perilaku not found' });
         }
@@ -295,10 +287,7 @@ router.delete('/:id', auth, superAdminOnly, async (req, res) => {
         await db.query('DELETE FROM perilaku WHERE id = ?', [perilakuId]);
 
         // Log activity
-        await db.query(
-            'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Delete Perilaku', `Deleted perilaku ID ${perilakuId}`]
-        );
+        await logActivity(req.user.id, 'DELETE_PERILAKU', `SuperAdmin ${req.user.nama} deleted perilaku for ${perilakuData.nama} (${perilakuData.nis}): ${perilakuData.karakter_siswa}`, req.ip);
 
         res.json({ message: 'Perilaku deleted successfully' });
     } catch (error) {

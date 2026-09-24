@@ -1,4 +1,4 @@
--- IPC Configuration Schema
+-- IPC Configuration Schema (PostgreSQL)
 -- Standalone seed / upgrade file for ipc point configuration tables.
 -- Safe to run after core tables exist (users must exist for FK on updated_by when inserting with updated_by).
 -- Prefer full install via skema.sql; use this to re-seed or upgrade an existing DB.
@@ -6,89 +6,105 @@
 -- ==================== IPC CONFIGURATION TABLES ====================
 
 CREATE TABLE IF NOT EXISTS ipc_organisasi (
-    id INT AUTO_INCREMENT PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL UNIQUE,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS ipc_perilaku_karakter (
-    id INT AUTO_INCREMENT PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL UNIQUE,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS ipc_perilaku_tingkat (
-    id INT AUTO_INCREMENT PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL UNIQUE,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS ipc_config (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    category VARCHAR(50) NOT NULL COMMENT 'prestasi, organisasi, kepanitiaan, event, pelanggaran, perilaku',
-    field1 VARCHAR(100) DEFAULT NULL COMMENT 'tingkat lomba, nama karakter, jenis pelanggaran, nama organisasi',
-    field2 VARCHAR(100) DEFAULT NULL COMMENT 'juara, tingkat penilaian, jabatan',
-    field3 VARCHAR(100) DEFAULT NULL COMMENT 'legacy compatibility column',
-    point_value INT NOT NULL COMMENT 'nilai point',
-    description TEXT COMMENT 'deskripsi tambahan',
+    id SERIAL PRIMARY KEY,
+    category VARCHAR(50) NOT NULL,
+    field1 VARCHAR(100) DEFAULT NULL,
+    field2 VARCHAR(100) DEFAULT NULL,
+    field3 VARCHAR(100) DEFAULT NULL,
+    point_value INTEGER NOT NULL,
+    description TEXT,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    updated_by INT COMMENT 'user id yang terakhir update',
-    UNIQUE KEY unique_config (category, field1, field2, field3),
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_by INTEGER,
+    CONSTRAINT unique_config UNIQUE (category, field1, field2, field3),
     FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS ipc_pelanggaran_level (
-    id INT AUTO_INCREMENT PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL UNIQUE,
-    point_value INT NOT NULL,
+    point_value INTEGER NOT NULL,
     description TEXT,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS ipc_pelanggaran_detail (
-    id INT AUTO_INCREMENT PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
     name VARCHAR(150) NOT NULL UNIQUE,
-    level_id INT NOT NULL,
+    level_id INTEGER NOT NULL,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (level_id) REFERENCES ipc_pelanggaran_level(id)
         ON UPDATE CASCADE ON DELETE RESTRICT
 );
 
--- Allow config-driven values (no hard ENUM lock)
-ALTER TABLE prestasi
-    MODIFY juara VARCHAR(100) NOT NULL COMMENT 'Driven by ipc_config prestasi.field2',
-    MODIFY kategori VARCHAR(100) NOT NULL COMMENT 'Driven by ipc_config prestasi.field1';
-
-ALTER TABLE event
-    MODIFY tingkat VARCHAR(100) NOT NULL COMMENT 'Driven by ipc_config event.field1';
+-- Config-driven values (no hard type lock): ensure prestasi/event columns are VARCHAR.
+-- No-op on fresh installs created from skema.sql; kept idempotent for upgrades.
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'prestasi') THEN
+        BEGIN
+            ALTER TABLE prestasi ALTER COLUMN juara TYPE VARCHAR(100);
+        EXCEPTION WHEN others THEN NULL;
+        END;
+        BEGIN
+            ALTER TABLE prestasi ALTER COLUMN kategori TYPE VARCHAR(100);
+        EXCEPTION WHEN others THEN NULL;
+        END;
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'event') THEN
+        BEGIN
+            ALTER TABLE event ALTER COLUMN tingkat TYPE VARCHAR(100);
+        EXCEPTION WHEN others THEN NULL;
+        END;
+    END IF;
+END $$;
 
 -- ==================== DEFAULT CONFIGURATION DATA ====================
 -- Only inserts when table is empty for ipc_config (avoids duplicate unique key errors on re-run)
 
 INSERT INTO ipc_pelanggaran_level (name, point_value, description, is_active)
-SELECT * FROM (
-    SELECT 'ringan' AS name, -1 AS point_value, 'Point untuk pelanggaran ringan' AS description, TRUE AS is_active
-    UNION ALL SELECT 'sedang', -5, 'Point untuk pelanggaran sedang', TRUE
-    UNION ALL SELECT 'berat', -25, 'Point untuk pelanggaran berat', TRUE
-) AS seed
+SELECT 'ringan', -1, 'Point untuk pelanggaran ringan', TRUE
+WHERE NOT EXISTS (SELECT 1 FROM ipc_pelanggaran_level LIMIT 1)
+UNION ALL
+SELECT 'sedang', -5, 'Point untuk pelanggaran sedang', TRUE
+WHERE NOT EXISTS (SELECT 1 FROM ipc_pelanggaran_level LIMIT 1)
+UNION ALL
+SELECT 'berat', -25, 'Point untuk pelanggaran berat', TRUE
 WHERE NOT EXISTS (SELECT 1 FROM ipc_pelanggaran_level LIMIT 1);
 
 INSERT INTO ipc_config (category, field1, field2, field3, point_value, description)
 SELECT v.category, v.field1, v.field2, v.field3, v.point_value, v.description
 FROM (
-    SELECT 'prestasi' category, 'kecamatan' field1, 'juara 1' field2, NULL field3, 50 point_value, 'Juara 1 tingkat kecamatan' description UNION ALL
+    SELECT 'prestasi' AS category, 'kecamatan' AS field1, 'juara 1' AS field2, NULL::VARCHAR(100) AS field3, 50 AS point_value, 'Juara 1 tingkat kecamatan' AS description UNION ALL
     SELECT 'prestasi', 'kecamatan', 'juara 2', NULL, 40, 'Juara 2 tingkat kecamatan' UNION ALL
     SELECT 'prestasi', 'kecamatan', 'juara 3', NULL, 30, 'Juara 3 tingkat kecamatan' UNION ALL
     SELECT 'prestasi', 'kecamatan', 'juara harapan 1', NULL, 25, 'Juara Harapan 1 tingkat kecamatan' UNION ALL
@@ -104,34 +120,10 @@ FROM (
     SELECT 'prestasi', 'kabupaten', 'juara harapan 3', NULL, 25, 'Juara Harapan 3 tingkat kabupaten' UNION ALL
     SELECT 'prestasi', 'kabupaten', 'finalis', NULL, 15, 'Finalis tingkat kabupaten' UNION ALL
     SELECT 'prestasi', 'kabupaten', 'peserta', NULL, 8, 'Peserta tingkat kabupaten' UNION ALL
-    SELECT 'perilaku', 'tanggung_jawab', 'sangat baik', NULL, 5, 'Karakter tanggung jawab sangat baik' UNION ALL
-    SELECT 'perilaku', 'tanggung_jawab', 'baik', NULL, 4, 'Karakter tanggung jawab baik' UNION ALL
-    SELECT 'perilaku', 'tanggung_jawab', 'cukup baik', NULL, 3, 'Karakter tanggung jawab cukup baik' UNION ALL
-    SELECT 'perilaku', 'tanggung_jawab', 'kurang baik', NULL, 1, 'Karakter tanggung jawab kurang baik' UNION ALL
-    SELECT 'perilaku', 'disiplin', 'sangat baik', NULL, 5, 'Karakter disiplin sangat baik' UNION ALL
-    SELECT 'perilaku', 'disiplin', 'baik', NULL, 4, 'Karakter disiplin baik' UNION ALL
-    SELECT 'perilaku', 'disiplin', 'cukup baik', NULL, 3, 'Karakter disiplin cukup baik' UNION ALL
-    SELECT 'perilaku', 'disiplin', 'kurang baik', NULL, 1, 'Karakter disiplin kurang baik' UNION ALL
-    SELECT 'perilaku', 'kepedulian', 'sangat baik', NULL, 5, 'Karakter kepedulian sangat baik' UNION ALL
-    SELECT 'perilaku', 'kepedulian', 'baik', NULL, 4, 'Karakter kepedulian baik' UNION ALL
-    SELECT 'perilaku', 'kepedulian', 'cukup baik', NULL, 3, 'Karakter kepedulian cukup baik' UNION ALL
-    SELECT 'perilaku', 'kepedulian', 'kurang baik', NULL, 1, 'Karakter kepedulian kurang baik' UNION ALL
-    SELECT 'perilaku', 'kemandirian', 'sangat baik', NULL, 5, 'Karakter kemandirian sangat baik' UNION ALL
-    SELECT 'perilaku', 'kemandirian', 'baik', NULL, 4, 'Karakter kemandirian baik' UNION ALL
-    SELECT 'perilaku', 'kemandirian', 'cukup baik', NULL, 3, 'Karakter kemandirian cukup baik' UNION ALL
-    SELECT 'perilaku', 'kemandirian', 'kurang baik', NULL, 1, 'Karakter kemandirian kurang baik' UNION ALL
-    SELECT 'perilaku', 'spiritual', 'sangat baik', NULL, 5, 'Karakter spiritual sangat baik' UNION ALL
-    SELECT 'perilaku', 'spiritual', 'baik', NULL, 4, 'Karakter spiritual baik' UNION ALL
-    SELECT 'perilaku', 'spiritual', 'cukup baik', NULL, 3, 'Karakter spiritual cukup baik' UNION ALL
-    SELECT 'perilaku', 'spiritual', 'kurang baik', NULL, 1, 'Karakter spiritual kurang baik' UNION ALL
-    SELECT 'perilaku', 'kejujuran', 'sangat baik', NULL, 5, 'Karakter kejujuran sangat baik' UNION ALL
-    SELECT 'perilaku', 'kejujuran', 'baik', NULL, 4, 'Karakter kejujuran baik' UNION ALL
-    SELECT 'perilaku', 'kejujuran', 'cukup baik', NULL, 3, 'Karakter kejujuran cukup baik' UNION ALL
-    SELECT 'perilaku', 'kejujuran', 'kurang baik', NULL, 1, 'Karakter kejujuran kurang baik' UNION ALL
-    SELECT 'perilaku', 'kepercayaan_diri', 'sangat baik', NULL, 5, 'Karakter kepercayaan diri sangat baik' UNION ALL
-    SELECT 'perilaku', 'kepercayaan_diri', 'baik', NULL, 4, 'Karakter kepercayaan diri baik' UNION ALL
-    SELECT 'perilaku', 'kepercayaan_diri', 'cukup baik', NULL, 3, 'Karakter kepercayaan diri cukup baik' UNION ALL
-    SELECT 'perilaku', 'kepercayaan_diri', 'kurang baik', NULL, 1, 'Karakter kepercayaan diri kurang baik' UNION ALL
+    SELECT 'perilaku', 'sangat baik', NULL, NULL, 5, 'Penilaian sangat baik (semua karakter)' UNION ALL
+    SELECT 'perilaku', 'baik', NULL, NULL, 4, 'Penilaian baik (semua karakter)' UNION ALL
+    SELECT 'perilaku', 'cukup baik', NULL, NULL, 3, 'Penilaian cukup baik (semua karakter)' UNION ALL
+    SELECT 'perilaku', 'kurang baik', NULL, NULL, 1, 'Penilaian kurang baik (semua karakter)' UNION ALL
     SELECT 'kepanitiaan', 'ketua', NULL, NULL, 10, 'Ketua kepanitiaan' UNION ALL
     SELECT 'kepanitiaan', 'wakil ketua', NULL, NULL, 8, 'Wakil ketua kepanitiaan' UNION ALL
     SELECT 'kepanitiaan', 'sekretaris', NULL, NULL, 7, 'Sekretaris kepanitiaan' UNION ALL
@@ -189,18 +181,29 @@ FROM (
 ) AS v
 WHERE NOT EXISTS (SELECT 1 FROM ipc_config LIMIT 1);
 
-INSERT IGNORE INTO ipc_organisasi (name)
+-- Pengaturan tampilan: batas minimum Total IPC (0 = nonaktif)
+INSERT INTO ipc_config (category, field1, field2, field3, point_value, description)
+SELECT 'pengaturan', 'min_ipc', NULL, NULL, 0,
+       'Batas minimum Total IPC - total di bawah nilai ini ditampilkan merah (0 = nonaktif)'
+WHERE NOT EXISTS (
+    SELECT 1 FROM ipc_config WHERE category = 'pengaturan' AND field1 = 'min_ipc'
+);
+
+INSERT INTO ipc_organisasi (name)
 SELECT DISTINCT field1 FROM ipc_config
-WHERE category = 'organisasi' AND field1 IS NOT NULL;
+WHERE category = 'organisasi' AND field1 IS NOT NULL
+ON CONFLICT (name) DO NOTHING;
 
-INSERT IGNORE INTO ipc_perilaku_karakter (name)
-SELECT DISTINCT field1 FROM ipc_config
-WHERE category = 'perilaku' AND field1 IS NOT NULL;
+INSERT INTO ipc_perilaku_karakter (name) VALUES
+('tanggung_jawab'), ('disiplin'), ('kepedulian'), ('kemandirian'),
+('spiritual'), ('kejujuran'), ('kepercayaan_diri')
+ON CONFLICT (name) DO NOTHING;
 
-INSERT IGNORE INTO ipc_perilaku_tingkat (name) VALUES
-('sangat baik'), ('baik'), ('cukup baik'), ('kurang baik');
+INSERT INTO ipc_perilaku_tingkat (name) VALUES
+('sangat baik'), ('baik'), ('cukup baik'), ('kurang baik')
+ON CONFLICT (name) DO NOTHING;
 
-CREATE INDEX idx_ipc_config_category ON ipc_config(category);
-CREATE INDEX idx_ipc_config_field1 ON ipc_config(field1);
-CREATE INDEX idx_ipc_config_field2 ON ipc_config(field2);
-CREATE INDEX idx_ipc_config_active ON ipc_config(is_active);
+CREATE INDEX IF NOT EXISTS idx_ipc_config_category ON ipc_config(category);
+CREATE INDEX IF NOT EXISTS idx_ipc_config_field1 ON ipc_config(field1);
+CREATE INDEX IF NOT EXISTS idx_ipc_config_field2 ON ipc_config(field2);
+CREATE INDEX IF NOT EXISTS idx_ipc_config_active ON ipc_config(is_active);

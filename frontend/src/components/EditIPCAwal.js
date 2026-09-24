@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
+import { useMinIpc, isBelowMinIpc } from '../utils/minIpc';
 
 function EditIPCAwal() {
   const [students, setStudents] = useState([]);
@@ -16,11 +17,9 @@ function EditIPCAwal() {
 
   const fetchStudents = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/users', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setStudents(response.data.filter(user => user.role === 'siswa'));
+      const response = await api.get('/users');
+      const users = Array.isArray(response.data) ? response.data : response.data.users;
+      setStudents(users.filter(user => user.role === 'siswa'));
     } catch (error) {
       console.error('Error fetching students:', error);
       setMessage('Gagal memuat data siswa');
@@ -74,13 +73,9 @@ function EditIPCAwal() {
 
     try {
       setSaving(true);
-      const token = localStorage.getItem('token');
-      
-      await axios.post('/users/bulk-update-ipc-awal', {
+      await api.post('/users/bulk-update-ipc-awal', {
         userIds: selectedStudents,
         ipcAwal: parsed
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
       });
 
       setMessage(`IPC awal berhasil diupdate untuk ${selectedStudents.length} siswa`);
@@ -386,6 +381,7 @@ function EditIPCAwal() {
 }
 
 function GradeSection({ grade, students, selectedStudents, onSelectAll, onSelectStudent, isAllSelected, isSomeSelected }) {
+  const minIpc = useMinIpc();
   return (
     <div className="panel">
       <div className="panel-head">
@@ -440,7 +436,7 @@ function GradeSection({ grade, students, selectedStudents, onSelectAll, onSelect
                   <td>{student.kelas || '-'}</td>
                   <td>{student.grha || '-'}</td>
                   <td className="num">{student.ipc_awal ?? '-'}</td>
-                  <td className="num">{student.ipc_total ?? 0}</td>
+                  <td className="num" style={isBelowMinIpc(student.ipc_total ?? 0, minIpc) ? { color: '#dc2626', fontWeight: 'bold' } : undefined}>{student.ipc_total ?? 0}</td>
                 </tr>
               ))}
             </tbody>

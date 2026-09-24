@@ -2,6 +2,8 @@ const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
+const fs = require('fs');
+const cookieParser = require('cookie-parser');
 const { 
   securityHeaders, 
   apiLimiter, 
@@ -11,12 +13,24 @@ const {
   sanitizeInput, 
   errorHandler,
   securityLogger,
-  loginLimiter 
+  loginLimiter
 } = require('./middleware/security');
 
 dotenv.config();
 
 const app = express();
+
+// Trust proxy: express-rate-limit needs this whenever an upstream proxy sets
+// X-Forwarded-For (CRA dev proxy, nginx, ...), otherwise it throws
+// ERR_ERL_UNEXPECTED_X_FORWARDED_FOR and can't identify users accurately.
+// - Development: ON (1 hop = CRA dev proxy).
+// - Production: OFF by default so clients can't spoof IPs to dodge rate
+//   limits; set TRUST_PROXY=1 (or hop count) only if actually behind a proxy.
+if (process.env.TRUST_PROXY !== undefined) {
+  app.set('trust proxy', /^\d+$/.test(process.env.TRUST_PROXY) ? parseInt(process.env.TRUST_PROXY, 10) : true);
+} else if (process.env.NODE_ENV !== 'production') {
+  app.set('trust proxy', 1);
+}
 
 // Security Middleware - Security headers (Helmet)
 app.use(securityHeaders);
@@ -82,12 +96,25 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Cookie parser middleware - required for HTTP-only cookie authentication
+app.use(cookieParser());
+
 // Static folder for uploads - with CORS headers for images
 app.use('/uploads', (req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Cross-Origin-Resource-Policy', 'cross-origin');
   next();
 }, express.static(path.join(__dirname, 'uploads')));
+
+// Serve React frontend static files (consolidated deployment)
+const frontendBuildPath = path.join(__dirname, '../frontend/build');
+if (fs.existsSync(frontendBuildPath)) {
+  app.use(express.static(frontendBuildPath));
+  console.log('Serving React frontend from:', frontendBuildPath);
+} else {
+  console.warn('Frontend build directory not found at:', frontendBuildPath);
+  console.warn('Please run "npm run build" in the frontend directory first');
+}
 
 // Routes - Auth with login rate limiting
 app.use('/api/auth', loginLimiter, require('./routes/auth'));
@@ -113,6 +140,28 @@ app.use('/api/academic-year', require('./routes/academicYear'));
 app.use('/api/sync', require('./routes/sync'));
 app.use('/api/ipc-config', require('./routes/ipcConfig'));
 app.use('/api/school-config', require('./routes/school-config'));
+
+// Catch-all route for React SPA client-side routing (must be after API routes)
+app.get('*', (req, res) => {
+  // Skip API routes and static file routes
+  if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) {
+    return res.status(404).json({ message: 'Not found' });
+  }
+  
+  // Skip favicon requests
+  if (req.path === '/favicon.ico') {
+    return res.status(404).end();
+  }
+  
+  const frontendBuildPath = path.join(__dirname, '../frontend/build');
+  const indexPath = path.join(frontendBuildPath, 'index.html');
+  
+  if (fs.existsSync(indexPath)) {
+    res.sendFile(indexPath);
+  } else {
+    res.status(404).json({ message: 'Frontend build not found. Please run "npm run build" in the frontend directory.' });
+  }
+});
 
 // Global error handler - Security: Don't expose internal details
 app.use(errorHandler);

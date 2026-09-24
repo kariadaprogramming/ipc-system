@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import API_BASE_URL from '../config';
+import { useMinIpc, isBelowMinIpc } from '../utils/minIpc';
+import { formatDisplayText } from '../utils/formatDisplayText';
 
 function getCurrentAcademicYear() {
   const now = new Date();
@@ -29,32 +31,8 @@ function getIpcDetailRows(points = {}) {
   ];
 }
 
-function formatDisplayText(text) {
-  return text
-    .replace(/_/g, ' ')
-    .replace(/\b\w+\b/g, word => {
-      if (/^[ivx]+$/.test(word.toLowerCase())) {
-        return word.toUpperCase();
-      }
-      return word.charAt(0).toUpperCase() + word.slice(1);
-    });
-}
-
-// Create axios instance dengan base URL
-const apiClient = axios.create({
-  baseURL: API_BASE_URL,
-});
-
-// Add token interceptor
-apiClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-}, (error) => Promise.reject(error));
-
 function WaliKelas() {
+  const minIpc = useMinIpc();
   const [assignments, setAssignments] = useState([]);
   const [classStats, setClassStats] = useState([]);
   const [teachers, setTeachers] = useState([]);
@@ -91,7 +69,7 @@ function WaliKelas() {
 
   const fetchAssignments = useCallback(async () => {
     try {
-      const response = await apiClient.get('/wali-kelas');
+      const response = await api.get('/wali-kelas');
       setAssignments(response.data);
       setError(null);
     } catch (err) {
@@ -102,7 +80,7 @@ function WaliKelas() {
 
   const fetchClassStatistics = useCallback(async () => {
     try {
-      const response = await apiClient.get('/wali-kelas/class-statistics', {
+      const response = await api.get('/wali-kelas/class-statistics', {
         params: { tahun_ajaran: selectedAcademicYear }
       });
       setClassStats(response.data);
@@ -117,7 +95,7 @@ function WaliKelas() {
 
   const fetchTeachers = useCallback(async () => {
     try {
-      const response = await apiClient.get('/wali-kelas/available-teachers', {
+      const response = await api.get('/wali-kelas/available-teachers', {
         params: { tahun_ajaran: selectedAcademicYear }
       });
       setTeachers(response.data);
@@ -141,7 +119,7 @@ function WaliKelas() {
   const handleCreate = async (e) => {
     e.preventDefault();
     try {
-      const response = await apiClient.post('/wali-kelas', formData);
+      const response = await api.post('/wali-kelas', formData);
       alert(response.data.message);
       setShowForm(false);
       setFormData({ guru_id: '', kelas: '', tahun_ajaran: selectedAcademicYear });
@@ -159,7 +137,7 @@ function WaliKelas() {
     if (!window.confirm('Apakah Anda yakin ingin menghapus assignment ini?')) return;
     
     try {
-      const response = await apiClient.delete(`/wali-kelas/${id}`);
+      const response = await api.delete(`/wali-kelas/${id}`);
       alert(response.data.message);
       fetchAssignments();
       fetchClassStatistics();
@@ -181,7 +159,7 @@ function WaliKelas() {
     setShowStudentDetail(true);
     setLoadingHistory(true);
     try {
-      const response = await apiClient.get(`/users/${student.id}/ipc-history`);
+      const response = await api.get(`/users/${student.id}/ipc-history`);
       setStudentHistory(response.data);
     } catch (err) {
       console.error('Error fetching student history:', err);
@@ -215,7 +193,7 @@ function WaliKelas() {
   const handleCheckMismatches = async () => {
     setLoadingMismatches(true);
     try {
-      const response = await apiClient.get('/wali-kelas/class-mismatches', {
+      const response = await api.get('/wali-kelas/class-mismatches', {
         params: { tahun_ajaran: selectedAcademicYear }
       });
       setMismatches(response.data);
@@ -716,7 +694,7 @@ function WaliKelas() {
                           </div>
                         </td>
                         <td style={{ padding: '13px 16px', fontSize: '.85rem', borderBottom: '1px solid #f1f5f9', color: '#334155' }}>
-                          <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '38px', height: '38px', borderRadius: '50%', background: '#0891b2', color: '#fff', fontWeight: 700, fontSize: '.85rem' }}>{student.ipc_total || 80}</span>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '38px', height: '38px', borderRadius: '50%', background: isBelowMinIpc(student.ipc_total || 80, minIpc) ? '#dc2626' : '#0891b2', color: '#fff', fontWeight: 700, fontSize: '.85rem' }}>{student.ipc_total || 80}</span>
                         </td>
                         <td style={{ padding: '13px 16px', fontSize: '.85rem', borderBottom: '1px solid #f1f5f9', color: '#334155' }}>
                           <button onClick={() => handleViewStudentDetail(student)} className="btn" style={{ border: 'none', borderRadius: '10px', padding: '6px 12px', fontSize: '.75rem', fontWeight: 600, cursor: 'pointer', background: '#2563eb', color: '#fff', transition: 'all 0.2s' }}>Detail</button>
@@ -840,7 +818,7 @@ function WaliKelas() {
 
               <div style={{ background: '#f8fafc', borderRadius: '10px', padding: '12px 16px' }}>
                 <div style={{ fontSize: '.72rem', fontWeight: 700, color: '#64748b', marginBottom: '4px' }}>Total IPC</div>
-                <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '44px', height: '44px', borderRadius: '50%', background: '#0891b2', color: '#fff', fontWeight: 700, fontSize: '1rem' }}>{selectedStudent.ipc_total || 80}</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '44px', height: '44px', borderRadius: '50%', background: isBelowMinIpc(selectedStudent.ipc_total || 80, minIpc) ? '#dc2626' : '#0891b2', color: '#fff', fontWeight: 700, fontSize: '1rem' }}>{selectedStudent.ipc_total || 80}</span>
               </div>
             </div>
           </div>

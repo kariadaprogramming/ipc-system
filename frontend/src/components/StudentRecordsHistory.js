@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { getRecordPhotoUrl } from '../utils/recordPhoto';
+import { toTitleCase } from '../utils/perilaku';
+import { formatDisplayText } from '../utils/formatDisplayText';
 
 const TABS = [
     { key: 'prestasi', label: 'Prestasi' },
@@ -66,7 +68,7 @@ function renderRecordDetails(item, type) {
                 <>
                     <strong>{item.nama_lomba}</strong>
                     <div style={{ fontSize: 13, color: 'var(--text-secondary, #666)', marginTop: 4 }}>
-                        {item.jenis} · {item.juara} · {item.kategori}
+                        {formatDisplayText(item.jenis)} · {formatDisplayText(item.juara)} · {formatDisplayText(item.kategori)}
                     </div>
                     <div style={{ fontSize: 13, marginTop: 4 }}>
                         <span className="badge badge-success">+{item.point} poin</span>
@@ -78,7 +80,7 @@ function renderRecordDetails(item, type) {
                 <>
                     <strong>{item.nama_event}</strong>
                     <div style={{ fontSize: 13, color: 'var(--text-secondary, #666)', marginTop: 4 }}>
-                        Tingkat: {item.tingkat}
+                        Tingkat: {formatDisplayText(item.tingkat)}
                     </div>
                     <div style={{ fontSize: 13, marginTop: 4 }}>
                         <span className="badge badge-success">+{item.point} poin</span>
@@ -112,7 +114,7 @@ function renderRecordDetails(item, type) {
         case 'pelanggaran':
             return (
                 <>
-                    <strong>{item.keterangan}</strong>
+                    <strong>{formatDisplayText(item.keterangan)}</strong>
                     <div style={{ fontSize: 13, color: 'var(--text-secondary, #666)', marginTop: 4 }}>
                         Jenis: {item.jenis_pelanggaran}
                     </div>
@@ -126,7 +128,7 @@ function renderRecordDetails(item, type) {
                 <>
                     <strong>Perilaku Positif</strong>
                     <div style={{ fontSize: 13, color: 'var(--text-secondary, #666)', marginTop: 4 }}>
-                        {item.karakter_siswa}
+                        {toTitleCase(item.karakter_siswa)}
                     </div>
                     <div style={{ fontSize: 13, marginTop: 4 }}>
                         <span className="badge badge-success">+{item.point} poin</span>

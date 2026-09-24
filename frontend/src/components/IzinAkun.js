@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 
 function IzinAkun() {
   const [users, setUsers] = useState([]);
@@ -7,13 +7,13 @@ function IzinAkun() {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
-  const [activeTab, setActiveTab] = useState('individual');
   const [filters, setFilters] = useState({
     role: '',
     kelas: '',
     grha: ''
   });
   const [bulkUpdating, setBulkUpdating] = useState(false);
+  const [selectedUserIds, setSelectedUserIds] = useState(new Set());
 
   const jenisInputs = [
     { key: 'prestasi', label: 'Prestasi', icon: '🏆' },
@@ -23,6 +23,9 @@ function IzinAkun() {
     { key: 'pelanggaran', label: 'Pelanggaran', icon: '⚠️' },
     { key: 'perilaku', label: 'Perilaku', icon: '✅' }
   ];
+
+  // Pelanggaran & Perilaku are guru-only (students never receive these permissions)
+  const GURU_ONLY_KEYS = ['pelanggaran', 'perilaku'];
 
   const kelasOptions = [
     'X TKJ 1', 'X TKJ 2', 'X TO 1', 'X TO 2',
@@ -103,12 +106,10 @@ function IzinAkun() {
 
   const fetchUsers = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/input-access/admin/users', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/input-access/admin/users');
       setUsers(response.data);
       setFilteredUsers(response.data);
+      // Selection is intentionally preserved across refreshes (stored as user IDs).
     } catch (error) {
       console.error('Error fetching users:', error);
     } finally {
@@ -119,13 +120,9 @@ function IzinAkun() {
   // Update Individual User Access
   const handleIndividualUpdate = async (userId, permissions) => {
     try {
-      const token = localStorage.getItem('token');
-      
-      await axios.post('/input-access/admin/individual', {
+      await api.post('/input-access/admin/individual', {
         user_id: userId,
         permissions: permissions
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
       });
       
       // Update local state
@@ -159,15 +156,12 @@ function IzinAkun() {
 
   // Reset all permissions
   const handleResetAll = async () => {
-    if (!window.confirm('⚠️ PERINGATAN!\n\nIni akan menghapus SEMUA individual permissions dan mereset sistem ke default (semua input aktif untuk semua user).\n\nYakin ingin melanjutkan?')) {
+    if (!window.confirm('⚠️ PERINGATAN!\n\nIni akan menghapus SEMUA individual permissions dan mereset izin ke default (semua input aktif untuk semua user).\n\nYakin ingin melanjutkan?')) {
       return;
     }
     
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.post('/input-access/admin/reset-all', {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.post('/input-access/admin/reset-all', {});
       
       setMessage(`✅ ${response.data.message}`);
       
@@ -176,87 +170,77 @@ function IzinAkun() {
       
       setTimeout(() => setMessage(''), 5000);
     } catch (error) {
-      setMessage('❌ Gagal reset sistem: ' + (error.response?.data?.message || error.message));
+      setMessage('❌ Gagal reset izin: ' + (error.response?.data?.message || error.message));
     }
   };
 
-  // Bulk update permissions by role (enable/disable all users with specific role)
-  const handleBulkRoleUpdate = async (role, jenis, enable) => {
+  // Toggle one user in the multi-select set
+  const handleToggleSelect = (userId) => {
+    setSelectedUserIds(prev => {
+      const next = new Set(prev);
+      if (next.has(userId)) {
+        next.delete(userId);
+      } else {
+        next.add(userId);
+      }
+      return next;
+    });
+  };
+
+  // Select all users currently visible (after search/filter)
+  const handleSelectAllVisible = () => {
+    setSelectedUserIds(new Set(filteredUsers.map(u => u.id)));
+  };
+
+  const handleClearSelection = () => {
+    setSelectedUserIds(new Set());
+  };
+
+  // Derived: which users are currently selected (used for guru-only bulk button gating)
+  // Guru-only permissions require a guru-ONLY selection: if even one siswa is
+  // selected, the "Aktifkan Pelanggaran/Perilaku" buttons stay disabled.
+  const selectedUsers = users.filter(u => selectedUserIds.has(u.id));
+  const onlyGuruSelected = selectedUsers.length > 0 && selectedUsers.every(u => u.role === 'guru');
+
+  // Bulk update ONE permission type, but only for the explicitly selected users
+  const handleBulkSelectedUpdate = async (jenis, enable) => {
     if (bulkUpdating) return; // Prevent multiple simultaneous updates
-    
+
+    if (selectedUserIds.size === 0) {
+      setMessage('❌ Pilih minimal satu user lewat checkbox terlebih dahulu');
+      setTimeout(() => setMessage(''), 3000);
+      return;
+    }
+
+    // Guru-only permissions can never be granted to students, so a mixed
+    // selection (guru + siswa) cannot use the enable buttons at all —
+    // deselect the siswa first. The backend enforces the same rule.
+    if (enable && GURU_ONLY_KEYS.includes(jenis) && !onlyGuruSelected) {
+      setMessage('⚠️ Pelanggaran & Perilaku hanya dapat diaktifkan untuk guru saja — hapus siswa dari pilihan Anda terlebih dahulu');
+      setTimeout(() => setMessage(''), 4000);
+      return;
+    }
+
     setBulkUpdating(true);
     try {
-      const token = localStorage.getItem('token');
-      const roleLabel = role === 'siswa' ? 'Siswa' : 'Guru';
       const jenisLabel = jenisInputs.find(j => j.key === jenis)?.label || jenis;
-      
-      // Get all users with this role (case-insensitive comparison)
-      const usersWithRole = users.filter(u => u.role?.toLowerCase() === role);
-      
-      if (usersWithRole.length === 0) {
-        setMessage(`❌ Tidak ada user dengan role ${roleLabel}`);
-        setTimeout(() => setMessage(''), 3000);
-        setBulkUpdating(false);
-        return;
-      }
-      
-      // Update each user - only change the selected jenis, keep others as is
-      let successCount = 0;
-      for (const user of usersWithRole) {
-        try {
-          // Keep existing permissions, only change the selected jenis
-          const newPermissions = {
-            can_input_prestasi: jenis === 'prestasi' ? enable : (user.can_input_prestasi ?? true),
-            can_input_organisasi: jenis === 'organisasi' ? enable : (user.can_input_organisasi ?? true),
-            can_input_kepanitiaan: jenis === 'kepanitiaan' ? enable : (user.can_input_kepanitiaan ?? true),
-            can_input_event: jenis === 'event' ? enable : (user.can_input_event ?? true),
-            can_input_pelanggaran: jenis === 'pelanggaran' ? enable : (user.can_input_pelanggaran ?? true),
-            can_input_perilaku: jenis === 'perilaku' ? enable : (user.can_input_perilaku ?? true)
-          };
-          
-          await axios.post('/input-access/admin/individual', {
-            user_id: user.id,
-            permissions: newPermissions
-          }, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-          successCount++;
-        } catch (err) {
-          console.error(`Error updating user ${user.id}:`, err);
-        }
-      }
-      
-      setMessage(`✅ ${jenisLabel} ${enable ? 'diaktifkan' : 'dimatikan'} untuk ${successCount} ${roleLabel}!`);
-      await fetchUsers(); // Refresh user list
+
+      const response = await api.post('/input-access/admin/bulk', {
+        user_ids: [...selectedUserIds],
+        jenis,
+        enable
+      });
+
+      const skippedSiswa = response.data.skipped_siswa_count || 0;
+      const skipNote = skippedSiswa > 0 ? ` (${skippedSiswa} siswa dilewati — khusus guru)` : '';
+      setMessage(`✅ ${jenisLabel} ${enable ? 'diaktifkan' : 'dimatikan'} untuk ${response.data.success_count} user terpilih!${skipNote}`);
+      await fetchUsers(); // Refresh user list (also clears selection)
       setTimeout(() => setMessage(''), 3000);
     } catch (error) {
       setMessage('❌ Gagal update bulk: ' + (error.response?.data?.message || error.message));
       setTimeout(() => setMessage(''), 3000);
     } finally {
       setBulkUpdating(false);
-    }
-  };
-
-  // Clear individual permissions for specific user
-  const handleClearUserPermissions = async (user) => {
-    if (!window.confirm(`Hapus izin individual untuk ${user.nama}?\n\nUser akan mengikuti pengaturan global/role.`)) {
-      return;
-    }
-    
-    try {
-      const token = localStorage.getItem('token');
-      const response = await axios.post(`/input-access/admin/clear-user-permissions/${user.id}`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      
-      setMessage(`✅ ${response.data.message}`);
-      
-      // Refresh users
-      fetchUsers();
-      
-      setTimeout(() => setMessage(''), 3000);
-    } catch (error) {
-      setMessage('❌ Gagal hapus izin: ' + (error.response?.data?.message || error.message));
     }
   };
 
@@ -407,6 +391,23 @@ function IzinAkun() {
         }
         .bulk-panel.siswa .bulk-panel-title{color:var(--blue-dark);}
         .bulk-panel.guru .bulk-panel-title{color:#b45309;}
+        .bulk-panel.unified{
+          background:var(--blue-light);
+          border-color:#bfdbfe;
+          grid-column:span 2;
+        }
+        .bulk-panel.unified .bulk-panel-title{color:var(--blue-dark);}
+        .select-checkbox{
+          width:17px;
+          height:17px;
+          padding:0;
+          margin:0;
+          accent-color:var(--blue);
+          cursor:pointer;
+          vertical-align:middle;
+        }
+        tbody tr.row-selected{background:#eff6ff;}
+        tbody tr.row-selected:hover{background:#dbeafe;}
         .chip-flow{
           display:grid;
           grid-template-columns:1fr 1fr;
@@ -532,19 +533,6 @@ function IzinAkun() {
         .toggle-cell:active{transform:scale(.88);}
         .toggle-cell.on{background:var(--green);}
         .toggle-cell.off{background:var(--red);}
-        .btn-hapus{
-          background:var(--orange);
-          color:#fff;
-          border:none;
-          border-radius:8px;
-          padding:7px 14px;
-          font-size:.75rem;
-          font-weight:700;
-          cursor:pointer;
-          transition:filter .15s ease, transform .12s ease;
-        }
-        .btn-hapus:hover{filter:brightness(1.08);}
-        .btn-hapus:active{transform:scale(.94);}
         @media (max-width: 900px){
           .bulk-grid{grid-template-columns:1fr;}
           .filter-row{grid-template-columns:1fr 1fr; }
@@ -553,8 +541,6 @@ function IzinAkun() {
         @media (max-width: 600px){
           body{padding:14px;}
           .page-header{font-size:1.05rem;}
-          .top-actions{flex-direction:column; align-items:stretch;}
-          .top-actions .btn{width:100%; justify-content:center;}
           .main-card{padding:16px;}
           .bulk-panel{padding:14px;}
           .chip-flow{grid-template-columns:1fr 1fr; gap:8px;}
@@ -568,36 +554,28 @@ function IzinAkun() {
       `}</style>
 
       {/* Header */}
-      <div className="reveal" style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.2rem', fontWeight: 700 }}>
-        <span style={{ fontSize: '1.3rem' }}>🛡️</span>
-        Izin Akses Input Data
+      <div className="reveal" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.2rem', fontWeight: 700 }}>
+          <span style={{ fontSize: '1.3rem' }}>🛡️</span>
+          Izin Akses Input Data
+        </div>
+        <button
+          onClick={handleResetAll}
+          className="btn btn-red"
+          title="Hapus semua individual permissions dan kembali ke pengaturan default"
+        >
+          🔄 Reset Izin
+        </button>
       </div>
-      
+
       {message && (
         <div style={{ padding: '12px 16px', borderRadius: '10px', background: message.startsWith('✅') ? '#dcfce7' : '#fee2e2', color: message.startsWith('✅') ? '#16a34a' : '#ef4444', fontSize: '.85rem', fontWeight: 600 }}>
           {message}
         </div>
       )}
 
-      {/* Top Actions */}
-      <div className="reveal" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-        <button
-          onClick={() => setActiveTab('individual')}
-          className="btn btn-primary"
-        >
-          👤 Individual
-        </button>
-        <button
-          onClick={handleResetAll}
-          className="btn btn-red"
-        >
-          🔄 Reset Sistem
-        </button>
-      </div>
-
       {/* INDIVIDUAL CONTROL */}
-      {activeTab === 'individual' && (
-        <>
+      <>
           <div className="main-card reveal">
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <div className="main-card-title">
@@ -605,103 +583,43 @@ function IzinAkun() {
                 Kontrol Individual
               </div>
               <p className="main-card-sub">
-                Berikan atau cabut akses untuk user tertentu. Atau gunakan tombol di bawah untuk bulk update berdasarkan role.
+                Centang user pada tabel di bawah, lalu gunakan tombol bulk update — hanya user yang dicentang yang akan diupdate.
               </p>
             </div>
 
-            {/* Bulk Action Buttons by Role */}
+            {/* Unified bulk update - applies only to checked users */}
             <div className="bulk-grid">
-              {/* Siswa Bulk Actions */}
-              <div className="bulk-panel siswa">
-                <div className="bulk-panel-title">🎓 Bulk Update Siswa</div>
+              <div className="bulk-panel unified">
+                <div className="bulk-panel-title">📦 Bulk Update ({selectedUserIds.size} user dipilih)</div>
                 <div className="chip-flow">
-                  <button className="chip-btn on" onClick={() => handleBulkRoleUpdate('siswa', 'prestasi', true)} disabled={bulkUpdating} style={{ opacity: bulkUpdating ? 0.6 : 1, cursor: bulkUpdating ? 'not-allowed' : 'pointer' }}>
-                    <span className="ic">✓</span>
-                    <span>Aktifkan Prestasi</span>
-                  </button>
-                  <button className="chip-btn off" onClick={() => handleBulkRoleUpdate('siswa', 'prestasi', false)} disabled={bulkUpdating} style={{ opacity: bulkUpdating ? 0.6 : 1, cursor: bulkUpdating ? 'not-allowed' : 'pointer' }}>
-                    <span className="ic">✕</span>
-                    <span>Matikan Prestasi</span>
-                  </button>
-                  <button className="chip-btn on" onClick={() => handleBulkRoleUpdate('siswa', 'organisasi', true)} disabled={bulkUpdating} style={{ opacity: bulkUpdating ? 0.6 : 1, cursor: bulkUpdating ? 'not-allowed' : 'pointer' }}>
-                    <span className="ic">✓</span>
-                    <span>Aktifkan Organisasi</span>
-                  </button>
-                  <button className="chip-btn off" onClick={() => handleBulkRoleUpdate('siswa', 'organisasi', false)} disabled={bulkUpdating} style={{ opacity: bulkUpdating ? 0.6 : 1, cursor: bulkUpdating ? 'not-allowed' : 'pointer' }}>
-                    <span className="ic">✕</span>
-                    <span>Matikan Organisasi</span>
-                  </button>
-                  <button className="chip-btn on" onClick={() => handleBulkRoleUpdate('siswa', 'kepanitiaan', true)} disabled={bulkUpdating} style={{ opacity: bulkUpdating ? 0.6 : 1, cursor: bulkUpdating ? 'not-allowed' : 'pointer' }}>
-                    <span className="ic">✓</span>
-                    <span>Aktifkan Kepanitiaan</span>
-                  </button>
-                  <button className="chip-btn off" onClick={() => handleBulkRoleUpdate('siswa', 'kepanitiaan', false)} disabled={bulkUpdating} style={{ opacity: bulkUpdating ? 0.6 : 1, cursor: bulkUpdating ? 'not-allowed' : 'pointer' }}>
-                    <span className="ic">✕</span>
-                    <span>Matikan Kepanitiaan</span>
-                  </button>
-                  <button className="chip-btn on" onClick={() => handleBulkRoleUpdate('siswa', 'event', true)} disabled={bulkUpdating} style={{ opacity: bulkUpdating ? 0.6 : 1, cursor: bulkUpdating ? 'not-allowed' : 'pointer' }}>
-                    <span className="ic">✓</span>
-                    <span>Aktifkan Event</span>
-                  </button>
-                  <button className="chip-btn off" onClick={() => handleBulkRoleUpdate('siswa', 'event', false)} disabled={bulkUpdating} style={{ opacity: bulkUpdating ? 0.6 : 1, cursor: bulkUpdating ? 'not-allowed' : 'pointer' }}>
-                    <span className="ic">✕</span>
-                    <span>Matikan Event</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Guru Bulk Actions */}
-              <div className="bulk-panel guru">
-                <div className="bulk-panel-title">🧑‍🏫 Bulk Update Guru</div>
-                <div className="chip-flow">
-                  <button className="chip-btn on" onClick={() => handleBulkRoleUpdate('guru', 'prestasi', true)} disabled={bulkUpdating} style={{ opacity: bulkUpdating ? 0.6 : 1, cursor: bulkUpdating ? 'not-allowed' : 'pointer' }}>
-                    <span className="ic">✓</span>
-                    <span>Aktifkan Prestasi</span>
-                  </button>
-                  <button className="chip-btn off" onClick={() => handleBulkRoleUpdate('guru', 'prestasi', false)} disabled={bulkUpdating} style={{ opacity: bulkUpdating ? 0.6 : 1, cursor: bulkUpdating ? 'not-allowed' : 'pointer' }}>
-                    <span className="ic">✕</span>
-                    <span>Matikan Prestasi</span>
-                  </button>
-                  <button className="chip-btn on" onClick={() => handleBulkRoleUpdate('guru', 'organisasi', true)} disabled={bulkUpdating} style={{ opacity: bulkUpdating ? 0.6 : 1, cursor: bulkUpdating ? 'not-allowed' : 'pointer' }}>
-                    <span className="ic">✓</span>
-                    <span>Aktifkan Organisasi</span>
-                  </button>
-                  <button className="chip-btn off" onClick={() => handleBulkRoleUpdate('guru', 'organisasi', false)} disabled={bulkUpdating} style={{ opacity: bulkUpdating ? 0.6 : 1, cursor: bulkUpdating ? 'not-allowed' : 'pointer' }}>
-                    <span className="ic">✕</span>
-                    <span>Matikan Organisasi</span>
-                  </button>
-                  <button className="chip-btn on" onClick={() => handleBulkRoleUpdate('guru', 'kepanitiaan', true)} disabled={bulkUpdating} style={{ opacity: bulkUpdating ? 0.6 : 1, cursor: bulkUpdating ? 'not-allowed' : 'pointer' }}>
-                    <span className="ic">✓</span>
-                    <span>Aktifkan Kepanitiaan</span>
-                  </button>
-                  <button className="chip-btn off" onClick={() => handleBulkRoleUpdate('guru', 'kepanitiaan', false)} disabled={bulkUpdating} style={{ opacity: bulkUpdating ? 0.6 : 1, cursor: bulkUpdating ? 'not-allowed' : 'pointer' }}>
-                    <span className="ic">✕</span>
-                    <span>Matikan Kepanitiaan</span>
-                  </button>
-                  <button className="chip-btn on" onClick={() => handleBulkRoleUpdate('guru', 'event', true)} disabled={bulkUpdating} style={{ opacity: bulkUpdating ? 0.6 : 1, cursor: bulkUpdating ? 'not-allowed' : 'pointer' }}>
-                    <span className="ic">✓</span>
-                    <span>Aktifkan Event</span>
-                  </button>
-                  <button className="chip-btn off" onClick={() => handleBulkRoleUpdate('guru', 'event', false)} disabled={bulkUpdating} style={{ opacity: bulkUpdating ? 0.6 : 1, cursor: bulkUpdating ? 'not-allowed' : 'pointer' }}>
-                    <span className="ic">✕</span>
-                    <span>Matikan Event</span>
-                  </button>
-                  <button className="chip-btn on" onClick={() => handleBulkRoleUpdate('guru', 'pelanggaran', true)} disabled={bulkUpdating} style={{ opacity: bulkUpdating ? 0.6 : 1, cursor: bulkUpdating ? 'not-allowed' : 'pointer' }}>
-                    <span className="ic">✓</span>
-                    <span>Aktifkan Pelanggaran</span>
-                  </button>
-                  <button className="chip-btn off" onClick={() => handleBulkRoleUpdate('guru', 'pelanggaran', false)} disabled={bulkUpdating} style={{ opacity: bulkUpdating ? 0.6 : 1, cursor: bulkUpdating ? 'not-allowed' : 'pointer' }}>
-                    <span className="ic">✕</span>
-                    <span>Matikan Pelanggaran</span>
-                  </button>
-                  <button className="chip-btn on" onClick={() => handleBulkRoleUpdate('guru', 'perilaku', true)} disabled={bulkUpdating} style={{ opacity: bulkUpdating ? 0.6 : 1, cursor: bulkUpdating ? 'not-allowed' : 'pointer' }}>
-                    <span className="ic">✓</span>
-                    <span>Aktifkan Perilaku</span>
-                  </button>
-                  <button className="chip-btn off" onClick={() => handleBulkRoleUpdate('guru', 'perilaku', false)} disabled={bulkUpdating} style={{ opacity: bulkUpdating ? 0.6 : 1, cursor: bulkUpdating ? 'not-allowed' : 'pointer' }}>
-                    <span className="ic">✕</span>
-                    <span>Matikan Perilaku</span>
-                  </button>
+                  {jenisInputs.map(({ key, label }) => {
+                    const baseDisabled = bulkUpdating || selectedUserIds.size === 0;
+                    const enableBlocked = enable => enable && GURU_ONLY_KEYS.includes(key) && !onlyGuruSelected;
+                    const enableDisabled = baseDisabled || enableBlocked(true);
+                    return (
+                      <React.Fragment key={key}>
+                        <button
+                          className="chip-btn on"
+                          onClick={() => handleBulkSelectedUpdate(key, true)}
+                          disabled={enableDisabled}
+                          title={enableBlocked(true) ? 'Hanya untuk pilihan berisi guru saja — hapus siswa dari pilihan' : undefined}
+                          style={{ opacity: enableDisabled ? 0.6 : 1, cursor: enableDisabled ? 'not-allowed' : 'pointer' }}
+                        >
+                          <span className="ic">✓</span>
+                          <span>Aktifkan {label}</span>
+                        </button>
+                        <button
+                          className="chip-btn off"
+                          onClick={() => handleBulkSelectedUpdate(key, false)}
+                          disabled={baseDisabled}
+                          style={{ opacity: baseDisabled ? 0.6 : 1, cursor: baseDisabled ? 'not-allowed' : 'pointer' }}
+                        >
+                          <span className="ic">✕</span>
+                          <span>Matikan {label}</span>
+                        </button>
+                      </React.Fragment>
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -756,12 +674,48 @@ function IzinAkun() {
             </div>
           </div>
 
+          {/* Selection bar */}
+          <div className="reveal" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', fontSize: '.85rem', color: '#334155' }}>
+            <strong>{selectedUserIds.size} user dipilih</strong>
+            <button className="btn btn-outline btn-sm" onClick={handleSelectAllVisible}>
+              Pilih semua yang tampil ({filteredUsers.length})
+            </button>
+            {selectedUserIds.size > 0 && (
+              <button className="btn btn-outline btn-sm" onClick={handleClearSelection}>
+                Hapus pilihan
+              </button>
+            )}
+          </div>
+
           {/* Table */}
           <div className="table-card reveal">
             <div className="table-wrap">
               <table>
                 <thead>
                   <tr>
+                    <th style={{ width: '44px' }}>
+                      <input
+                        type="checkbox"
+                        className="select-checkbox"
+                        checked={filteredUsers.length > 0 && filteredUsers.every(u => selectedUserIds.has(u.id))}
+                        ref={(el) => {
+                          if (el) {
+                            const someSelected = filteredUsers.some(u => selectedUserIds.has(u.id));
+                            const allSelected = filteredUsers.length > 0 && filteredUsers.every(u => selectedUserIds.has(u.id));
+                            el.indeterminate = someSelected && !allSelected;
+                          }
+                        }}
+                        onChange={() => {
+                          const allSelected = filteredUsers.length > 0 && filteredUsers.every(u => selectedUserIds.has(u.id));
+                          if (allSelected) {
+                            handleClearSelection();
+                          } else {
+                            handleSelectAllVisible();
+                          }
+                        }}
+                        title="Pilih semua yang tampil"
+                      />
+                    </th>
                     <th>User</th>
                     <th>Role</th>
                     <th className="col-prestasi"><span className="th-ic">🏆</span>Prestasi</th>
@@ -770,12 +724,19 @@ function IzinAkun() {
                     <th className="col-event"><span className="th-ic">📅</span>Event</th>
                     <th className="col-pelanggaran"><span className="th-ic">⚠️</span>Pelanggaran<br/><span style={{ fontWeight: 500 }}>(GURU ONLY)</span></th>
                     <th className="col-perilaku"><span className="th-ic">✅</span>Perilaku<br/><span style={{ fontWeight: 500 }}>(GURU ONLY)</span></th>
-                    <th>Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredUsers.map(user => (
-                    <tr key={user.id}>
+                    <tr key={user.id} className={selectedUserIds.has(user.id) ? 'row-selected' : ''}>
+                      <td>
+                        <input
+                          type="checkbox"
+                          className="select-checkbox"
+                          checked={selectedUserIds.has(user.id)}
+                          onChange={() => handleToggleSelect(user.id)}
+                        />
+                      </td>
                       <td className="user-cell">
                         <div className="user-name">{user.nama}</div>
                         <div className="user-sub">{user.nis || user.nip || '-'}</div>
@@ -838,15 +799,6 @@ function IzinAkun() {
                           );
                         })
                       )}
-                      <td>
-                        <button
-                          onClick={() => handleClearUserPermissions(user)}
-                          className="btn-hapus"
-                          title="Hapus izin individual, gunakan global/role"
-                        >
-                          🗑 Hapus
-                        </button>
-                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -859,8 +811,7 @@ function IzinAkun() {
               </div>
             )}
           </div>
-        </>
-      )}
+      </>
     </div>
   );
 }

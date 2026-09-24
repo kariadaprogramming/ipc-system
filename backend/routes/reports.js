@@ -5,6 +5,8 @@ const { auth, teacherOnly } = require('../middleware/auth');
 const { buildIpcCardBreakdown } = require('../utils/ipcCardBreakdown');
 const { calculateFullClass } = require('../utils/academicYear');
 const { generateRaportIPC, generateRaportIPCBuffer, generateLegerIPCBuffer, formatDateIndo } = require('../utils/pdfGenerator');
+const { getSchoolSignature } = require('../utils/schoolConfig');
+const { getRequestedSemester, getRequestedTahunPelajaran, getCutoffDate } = require('../utils/reportParams');
 const path = require('path');
 const fs = require('fs');
 
@@ -12,7 +14,7 @@ const fs = require('fs');
 const getTeacherWaliKelasClass = async (guruId) => {
     const [assignment] = await db.query(
         `SELECT kelas FROM wali_kelas_assignment 
-         WHERE guru_id = ? AND tahun_ajaran = YEAR(CURDATE())
+         WHERE guru_id = ? AND SPLIT_PART(tahun_ajaran, '-', 1)::INT = EXTRACT(YEAR FROM CURRENT_DATE)::INT
          LIMIT 1`,
         [guruId]
     );
@@ -197,7 +199,7 @@ router.get('/class-ipc/:kelas', auth, async (req, res) => {
                 is_graduated
             FROM users
             WHERE role = 'siswa' AND kelas = ? AND (is_graduated = 0 OR is_graduated IS NULL)
-            ORDER BY CAST(nis AS UNSIGNED) ASC
+            ORDER BY CASE WHEN nis ~ '^[0-9]+$' THEN nis::BIGINT ELSE NULL END ASC NULLS LAST, nis ASC
         `;
 
         const [students] = await db.query(query, [kelas]);
@@ -267,7 +269,7 @@ router.get('/ipc-card/:userId', auth, async (req, res) => {
             }
         }
 
-        const cardData = await buildIpcCardBreakdown(userId);
+        const cardData = await buildIpcCardBreakdown(userId, getCutoffDate(req));
         if (!cardData) {
             return res.status(404).json({ message: 'Siswa tidak ditemukan' });
         }
@@ -287,7 +289,7 @@ router.get('/ipc-card/:userId', auth, async (req, res) => {
             `SELECT u.nama AS wali_nama, u.nip AS wali_nip, wka.tahun_ajaran
              FROM wali_kelas_assignment wka
              JOIN users u ON wka.guru_id = u.id
-             WHERE wka.kelas = ? AND wka.tahun_ajaran = YEAR(CURDATE())
+             WHERE wka.kelas = ? AND SPLIT_PART(wka.tahun_ajaran, '-', 1)::INT = EXTRACT(YEAR FROM CURRENT_DATE)::INT
              ORDER BY wka.id DESC
              LIMIT 1`,
             [calculatedClass]
@@ -349,7 +351,7 @@ router.get('/ipc-card-pdf/:userId', auth, async (req, res) => {
             }
         }
 
-        const cardData = await buildIpcCardBreakdown(userId);
+        const cardData = await buildIpcCardBreakdown(userId, getCutoffDate(req));
         if (!cardData) {
             return res.status(404).json({ message: 'Siswa tidak ditemukan' });
         }
@@ -367,7 +369,7 @@ router.get('/ipc-card-pdf/:userId', auth, async (req, res) => {
             `SELECT u.nama AS wali_nama, u.nip AS wali_nip
              FROM wali_kelas_assignment wka
              JOIN users u ON wka.guru_id = u.id
-             WHERE wka.kelas = ? AND wka.tahun_ajaran = YEAR(CURDATE())
+             WHERE wka.kelas = ? AND SPLIT_PART(wka.tahun_ajaran, '-', 1)::INT = EXTRACT(YEAR FROM CURRENT_DATE)::INT
              ORDER BY wka.id DESC
              LIMIT 1`,
             [calculatedClass]
@@ -399,9 +401,9 @@ router.get('/ipc-card-pdf/:userId', auth, async (req, res) => {
         const pelanggaranRingan = Number(points.pelanggaran_ringan) || 0;
         const pelanggaranSedang = Number(points.pelanggaran_sedang) || 0;
         const pelanggaranBerat = Number(points.pelanggaran_berat) || 0;
-        const jumlahPelanggaran = pelanggaranRingan + pelanggaranSedang + pelanggaranBerat;
+        const jumlahPelanggaran = pelanggaranRingan + pelanggaranSedang + pelanggaranBerat + (Number(points.pelanggaran_lainnya) || 0);
         
-        const totalPointIPC = pointAwal + jumlahPrestasi + jumlahKarakter + jumlahKeaktifan - jumlahPelanggaran;
+        const totalPointIPC = pointAwal + jumlahPrestasi + jumlahKarakter + jumlahKeaktifan + jumlahPelanggaran;
 
         // Prepare data for template
         const templateData = {
@@ -411,8 +413,8 @@ router.get('/ipc-card-pdf/:userId', auth, async (req, res) => {
             nis: student.nis || '-',
             grha: student.grha || '-',
             wali_kelas: wali?.wali_nama || 'Wali Kelas Belum Ditentukan',
-            semester: 'Ganjil',
-            tahun_pelajaran: new Date().getFullYear() + '/' + (new Date().getFullYear() + 1),
+            semester: getRequestedSemester(req),
+            tahun_pelajaran: getRequestedTahunPelajaran(req),
             point_awal: pointAwal,
             prestasi_akademik: prestasiAkademik,
             prestasi_non_akademik: prestasiNonAkademik,
@@ -434,8 +436,7 @@ router.get('/ipc-card-pdf/:userId', auth, async (req, res) => {
             pelanggaran_berat: pelanggaranBerat,
             jumlah_pelanggaran: jumlahPelanggaran,
             total_point_ipc: totalPointIPC,
-            nama_kepala_sekolah: 'Ketut Susila Widiarsana, S.Pd., M.Pd.',
-            nip_kepala_sekolah: '19831101 200803 1 001',
+            ...(await getSchoolSignature()),
             tanggal_cetak: formatDateIndo(),
             nama_wali_kelas: wali?.wali_nama || 'Wali Kelas Belum Ditentukan',
             nip_wali_kelas: wali?.wali_nip || '-'
@@ -487,7 +488,7 @@ router.get('/ipc-card-preview/:userId', auth, async (req, res) => {
             }
         }
 
-        const cardData = await buildIpcCardBreakdown(userId);
+        const cardData = await buildIpcCardBreakdown(userId, getCutoffDate(req));
         if (!cardData) {
             return res.status(404).json({ message: 'Siswa tidak ditemukan' });
         }
@@ -505,7 +506,7 @@ router.get('/ipc-card-preview/:userId', auth, async (req, res) => {
             `SELECT u.nama AS wali_nama, u.nip AS wali_nip
              FROM wali_kelas_assignment wka
              JOIN users u ON wka.guru_id = u.id
-             WHERE wka.kelas = ? AND wka.tahun_ajaran = YEAR(CURDATE())
+             WHERE wka.kelas = ? AND SPLIT_PART(wka.tahun_ajaran, '-', 1)::INT = EXTRACT(YEAR FROM CURRENT_DATE)::INT
              ORDER BY wka.id DESC
              LIMIT 1`,
             [calculatedClass]
@@ -537,9 +538,9 @@ router.get('/ipc-card-preview/:userId', auth, async (req, res) => {
         const pelanggaranRingan = Number(points.pelanggaran_ringan) || 0;
         const pelanggaranSedang = Number(points.pelanggaran_sedang) || 0;
         const pelanggaranBerat = Number(points.pelanggaran_berat) || 0;
-        const jumlahPelanggaran = pelanggaranRingan + pelanggaranSedang + pelanggaranBerat;
+        const jumlahPelanggaran = pelanggaranRingan + pelanggaranSedang + pelanggaranBerat + (Number(points.pelanggaran_lainnya) || 0);
         
-        const totalPointIPC = pointAwal + jumlahPrestasi + jumlahKarakter + jumlahKeaktifan - jumlahPelanggaran;
+        const totalPointIPC = pointAwal + jumlahPrestasi + jumlahKarakter + jumlahKeaktifan + jumlahPelanggaran;
 
         // Prepare data for template
         const templateData = {
@@ -549,8 +550,8 @@ router.get('/ipc-card-preview/:userId', auth, async (req, res) => {
             nis: student.nis || '-',
             grha: student.grha || '-',
             wali_kelas: wali?.wali_nama || 'Wali Kelas Belum Ditentukan',
-            semester: 'Ganjil',
-            tahun_pelajaran: new Date().getFullYear() + '/' + (new Date().getFullYear() + 1),
+            semester: getRequestedSemester(req),
+            tahun_pelajaran: getRequestedTahunPelajaran(req),
             point_awal: pointAwal,
             prestasi_akademik: prestasiAkademik,
             prestasi_non_akademik: prestasiNonAkademik,
@@ -572,8 +573,7 @@ router.get('/ipc-card-preview/:userId', auth, async (req, res) => {
             pelanggaran_berat: pelanggaranBerat,
             jumlah_pelanggaran: jumlahPelanggaran,
             total_point_ipc: totalPointIPC,
-            nama_kepala_sekolah: 'Ketut Susila Widiarsana, S.Pd., M.Pd.',
-            nip_kepala_sekolah: '19831101 200803 1 001',
+            ...(await getSchoolSignature()),
             tanggal_cetak: formatDateIndo(),
             nama_wali_kelas: wali?.wali_nama || 'Wali Kelas Belum Ditentukan',
             nip_wali_kelas: wali?.wali_nip || '-'
@@ -654,9 +654,9 @@ router.get('/leger-pdf/:kelas', auth, async (req, res) => {
                 const pelanggaranRingan = Number(points.pelanggaran_ringan) || 0;
                 const pelanggaranSedang = Number(points.pelanggaran_sedang) || 0;
                 const pelanggaranBerat = Number(points.pelanggaran_berat) || 0;
-                const jumlahPelanggaran = pelanggaranRingan + pelanggaranSedang + pelanggaranBerat;
+                const jumlahPelanggaran = pelanggaranRingan + pelanggaranSedang + pelanggaranBerat + (Number(points.pelanggaran_lainnya) || 0);
                 
-                const totalPointIPC = pointAwal + jumlahPrestasi + jumlahKarakter + jumlahKeaktifan - jumlahPelanggaran;
+                const totalPointIPC = pointAwal + jumlahPrestasi + jumlahKarakter + jumlahKeaktifan + jumlahPelanggaran;
 
                 // Calculate current class
                 let calculatedClass = student.kelas;
@@ -698,7 +698,7 @@ router.get('/leger-pdf/:kelas', auth, async (req, res) => {
             `SELECT u.nama AS wali_nama, u.nip AS wali_nip
              FROM wali_kelas_assignment wka
              JOIN users u ON wka.guru_id = u.id
-             WHERE wka.kelas = ? AND wka.tahun_ajaran = YEAR(CURDATE())
+             WHERE wka.kelas = ? AND SPLIT_PART(wka.tahun_ajaran, '-', 1)::INT = EXTRACT(YEAR FROM CURRENT_DATE)::INT
              ORDER BY wka.id DESC
              LIMIT 1`,
             [kelas]
@@ -711,8 +711,7 @@ router.get('/leger-pdf/:kelas', auth, async (req, res) => {
             nama_kelas: kelas,
             tahun_pelajaran: new Date().getFullYear() + '/' + (new Date().getFullYear() + 1),
             kop_surat_path_file: 'header.png',
-            nama_kepala_sekolah: 'Ketut Susila Widiarsana, S.Pd., M.Pd.',
-            nip_kepala_sekolah: '19831101 200803 1 001',
+            ...(await getSchoolSignature()),
             tanggal_cetak: formatDateIndo(),
             nama_wali_kelas: wali?.wali_nama || 'Wali Kelas Belum Ditentukan',
             nip_wali_kelas: wali?.wali_nip || '-'
@@ -793,9 +792,9 @@ router.get('/leger-preview/:kelas', auth, async (req, res) => {
                 const pelanggaranRingan = Number(points.pelanggaran_ringan) || 0;
                 const pelanggaranSedang = Number(points.pelanggaran_sedang) || 0;
                 const pelanggaranBerat = Number(points.pelanggaran_berat) || 0;
-                const jumlahPelanggaran = pelanggaranRingan + pelanggaranSedang + pelanggaranBerat;
+                const jumlahPelanggaran = pelanggaranRingan + pelanggaranSedang + pelanggaranBerat + (Number(points.pelanggaran_lainnya) || 0);
                 
-                const totalPointIPC = pointAwal + jumlahPrestasi + jumlahKarakter + jumlahKeaktifan - jumlahPelanggaran;
+                const totalPointIPC = pointAwal + jumlahPrestasi + jumlahKarakter + jumlahKeaktifan + jumlahPelanggaran;
 
                 // Calculate current class
                 let calculatedClass = student.kelas;
@@ -837,7 +836,7 @@ router.get('/leger-preview/:kelas', auth, async (req, res) => {
             `SELECT u.nama AS wali_nama, u.nip AS wali_nip
              FROM wali_kelas_assignment wka
              JOIN users u ON wka.guru_id = u.id
-             WHERE wka.kelas = ? AND wka.tahun_ajaran = YEAR(CURDATE())
+             WHERE wka.kelas = ? AND SPLIT_PART(wka.tahun_ajaran, '-', 1)::INT = EXTRACT(YEAR FROM CURRENT_DATE)::INT
              ORDER BY wka.id DESC
              LIMIT 1`,
             [kelas]
@@ -850,8 +849,7 @@ router.get('/leger-preview/:kelas', auth, async (req, res) => {
             nama_kelas: kelas,
             tahun_pelajaran: new Date().getFullYear() + '/' + (new Date().getFullYear() + 1),
             kop_surat_path_file: 'header.png',
-            nama_kepala_sekolah: 'Ketut Susila Widiarsana, S.Pd., M.Pd.',
-            nip_kepala_sekolah: '19831101 200803 1 001',
+            ...(await getSchoolSignature()),
             tanggal_cetak: formatDateIndo(),
             nama_wali_kelas: wali?.wali_nama || 'Wali Kelas Belum Ditentukan',
             nip_wali_kelas: wali?.wali_nip || '-'

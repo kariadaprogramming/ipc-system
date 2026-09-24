@@ -247,6 +247,9 @@ const calculatePelanggaranPoints = async (jenis) => {
     }
 };
 
+// Nilai point perilaku hanya bergantung pada TINGKAT penilaian (shared
+// untuk semua karakter). Baris baru menyimpan tingkat di field1
+// (pola seperti event); klausa OR tetap membaca DB lama (tingkat di field2).
 const lookupPerilakuPoint = async (character, rating) => {
     if (!rating) return 0;
 
@@ -255,26 +258,12 @@ const lookupPerilakuPoint = async (character, rating) => {
          FROM ipc_config
          WHERE category = 'perilaku'
            AND is_active = TRUE
-           AND LOWER(TRIM(field1)) = LOWER(TRIM(?))
-           AND LOWER(TRIM(field2)) = LOWER(TRIM(?))
+           AND (LOWER(TRIM(field1)) = LOWER(TRIM(?)) OR LOWER(TRIM(field2)) = LOWER(TRIM(?)))
          LIMIT 1`,
-        [character, rating]
+        [rating, rating]
     );
     if (rows[0]) {
         return rows[0].point_value;
-    }
-
-    const [ratingOnly] = await db.query(
-        `SELECT point_value
-         FROM ipc_config
-         WHERE category = 'perilaku'
-           AND is_active = TRUE
-           AND LOWER(TRIM(field2)) = LOWER(TRIM(?))
-         LIMIT 1`,
-        [rating]
-    );
-    if (ratingOnly[0]) {
-        return ratingOnly[0].point_value;
     }
 
     return PERILAKU_POINTS[normalizeKey(rating)] || 0;

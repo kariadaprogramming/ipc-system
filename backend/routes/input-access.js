@@ -121,8 +121,9 @@ router.post('/admin/global', auth, superAdminOnly, async (req, res) => {
             await db.query(
                 `INSERT INTO input_access_control (control_type, role_target, jenis_input, is_enabled, updated_by)
                  VALUES (?, 'all', ?, ?, ?)
-                 ON DUPLICATE KEY UPDATE is_enabled = ?, updated_by = ?, updated_at = CURRENT_TIMESTAMP`,
-                ['global', jenis, is_enabled, adminId, is_enabled, adminId]
+                 ON CONFLICT (control_type, role_target, jenis_input) DO UPDATE
+                 SET is_enabled = EXCLUDED.is_enabled, updated_by = EXCLUDED.updated_by, updated_at = CURRENT_TIMESTAMP`,
+                ['global', jenis, is_enabled, adminId]
             );
             
             // Log the change
@@ -155,7 +156,7 @@ router.post('/admin/global', auth, superAdminOnly, async (req, res) => {
             : `SuperAdmin telah mematikan input data ${jenis_input === 'all' ? 'semua jenis' : jenis_input}. Anda tidak dapat menginput data untuk sementara.`;
         
         // Get all users (siswa and guru)
-        const [users] = await db.query('SELECT id, role FROM users WHERE role IN ("siswa", "guru")');
+        const [users] = await db.query("SELECT id, role FROM users WHERE role IN ('siswa', 'guru')");
         
         for (const user of users) {
             await db.query(
@@ -194,8 +195,9 @@ router.post('/admin/role', auth, superAdminOnly, async (req, res) => {
             await db.query(
                 `INSERT INTO input_access_control (control_type, role_target, jenis_input, is_enabled, updated_by)
                  VALUES (?, ?, ?, ?, ?)
-                 ON DUPLICATE KEY UPDATE is_enabled = ?, updated_by = ?, updated_at = CURRENT_TIMESTAMP`,
-                ['role', role, jenis, is_enabled, adminId, is_enabled, adminId]
+                 ON CONFLICT (control_type, role_target, jenis_input) DO UPDATE
+                 SET is_enabled = EXCLUDED.is_enabled, updated_by = EXCLUDED.updated_by, updated_at = CURRENT_TIMESTAMP`,
+                ['role', role, jenis, is_enabled, adminId]
             );
             
             // Log the change
@@ -268,6 +270,14 @@ router.post('/admin/individual', auth, superAdminOnly, async (req, res) => {
         if (userInfo.length === 0) {
             return res.status(404).json({ message: 'User tidak ditemukan' });
         }
+
+        // Pelanggaran & Perilaku are guru-only: force them off for non-guru users
+        // so students can never hold these flags (also heals previously mis-granted rows).
+        const sanitizedPermissions = { ...permissions };
+        if (userInfo[0].role !== 'guru') {
+            sanitizedPermissions.can_input_pelanggaran = false;
+            sanitizedPermissions.can_input_perilaku = false;
+        }
         
         // Check if permission record exists
         const [existingPerm] = await db.query('SELECT id FROM permissions WHERE user_id = ?', [user_id]);
@@ -284,12 +294,12 @@ router.post('/admin/individual', auth, superAdminOnly, async (req, res) => {
                     can_input_perilaku = ?
                  WHERE user_id = ?`,
                 [
-                    permissions.can_input_prestasi,
-                    permissions.can_input_organisasi,
-                    permissions.can_input_kepanitiaan,
-                    permissions.can_input_event,
-                    permissions.can_input_pelanggaran,
-                    permissions.can_input_perilaku,
+                    sanitizedPermissions.can_input_prestasi,
+                    sanitizedPermissions.can_input_organisasi,
+                    sanitizedPermissions.can_input_kepanitiaan,
+                    sanitizedPermissions.can_input_event,
+                    sanitizedPermissions.can_input_pelanggaran,
+                    sanitizedPermissions.can_input_perilaku,
                     user_id
                 ]
             );
@@ -300,12 +310,12 @@ router.post('/admin/individual', auth, superAdminOnly, async (req, res) => {
                  VALUES (?, ?, ?, ?, ?, ?, ?)`,
                 [
                     user_id,
-                    permissions.can_input_prestasi,
-                    permissions.can_input_organisasi,
-                    permissions.can_input_kepanitiaan,
-                    permissions.can_input_event,
-                    permissions.can_input_pelanggaran,
-                    permissions.can_input_perilaku
+                    sanitizedPermissions.can_input_prestasi,
+                    sanitizedPermissions.can_input_organisasi,
+                    sanitizedPermissions.can_input_kepanitiaan,
+                    sanitizedPermissions.can_input_event,
+                    sanitizedPermissions.can_input_pelanggaran,
+                    sanitizedPermissions.can_input_perilaku
                 ]
             );
         }
@@ -322,7 +332,7 @@ router.post('/admin/individual', auth, superAdminOnly, async (req, res) => {
             'can_input_perilaku': 'perilaku'
         };
         
-        for (const [key, value] of Object.entries(permissions)) {
+        for (const [key, value] of Object.entries(sanitizedPermissions)) {
             if (permMap[key]) {
                 await db.query(
                     `INSERT INTO input_access_logs (control_type, target_user_id, jenis_input, action, performed_by)
@@ -363,6 +373,115 @@ router.post('/admin/individual', auth, superAdminOnly, async (req, res) => {
     } catch (error) {
         console.error('Error updating individual access:', error);
         res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Bulk update one permission type for explicitly selected users only.
+// Body: { user_ids: number[], jenis: 'prestasi'|..., enable: boolean }
+router.post('/admin/bulk', auth, superAdminOnly, async (req, res) => {
+    try {
+        const { user_ids, jenis, enable } = req.body;
+        const adminId = req.user.id;
+
+        const validJenis = ['prestasi', 'organisasi', 'kepanitiaan', 'event', 'pelanggaran', 'perilaku'];
+        if (!user_ids || !Array.isArray(user_ids) || user_ids.length === 0) {
+            return res.status(400).json({ message: 'user_ids array diperlukan dan tidak boleh kosong' });
+        }
+        if (!validJenis.includes(jenis)) {
+            return res.status(400).json({ message: 'jenis tidak valid' });
+        }
+        if (enable === undefined || enable === null) {
+            return res.status(400).json({ message: 'enable diperlukan (true/false)' });
+        }
+
+        const colName = `can_input_${jenis}`;
+        const enableBool = enable === true || enable === 1 || enable === 'true' || enable === '1';
+        const permCols = validJenis.map(j => `can_input_${j}`);
+
+        // Pelanggaran & Perilaku are guru-only input types. They must never be
+        // granted to students (matching the "(GURU ONLY)" rule in the UI and the
+        // siswa block in checkPermission/checkInputAccess). Disabling is always
+        // allowed so admins can clean up previously mis-granted rows.
+        const isGuruOnly = jenis === 'pelanggaran' || jenis === 'perilaku';
+
+        let successCount = 0;
+        const skippedIds = [];
+        let skippedSiswaCount = 0;
+        for (const user_id of user_ids) {
+            const [userInfo] = await db.query('SELECT id, nama, role FROM users WHERE id = ?', [user_id]);
+            if (userInfo.length === 0) {
+                skippedIds.push(user_id);
+                continue;
+            }
+
+            const targetRole = userInfo[0].role;
+            const isGuruOnlyTarget = targetRole !== 'guru';
+
+            if (isGuruOnly && enableBool && isGuruOnlyTarget) {
+                // Skip students for guru-only "enable" actions
+                skippedIds.push(user_id);
+                skippedSiswaCount++;
+                continue;
+            }
+
+            const [existingPerm] = await db.query(
+                `SELECT ${permCols.join(', ')} FROM permissions WHERE user_id = ?`,
+                [user_id]
+            );
+
+            if (existingPerm.length > 0) {
+                // Preserve all other columns, change only the selected jenis
+                await db.query(
+                    `UPDATE permissions SET ${colName} = ? WHERE user_id = ?`,
+                    [enableBool, user_id]
+                );
+            } else {
+                // New row: selected jenis as given, everything else defaults to true
+                // — except guru-only types for students, which default to false
+                const values = {};
+                for (const j of validJenis) {
+                    const otherIsGuruOnly = j === 'pelanggaran' || j === 'perilaku';
+                    values[`can_input_${j}`] = (j === jenis)
+                        ? enableBool
+                        : (otherIsGuruOnly && isGuruOnlyTarget ? false : true);
+                }
+                await db.query(
+                    `INSERT INTO permissions (user_id, ${permCols.join(', ')})
+                     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                    [user_id, ...permCols.map(c => values[c])]
+                );
+            }
+
+            // Log the change
+            await db.query(
+                `INSERT INTO input_access_logs (control_type, target_user_id, jenis_input, action, performed_by)
+                 VALUES (?, ?, ?, ?, ?)`,
+                ['individual', user_id, jenis, enableBool ? 'enabled' : 'disabled', adminId]
+            );
+
+            // Notify the user
+            await db.query(
+                `INSERT INTO notifications (user_id, type, title, message, related_type)
+                 VALUES (?, 'system', ?, ?, 'input_access')`,
+                [user_id,
+                 enableBool ? '✅ Akses Input Data Diberikan' : '❌ Akses Input Data Dicabut',
+                 enableBool
+                    ? `SuperAdmin telah memberikan Anda akses untuk input data: ${jenis}. Anda sekarang dapat menginput data.`
+                    : `SuperAdmin telah mencabut akses Anda untuk input data: ${jenis}. Anda tidak dapat menginput data tersebut untuk sementara.`]
+            );
+
+            successCount++;
+        }
+
+        res.json({
+            message: `Berhasil ${enableBool ? 'mengaktifkan' : 'mematikan'} ${jenis} untuk ${successCount} user`,
+            success_count: successCount,
+            skipped_ids: skippedIds,
+            skipped_siswa_count: skippedSiswaCount
+        });
+    } catch (error) {
+        console.error('Error updating bulk access:', error);
+        res.status(500).json({ message: 'Server error', error: error.message });
     }
 });
 
@@ -489,7 +608,7 @@ router.post('/admin/clear-user-permissions/:userId', auth, superAdminOnly, async
     }
 });
 
-// Reset all individual permissions - clear everything and start fresh
+// Reset all individual permissions (Reset Izin) - clear everything and start fresh
 router.post('/admin/reset-all', auth, superAdminOnly, async (req, res) => {
     try {
         const adminId = req.user.id;
@@ -509,8 +628,9 @@ router.post('/admin/reset-all', auth, superAdminOnly, async (req, res) => {
             await db.query(
                 `INSERT INTO input_access_control (control_type, role_target, jenis_input, is_enabled, updated_by)
                  VALUES ('global', 'all', ?, TRUE, ?)
-                 ON DUPLICATE KEY UPDATE is_enabled = TRUE, updated_by = ?, updated_at = CURRENT_TIMESTAMP`,
-                [jenis, adminId, adminId]
+                 ON CONFLICT (control_type, role_target, jenis_input) DO UPDATE
+                 SET is_enabled = TRUE, updated_by = EXCLUDED.updated_by, updated_at = CURRENT_TIMESTAMP`,
+                [jenis, adminId]
             );
         }
         
@@ -522,17 +642,17 @@ router.post('/admin/reset-all', auth, superAdminOnly, async (req, res) => {
         );
         
         // Send notification to all users
-        const [users] = await db.query('SELECT id FROM users WHERE role IN ("siswa", "guru")');
+        const [users] = await db.query("SELECT id FROM users WHERE role IN ('siswa', 'guru')");
         for (const user of users) {
             await db.query(
                 `INSERT INTO notifications (user_id, type, title, message, related_type) 
                  VALUES (?, 'system', ?, ?, 'input_access')`,
-                [user.id, '✅ Sistem Di-Reset', 'SuperAdmin telah mereset sistem izin. Semua user sekarang dapat menginput data sesuai pengaturan global.']
+                [user.id, '✅ Izin Di-Reset', 'SuperAdmin telah mereset izin input data. Semua user sekarang dapat menginput data sesuai pengaturan global.']
             );
         }
         
         res.json({ 
-            message: `Sistem berhasil di-reset! ${countBefore[0].count} individual permissions dihapus. Semua input data sekarang aktif untuk semua user.`,
+            message: `Reset izin berhasil! ${countBefore[0].count} individual permissions dihapus. Semua input data sekarang aktif untuk semua user.`,
             deleted_permissions: countBefore[0].count,
             affected_users: users.length
         });

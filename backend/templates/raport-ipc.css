@@ -6,7 +6,7 @@
 * { box-sizing: border-box; }
 
 body {
-  font-family: 'Calibri', Arial, sans-serif;
+  font-family: 'Times New Roman', Times, serif;
   font-size: 12px;
   color: #000;
   margin: 0;
@@ -30,8 +30,31 @@ body {
   text-align: center;
   font-weight: bold;
   font-size: 14px;
-  margin: 6px 0 10px 0;
+  margin: 6px 0 2px 0;
   text-transform: uppercase;
+}
+
+.sekolah {
+  text-align: center;
+  font-weight: bold;
+  font-size: 14px;
+  margin: 2px 0;
+  text-transform: uppercase;
+}
+
+.tahun-label {
+  text-align: center;
+  font-weight: bold;
+  font-size: 12px;
+  margin: 4px 0 0 0;
+  text-transform: uppercase;
+}
+
+.tahun {
+  text-align: center;
+  font-weight: bold;
+  font-size: 12px;
+  margin: 0 0 10px 0;
 }
 
 /* ---------- INFO SISWA ---------- */
@@ -73,19 +96,17 @@ col.pt   { width: 30%; }
 
 tr.section-head td {
   font-weight: bold;
-  background-color: #d9d9d9;
 }
 tr.section-head td.num  { text-align: center; }
-tr.section-head td.point { text-align: center; color: #1f4e78; font-weight: bold; }
+tr.section-head td.point { text-align: center; font-weight: bold; }
 
 tr.item td.num2  { text-align: center; }
-tr.item td.point { text-align: center; color: #1f4e78; }
+tr.item td.point { text-align: center; }
 
 tr.total td {
   font-weight: bold;
-  background-color: #bdd7ee;
 }
-tr.total td.point { text-align: center; color: #1f4e78; }
+tr.total td.point { text-align: center; }
 
 td.point-empty { background: #fff; }
 

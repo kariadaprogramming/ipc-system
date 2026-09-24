@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import React, { useState, useEffect, useCallback } from 'react';
+import api from '../utils/api';
+import { useMinIpc, isBelowMinIpc } from '../utils/minIpc';
 import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
 import StudentDetail from './StudentDetail';
 import { GRHA_OPTIONS, getRowField, normalizeGrha } from '../utils/excelImport';
 
-const JABATAN_OPTIONS = ['Guru', 'Pegawai', 'Staff'];
+const JABATAN_OPTIONS = ['Guru', 'Pegawai'];
 
 const KELAS_OPTIONS = [
   'X TKJ 1', 'X TKJ 2', 'X TKR 1', 'X TKR 2',
@@ -17,6 +18,7 @@ const KELAS_OPTIONS = [
 ];
 
 function KelolaAkun() {
+  const minIpc = useMinIpc();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({});
@@ -42,20 +44,18 @@ function KelolaAkun() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [importModalType, setImportModalType] = useState('');
   const [showEditBiodataModal, setShowEditBiodataModal] = useState(false);
-  const [showClassValidationModal, setShowClassValidationModal] = useState(false);
-  const [validationResults, setValidationResults] = useState(null);
-  const [validatingClasses, setValidatingClasses] = useState(false);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 50,
+    total: 0,
+    totalPages: 0
+  });
+  const [searchQuery, setSearchQuery] = useState('');
 
   const grhaOptions = GRHA_OPTIONS;
 
-  const filteredUsers = users.filter(user => {
-    if (filters.role && user.role !== filters.role) return false;
-    if (filters.kelas && user.kelas !== filters.kelas) return false;
-    if (filters.grha && user.grha !== filters.grha) return false;
-    if (filters.jurusan && user.jurusan !== filters.jurusan) return false;
-    if (filters.tahun_pelajaran && user.tahun_pelajaran !== filters.tahun_pelajaran) return false;
-    return true;
-  });
+  // Remove client-side filtering since backend handles it now
+  const filteredUsers = users;
 
   const handleFilterChange = (key, value) => {
     setFilters(prev => ({ ...prev, [key]: value }));
@@ -65,40 +65,52 @@ function KelolaAkun() {
     setFilters({ role: '', kelas: '', grha: '', jurusan: '', tahun_pelajaran: '' });
   };
 
-  useEffect(() => {
-    const user = JSON.parse(localStorage.getItem('user'));
-    setUserRole(user?.role);
-    fetchUsers();
-  }, []);
-
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async (page = 1) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/users', {
-        headers: { Authorization: `Bearer ${token}` }
+      setLoading(true);
+      const params = new URLSearchParams({
+        page: page,
+        limit: pagination.limit,
+        search: searchQuery
       });
-      // If guru, only show students. If superadmin, show all users
-      const user = JSON.parse(localStorage.getItem('user'));
-      if (user?.role === 'guru') {
-        const students = response.data.filter(user => user.role === 'siswa');
-        setUsers(students);
-      } else {
-        setUsers(response.data);
-      }
+
+      if (filters.role) params.append('role', filters.role);
+
+      const response = await api.get(`/users?${params.toString()}`);
+
+      setUsers(response.data.users || []);
+      setPagination(response.data.pagination || {
+        page: 1,
+        limit: 50,
+        total: 0,
+        totalPages: 0
+      });
     } catch (error) {
       console.error('Error fetching users:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [pagination.limit, searchQuery, filters.role]);
+
+  useEffect(() => {
+    const user = JSON.parse(localStorage.getItem('user'));
+    setUserRole(user?.role);
+    fetchUsers();
+  }, [fetchUsers]);
+
+  // Debounced search effect
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchUsers(1);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, filters.role, fetchUsers]);
 
   const handleCreateStudent = async (e) => {
     e.preventDefault();
     try {
-      const token = localStorage.getItem('token');
-      await axios.post('/users/create-student', formData, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.post('/users/create-student', formData);
       setMessage('Akun siswa berhasil dibuat!');
       setShowCreateModal(false);
       setFormData({});
@@ -111,10 +123,7 @@ function KelolaAkun() {
   const handleCreateTeacher = async (e) => {
     e.preventDefault();
     try {
-      const token = localStorage.getItem('token');
-      await axios.post('/users/create-teacher', formData, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.post('/users/create-teacher', formData);
       setMessage('Akun guru berhasil dibuat!');
       setShowCreateModal(false);
       setFormData({});
@@ -128,10 +137,7 @@ function KelolaAkun() {
     if (!window.confirm('Apakah Anda yakin ingin menghapus akun ini?')) return;
     
     try {
-      const token = localStorage.getItem('token');
-      await axios.delete(`/users/${userId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.delete(`/users/${userId}`);
       setMessage('Akun berhasil dihapus!');
       fetchUsers();
     } catch (error) {
@@ -151,10 +157,7 @@ function KelolaAkun() {
     }
 
     try {
-      const token = localStorage.getItem('token');
-      await axios.post('/users/bulk-delete', { user_ids: selectedIds }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.post('/users/bulk-delete', { user_ids: selectedIds });
       setMessage(`Berhasil menghapus ${selectedIds.length} akun`);
       setSelectedIds([]);
       setSelectionRole(null);
@@ -236,26 +239,20 @@ function KelolaAkun() {
   const handleUpdateUser = async (e) => {
     e.preventDefault();
     try {
-      const token = localStorage.getItem('token');
-      
       if (userRole === 'guru' && editStudent.role === 'siswa') {
         // Guru needs approval to update student biodata
-        await axios.post(`/users/${editStudent.id}/biodata-request`, formData, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        await api.post(`/users/${editStudent.id}/biodata-request`, formData);
         setMessage('Permintaan update biodata berhasil diajukan, menunggu persetujuan SuperAdmin!');
       } else {
         // SuperAdmin updates directly
-        await axios.put(`/users/${editStudent.id}/biodata`, formData, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        await api.put(`/users/${editStudent.id}/biodata`, formData);
         setMessage(`Data ${editStudent.role === 'siswa' ? 'siswa' : 'guru'} berhasil diupdate!`);
       }
       
       setShowEditBiodataModal(false);
       setEditStudent(null);
       setFormData({});
-      fetchUsers();
+      fetchUsers(pagination.page);
     } catch (error) {
       setMessage(error.response?.data?.message || 'Gagal update data');
     }
@@ -281,8 +278,6 @@ function KelolaAkun() {
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
       const jsonData = XLSX.utils.sheet_to_json(worksheet);
-
-      const token = localStorage.getItem('token');
 
       for (const row of jsonData) {
         try {
@@ -361,9 +356,7 @@ function KelolaAkun() {
               password: getRowField(row, 'password', 'Password') || '123456'
             };
 
-            await axios.post('/users/create-student', studentData, {
-              headers: { Authorization: `Bearer ${token}` }
-            });
+            await api.post('/users/create-student', studentData);
             results.push({ 
               status: 'success', 
               name: studentData.nama, 
@@ -391,9 +384,7 @@ function KelolaAkun() {
               continue;
             }
 
-            await axios.post('/users/create-teacher', teacherData, {
-              headers: { Authorization: `Bearer ${token}` }
-            });
+            await api.post('/users/create-teacher', teacherData);
             results.push({ status: 'success', name: teacherData.nama, type: 'guru' });
           }
         } catch (error) {
@@ -407,7 +398,7 @@ function KelolaAkun() {
 
       setImportResults(results);
       setMessage(`Import completed: ${results.filter(r => r.status === 'success').length} successful, ${results.filter(r => r.status === 'error').length} failed`);
-      fetchUsers();
+      fetchUsers(pagination.page);
     } catch (error) {
       setMessage('Error reading Excel file: ' + error.message);
     } finally {
@@ -531,44 +522,6 @@ function KelolaAkun() {
     }
   };
 
-  const handleValidateClasses = async () => {
-    setValidatingClasses(true);
-    try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/academic-year/validate-classes', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setValidationResults(response.data);
-      setShowClassValidationModal(true);
-    } catch (error) {
-      console.error('Error validating classes:', error);
-      alert('Gagal memvalidasi kelas');
-    } finally {
-      setValidatingClasses(false);
-    }
-  };
-
-  const handleFixDiscrepancies = async (dryRun = false) => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await axios.post('/academic-year/fix-discrepancies', 
-        { dryRun },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      
-      if (dryRun) {
-        alert(`Preview: ${response.data.discrepanciesFound} discrepancies found. Run again without dryRun to fix.`);
-      } else {
-        alert(`Berhasil memperbaiki ${response.data.fixedCount} siswa`);
-        // Re-validate to show updated results
-        await handleValidateClasses();
-      }
-    } catch (error) {
-      console.error('Error fixing discrepancies:', error);
-      alert('Gagal memperbaiki discrepancies');
-    }
-  };
-
   if (loading) {
     return <div className="loading"><div className="spinner"></div></div>;
   }
@@ -627,19 +580,6 @@ function KelolaAkun() {
           {userRole === 'superadmin' && (
             <>
               <button 
-                onClick={handleValidateClasses} 
-                disabled={validatingClasses}
-                style={{ 
-                  padding: '10px 16px', border: 'none', borderRadius: '4px', fontSize: '14px', fontWeight: '500', cursor: validatingClasses ? 'not-allowed' : 'pointer',
-                  background: '#ffa726', color: 'white', display: 'inline-flex', alignItems: 'center', gap: '6px',
-                  transition: 'all 0.3s ease', opacity: validatingClasses ? 0.6 : 1
-                }}
-                onMouseOver={(e) => { if (!validatingClasses) { e.target.style.background = '#fb8c00'; e.target.style.transform = 'translateY(-2px)'; e.target.style.boxShadow = '0 4px 8px rgba(255, 167, 38, 0.3)'; } }}
-                onMouseOut={(e) => { e.target.style.background = '#ffa726'; e.target.style.transform = 'translateY(0)'; e.target.style.boxShadow = 'none'; }}
-              >
-                {validatingClasses ? 'Memvalidasi...' : 'Validasi Kelas'}
-              </button>
-              <button 
                 onClick={() => { setShowImportModal(true); setImportModalType('siswa'); setExcelFile(null); setImportResults([]); }}
                 style={{ 
                   padding: '10px 16px', border: 'none', borderRadius: '4px', fontSize: '14px', fontWeight: '500', cursor: 'pointer',
@@ -670,14 +610,29 @@ function KelolaAkun() {
         {/* Filters */}
         <div style={{ background: '#f9f9f9', border: '1px solid #e0e0e0', borderRadius: '4px', padding: '16px', marginBottom: '24px' }}>
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            <div style={{ flex: '2', minWidth: '200px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#666', marginBottom: '6px' }}>Cari</label>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Cari nama, NIS, atau NIP..."
+                style={{
+                  width: '100%', padding: '8px 12px', border: '1px solid #d0d0d0', borderRadius: '4px',
+                  fontSize: '13px', background: 'white', color: '#333', transition: 'all 0.3s ease'
+                }}
+                onFocus={(e) => { e.target.style.borderColor = '#1e88e5'; e.target.style.boxShadow = '0 0 0 2px rgba(30, 136, 229, 0.1)'; }}
+                onBlur={(e) => { e.target.style.borderColor = '#d0d0d0'; e.target.style.boxShadow = 'none'; }}
+              />
+            </div>
             {userRole === 'superadmin' && (
               <div style={{ flex: '1', minWidth: '160px' }}>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#666', marginBottom: '6px' }}>Role</label>
                 <select
                   value={filters.role}
                   onChange={(e) => handleFilterChange('role', e.target.value)}
-                  style={{ 
-                    width: '100%', padding: '8px 12px', border: '1px solid #d0d0d0', borderRadius: '4px', 
+                  style={{
+                    width: '100%', padding: '8px 12px', border: '1px solid #d0d0d0', borderRadius: '4px',
                     fontSize: '13px', background: 'white', color: '#333', transition: 'all 0.3s ease'
                   }}
                   onFocus={(e) => { e.target.style.borderColor = '#1e88e5'; e.target.style.boxShadow = '0 0 0 2px rgba(30, 136, 229, 0.1)'; }}
@@ -877,8 +832,8 @@ function KelolaAkun() {
                   )}
                   <td style={{ padding: '10px 12px', borderRight: '1px solid #e0e0e0', borderBottom: '1px solid #e0e0e0' }}>
                     <span style={{ 
-                      color: (user.ipc_total ?? 0) < 0 ? '#dc2626' : 'inherit',
-                      fontWeight: (user.ipc_total ?? 0) < 0 ? 'bold' : 'normal'
+                      color: (user.ipc_total ?? 0) < 0 || isBelowMinIpc(user.ipc_total ?? 0, minIpc) ? '#dc2626' : 'inherit',
+                      fontWeight: (user.ipc_total ?? 0) < 0 || isBelowMinIpc(user.ipc_total ?? 0, minIpc) ? 'bold' : 'normal'
                     }}>
                       {(user.ipc_total ?? 0) < 0 ? `${user.ipc_total ?? 0} (MINUS)` : (user.ipc_total ?? 0)}
                     </span>
@@ -964,14 +919,11 @@ function KelolaAkun() {
         {/* Bulk Actions */}
         {userRole === 'superadmin' && (
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '16px', borderTop: '1px solid #e0e0e0' }}>
-            <div style={{ fontSize: '12px', color: '#999' }}>
-              Menampilkan {filteredUsers.length} pengguna
-            </div>
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button 
+              <button
                 onClick={selectAllFiltered}
-                style={{ 
-                  padding: '6px 12px', border: '1px solid #d0d0d0', background: 'white', borderRadius: '3px', 
+                style={{
+                  padding: '6px 12px', border: '1px solid #d0d0d0', background: 'white', borderRadius: '3px',
                   fontSize: '12px', cursor: 'pointer', color: '#333'
                 }}
                 onMouseOver={(e) => { e.target.style.background = '#f5f5f5'; e.target.style.borderColor = '#bbb'; }}
@@ -981,10 +933,10 @@ function KelolaAkun() {
               </button>
               {selectedIds.length > 0 && (
                 <>
-                  <button 
+                  <button
                     onClick={handleBulkDelete}
-                    style={{ 
-                      padding: '6px 12px', border: '1px solid #d0d0d0', background: '#dc3545', borderRadius: '3px', 
+                    style={{
+                      padding: '6px 12px', border: '1px solid #d0d0d0', background: '#dc3545', borderRadius: '3px',
                       fontSize: '12px', cursor: 'pointer', color: 'white'
                     }}
                     onMouseOver={(e) => { e.target.style.background = '#c82333'; }}
@@ -992,10 +944,10 @@ function KelolaAkun() {
                   >
                     Hapus ({selectedIds.length})
                   </button>
-                  <button 
+                  <button
                     onClick={clearSelection}
-                    style={{ 
-                      padding: '6px 12px', border: '1px solid #d0d0d0', background: 'white', borderRadius: '3px', 
+                    style={{
+                      padding: '6px 12px', border: '1px solid #d0d0d0', background: 'white', borderRadius: '3px',
                       fontSize: '12px', cursor: 'pointer', color: '#333'
                     }}
                     onMouseOver={(e) => { e.target.style.background = '#f5f5f5'; e.target.style.borderColor = '#bbb'; }}
@@ -1006,8 +958,40 @@ function KelolaAkun() {
                 </>
               )}
             </div>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <button
+                onClick={() => fetchUsers(pagination.page - 1)}
+                disabled={pagination.page === 1 || loading}
+                style={{
+                  padding: '6px 12px', border: '1px solid #d0d0d0', borderRadius: '4px',
+                  fontSize: '12px', cursor: pagination.page === 1 || loading ? 'not-allowed' : 'pointer',
+                  background: pagination.page === 1 || loading ? '#f5f5f5' : 'white',
+                  color: pagination.page === 1 || loading ? '#999' : '#333'
+                }}
+              >
+                ← Sebelumnya
+              </button>
+              <span style={{ fontSize: '12px', color: '#666' }}>
+                {pagination.page} / {pagination.totalPages}
+              </span>
+              <button
+                onClick={() => fetchUsers(pagination.page + 1)}
+                disabled={pagination.page === pagination.totalPages || loading}
+                style={{
+                  padding: '6px 12px', border: '1px solid #d0d0d0', borderRadius: '4px',
+                  fontSize: '12px', cursor: pagination.page === pagination.totalPages || loading ? 'not-allowed' : 'pointer',
+                  background: pagination.page === pagination.totalPages || loading ? '#f5f5f5' : 'white',
+                  color: pagination.page === pagination.totalPages || loading ? '#999' : '#333'
+                }}
+              >
+                Selanjutnya →
+              </button>
+            </div>
           </div>
         )}
+        <div style={{ fontSize: '12px', color: '#999', marginTop: '8px' }}>
+          Menampilkan {users.length} dari {pagination.total} pengguna (Halaman {pagination.page} dari {pagination.totalPages})
+        </div>
         {userRole === 'superadmin' && selectionRole && (
           <p style={{ fontSize: '13px', color: '#666', marginTop: '12px' }}>
             Mode pilihan: <strong>{selectionRole === 'siswa' ? 'Siswa' : 'Guru'}</strong> — hanya role yang sama yang bisa dipilih.
@@ -1252,7 +1236,7 @@ function KelolaAkun() {
                   </div>
                 ) : (
                   <div>
-                    <strong>Format Guru:</strong> nama, nip, jabatan (Guru/Pegawai/Staff), no_hp, password
+                    <strong>Format Guru:</strong> nama, nip, jabatan (Guru/Pegawai), no_hp, password
                   </div>
                 )}
               </div>
@@ -1309,97 +1293,6 @@ function KelolaAkun() {
                     ))}
                   </tbody>
                 </table>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Class Validation Modal */}
-      {showClassValidationModal && validationResults && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000
-        }}>
-          <div className="card" style={{ width: 800, maxWidth: '90%', maxHeight: '90vh', overflowY: 'auto' }}>
-            <h3>Validasi Kelas</h3>
-            <button className="btn btn-danger" onClick={() => { setShowClassValidationModal(false); setValidationResults(null); }} style={{ marginBottom: '10px' }}>Tutup</button>
-
-            <div style={{ marginBottom: '20px' }}>
-              <div style={{ display: 'flex', gap: '20px', marginBottom: '15px' }}>
-                <div style={{ flex: 1, padding: '10px', backgroundColor: '#d4edda', borderRadius: '4px' }}>
-                  <strong>Total Siswa:</strong> {validationResults.totalStudents}
-                </div>
-                <div style={{ flex: 1, padding: '10px', backgroundColor: '#d4edda', borderRadius: '4px' }}>
-                  <strong>Valid:</strong> {validationResults.validCount}
-                </div>
-                <div style={{ flex: 1, padding: '10px', backgroundColor: validationResults.discrepancyCount > 0 ? '#f8d7da' : '#d4edda', borderRadius: '4px' }}>
-                  <strong>Discrepancies:</strong> {validationResults.discrepancyCount}
-                </div>
-              </div>
-
-              {validationResults.discrepancyCount > 0 && (
-                <div style={{ marginBottom: '15px' }}>
-                  <button 
-                    className="btn btn-info" 
-                    onClick={() => handleFixDiscrepancies(true)}
-                    style={{ marginRight: '10px' }}
-                  >
-                    Preview Perbaikan
-                  </button>
-                  <button 
-                    className="btn btn-success" 
-                    onClick={() => handleFixDiscrepancies(false)}
-                  >
-                    Perbaiki Sekarang
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {validationResults.discrepancies.length > 0 ? (
-              <div>
-                <h4>Discrepancies ({validationResults.discrepancies.length})</h4>
-                <div style={{ maxHeight: '400px', overflowY: 'auto', border: '1px solid #ddd', borderRadius: '4px' }}>
-                  <table className="table" style={{ fontSize: '12px' }}>
-                    <thead>
-                      <tr>
-                        <th>Nama</th>
-                        <th>NIS</th>
-                        <th>Tipe</th>
-                        <th>Expected</th>
-                        <th>Actual</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {validationResults.discrepancies.map((discrepancy, index) => (
-                        <tr key={index}>
-                          <td>{discrepancy.nama}</td>
-                          <td>{discrepancy.nis}</td>
-                          <td>
-                            <span className={`badge badge-${discrepancy.discrepancyType === 'graduation_status' ? 'danger' : 'warning'}`}>
-                              {discrepancy.discrepancyType === 'graduation_status' ? 'Graduation' : 'Class'}
-                            </span>
-                          </td>
-                          <td>{discrepancy.expectedValue}</td>
-                          <td>{discrepancy.actualValue}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            ) : (
-              <div style={{ padding: '20px', backgroundColor: '#d4edda', borderRadius: '4px', textAlign: 'center' }}>
-                <strong>✅ Semua kelas valid!</strong>
               </div>
             )}
           </div>
@@ -1490,6 +1383,9 @@ function KelolaAkun() {
                     <label>Jabatan</label>
                     <select value={formData.jabatan || ''} onChange={(e) => setFormData({...formData, jabatan: e.target.value})} required>
                       <option value="">Pilih Jabatan</option>
+                      {!JABATAN_OPTIONS.includes(formData.jabatan) && formData.jabatan ? (
+                        <option value={formData.jabatan}>{formData.jabatan} (lama)</option>
+                      ) : null}
                       {JABATAN_OPTIONS.map((jabatan) => (
                         <option key={jabatan} value={jabatan}>{jabatan}</option>
                       ))}

@@ -1,29 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import api from '../utils/api';
 import ExcelJS from 'exceljs';
+import { createIndividualIpcExcelBuffer, fetchKopImage } from '../utils/ipcExcel';
+import { fetchMinIpc, isBelowMinIpc } from '../utils/minIpc';
 import '../ipcPrint.css';
 
 // ------------------------------------------------------------------
 // KONFIGURASI WARNA
 // ------------------------------------------------------------------
-const COLORS = {
-  headerPrestasi: [255, 242, 204], // kuning muda
-  headerKarakter: [198, 224, 180], // hijau muda
-  headerKeaktifan: [248, 203, 173], // oranye muda
-  headerPelanggaran: [244, 199, 195], // pink muda
-  headerTotal: [189, 215, 238], // biru muda
-
-  cellJumlahPrestasi: [255, 242, 0], // kuning tegas
-  cellJumlahKarakter: [169, 208, 142], // hijau tegas
-  cellJumlahKeaktifan: [244, 176, 132], // oranye tegas
-  cellJumlahPelanggaran: [255, 199, 206], // pink tegas
-
-  textNegative: [192, 0, 0], // merah untuk nilai negatif
-  borderGray: [180, 180, 180],
-};
-
 // Warna untuk ExcelJS (format ARGB)
 const EXCEL_COLORS = {
   prestasi: "FFFFF2CC",
@@ -72,12 +56,14 @@ function hitungTotal(s) {
   const pelanggaranRingan = Number(s.pelanggaran_ringan) || 0;
   const pelanggaranSedang = Number(s.pelanggaran_sedang) || 0;
   const pelanggaranBerat = Number(s.pelanggaran_berat) || 0;
+  const pelanggaranLainnya = Number(s.pelanggaran_lainnya) || 0;
   
   const totalPrestasi = prestasiAkademik + prestasiNonakademik;
   const totalKarakter = tanggungJawab + disiplin + kepedulian + kemandirian + spiritual + kejujuran + kepercayaanDiri;
   const totalKeaktifan = organisasi + kepanitiaan + event;
-  const totalPelanggaran = pelanggaranRingan + pelanggaranSedang + pelanggaranBerat;
+  const totalPelanggaran = pelanggaranRingan + pelanggaranSedang + pelanggaranBerat + pelanggaranLainnya;
   
+  // Pelanggaran bernilai negatif (pengurangan) -> cukup dijumlahkan.
   const ipcTotal = ipcAwal + totalPrestasi + totalKarakter + totalKeaktifan + totalPelanggaran;
   
   return {
@@ -142,10 +128,10 @@ function buildRowValues(s) {
     nis: s.nis,
     kelas: s.kelas,
     ghra: s.ghra || "-",
-    pointAwal: t.pointAwal, // Added point awal
+    pointAwal: t.ipcAwal, // ipc_awal siswa
     prestasi_akademik: Number(s.prestasi_akademik) ?? 0,
     prestasi_nonakademik: Number(s.prestasi_nonakademik) ?? 0,
-    jumlahPrestasi: t.jumlahPrestasi,
+    jumlahPrestasi: t.totalPrestasi,
     tanggung_jawab: Number(s.tanggung_jawab) ?? 0,
     disiplin: Number(s.disiplin) ?? 0,
     kepedulian: Number(s.kepedulian) ?? 0,
@@ -153,48 +139,18 @@ function buildRowValues(s) {
     spiritual: Number(s.spiritual) ?? 0,
     kejujuran: Number(s.kejujuran) ?? 0,
     kepercayaan_diri: Number(s.kepercayaan_diri) ?? 0,
-    jumlahKarakter: t.jumlahKarakter,
+    jumlahKarakter: t.totalKarakter,
     organisasi: Number(s.organisasi) ?? 0,
     kepanitiaan: Number(s.kepanitiaan) ?? 0,
     event: Number(s.event) ?? 0,
-    jumlahKeaktifan: t.jumlahKeaktifan,
+    jumlahKeaktifan: t.totalKeaktifan,
     pelanggaran_ringan: Number(s.pelanggaran_ringan) ?? 0,
     pelanggaran_sedang: Number(s.pelanggaran_sedang) ?? 0,
     pelanggaran_berat: Number(s.pelanggaran_berat) ?? 0,
-    jumlahPelanggaran: t.jumlahPelanggaran,
-    totalIPC: t.totalIPC,
+    jumlahPelanggaran: t.totalPelanggaran,
+    totalIPC: t.ipcTotal,
   };
 }
-
-// Index kolom body (0-based)
-const COL = {
-  NO: 0,
-  NAMA: 1,
-  NIS: 2,
-  KELAS: 3,
-  GHRA: 4,
-  POINT_AWAL: 5, // Added point awal
-  PRESTASI_AKADEMIK: 6,
-  PRESTASI_NONAKADEMIK: 7,
-  PRESTASI_JUMLAH: 8,
-  KARAKTER_TJ: 9,
-  KARAKTER_DISIPLIN: 10,
-  KARAKTER_PEDULI: 11,
-  KARAKTER_KEMANDIRIAN: 12, // Added kemandirian
-  KARAKTER_SPIRITUAL: 13,
-  KARAKTER_JUJUR: 14,
-  KARAKTER_PD: 15,
-  KARAKTER_JUMLAH: 16,
-  KEAKTIFAN_ORGANISASI: 17,
-  KEAKTIFAN_KEPANITIAAN: 18,
-  KEAKTIFAN_EVENT: 19,
-  KEAKTIFAN_JUMLAH: 20,
-  PELANGGARAN_RINGAN: 21,
-  PELANGGARAN_SEDANG: 22,
-  PELANGGARAN_BERAT: 23,
-  PELANGGARAN_JUMLAH: 24,
-  TOTAL_IPC: 25,
-};
 
 function LaporanCetak({ user }) {
   const [students, setStudents] = useState([]);
@@ -202,14 +158,20 @@ function LaporanCetak({ user }) {
   const [selectedClass, setSelectedClass] = useState('');
   const [classes, setClasses] = useState([]);
   const [selectedStudentId, setSelectedStudentId] = useState('');
-  const [ipcLoading, setIpcLoading] = useState(false);
-  const [pdfPreviewUrl, setPdfPreviewUrl] = useState(null);
+  const [excelLoading, setExcelLoading] = useState(false);
   const [reportType, setReportType] = useState('individual'); // 'individual' or 'class'
   const [classStudents, setClassStudents] = useState([]);
   const [isWaliKelas, setIsWaliKelas] = useState(false);
   const [waliKelasInfo, setWaliKelasInfo] = useState(null);
-  const [excelLoading, setExcelLoading] = useState(false);
   const [schoolConfig, setSchoolConfig] = useState(null);
+  // Semester & tahun pelajaran untuk cetakan IPC individual
+  const currentYear = new Date().getFullYear();
+  const [semester, setSemester] = useState('Ganjil');
+  const [tahunPelajaran, setTahunPelajaran] = useState(`${currentYear}/${currentYear + 1}`);
+  const tahunOptions = [];
+  for (let y = currentYear - 5; y <= currentYear + 1; y++) {
+    tahunOptions.push(`${y}/${y + 1}`);
+  }
   
   useEffect(() => {
     checkWaliKelasStatus();
@@ -221,10 +183,7 @@ function LaporanCetak({ user }) {
   const checkWaliKelasStatus = async () => {
     if (user?.role === 'guru') {
       try {
-        const token = localStorage.getItem('token');
-        const response = await axios.get('/wali-kelas/my-class', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        const response = await api.get('/wali-kelas/my-class');
         setIsWaliKelas(true);
         setWaliKelasInfo(response.data);
         setSelectedClass(response.data.kelas);
@@ -236,12 +195,10 @@ function LaporanCetak({ user }) {
 
   useEffect(() => {
     setSelectedStudentId('');
-    setPdfPreviewUrl(null);
     setClassStudents([]);
   }, [selectedClass]);
 
   useEffect(() => {
-    setPdfPreviewUrl(null);
     if (selectedClass && reportType === 'class') {
       fetchClassStudents();
     }
@@ -250,21 +207,16 @@ function LaporanCetak({ user }) {
 
   const fetchStudents = async () => {
     try {
-      const token = localStorage.getItem('token');
       let response;
       
       if (isWaliKelas && waliKelasInfo) {
         // For wali kelas, fetch only their class students
-        response = await axios.get(`/reports/class-ipc/${waliKelasInfo.kelas}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        response = await api.get(`/reports/class-ipc/${waliKelasInfo.kelas}`);
         setStudents(response.data);
         setClasses([waliKelasInfo.kelas]); // Only show their class
       } else {
         // For superadmin, fetch all students
-        response = await axios.get('/reports/students', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        response = await api.get('/reports/students');
         setStudents(response.data);
 
         // Get unique classes from calculated classes
@@ -284,19 +236,17 @@ function LaporanCetak({ user }) {
   };
 
   const fetchIpcCard = async (userId) => {
-    const token = localStorage.getItem('token');
-    const response = await axios.get(`/reports/ipc-card/${userId}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
+    // Teruskan semester & tahun pelajaran agar breakdown (dan total) hanya
+    // mencakup point sampai periode terpilih (cutoff di backend).
+    const response = await api.get(
+      `/reports/ipc-card/${userId}?semester=${encodeURIComponent(semester)}&tahun_pelajaran=${encodeURIComponent(tahunPelajaran)}`
+    );
     return response.data;
   };
 
   const fetchClassStudents = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`/reports/class-ipc/${selectedClass}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get(`/reports/class-ipc/${selectedClass}`);
       setClassStudents(response.data);
     } catch (error) {
       console.error('Error fetching class students:', error);
@@ -305,10 +255,7 @@ function LaporanCetak({ user }) {
 
   const fetchSchoolConfig = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/school-config', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/school-config');
       setSchoolConfig(response.data);
     } catch (error) {
       console.error('Error fetching school config:', error);
@@ -323,317 +270,6 @@ function LaporanCetak({ user }) {
     }
   };
 
-  const generateClassReportPdf = async (students) => {
-    try {
-      // Refresh school config to get latest data
-      await fetchSchoolConfig();
-
-      const doc = new jsPDF({
-        orientation: 'landscape',
-        unit: 'mm',
-        format: 'a4'
-      });
-
-      // Fetch wali kelas data for this class
-      let waliKelasData = { nama: 'Wali Kelas Belum Ditentukan', nip: '' };
-      try {
-        const token = localStorage.getItem('token');
-        const response = await axios.get(`/wali-kelas/class/${selectedClass}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-         if (response.data && response.data.nama) {
-          waliKelasData = response.data;
-        }
-      } catch (error) {
-        console.error('Could not fetch wali kelas data:', error);
-      }
-
-      // Header Image
-      try {
-        const headerImg = '/header.png';
-        doc.addImage(headerImg, 'PNG', 20, 10, doc.internal.pageSize.getWidth() - 40, 40);
-      } catch (e) {
-        console.log('Header image not found, using text fallback');
-        doc.setFontSize(12);
-        doc.setFont('helvetica', 'bold');
-        doc.text('SMK NEGERI BALI MANDARA', doc.internal.pageSize.getWidth() / 2, 16, { align: 'center' });
-      }
-
-      // Title
-      doc.setFontSize(12);
-      doc.setFont('times', 'bold');
-      doc.text('LAPORAN IPC PER KELAS', doc.internal.pageSize.getWidth() / 2, 55, { align: 'center' });
-      doc.text('SMK NEGERI BALI MANDARA', doc.internal.pageSize.getWidth() / 2, 60, { align: 'center' });
-      doc.text(`TAHUN PELAJARAN ${new Date().getFullYear()}/${new Date().getFullYear() + 1}`, doc.internal.pageSize.getWidth() / 2, 65, { align: 'center' });
-
-      // Class info
-      doc.setFontSize(10);
-      doc.setFont('times', 'bold');
-      doc.text(`Kelas: ${selectedClass}`, 20, 75);
-
-      let y = 78;
-
-      // Prepare table data with full breakdown and subtotals
-      const tableData = students.map((student, index) => {
-        const points = student.points || {};
-        const pointAwalNum = Number(points.point_awal || student.ipc_awal) || 80;
-
-        // Calculate subtotals - MUST MATCH BACKEND CALCULATION
-        // Use Number() to ensure type consistency (handle string/null from API)
-        const prestasiTotal = (Number(points.prestasi_akademik) || 0) + (Number(points.prestasi_nonakademik) || 0);
-        const karakterTotal = (Number(points.tanggung_jawab) || 0) + (Number(points.disiplin) || 0) + (Number(points.kepedulian) || 0) +
-                             (Number(points.kemandirian) || 0) + // Added kemandirian
-                             (Number(points.spiritual) || 0) + (Number(points.kejujuran) || 0) + (Number(points.kepercayaan_diri) || 0);
-        const keaktifanTotal = (Number(points.organisasi) || 0) + (Number(points.kepanitiaan) || 0) + (Number(points.event) || 0);
-        const pelanggaranTotal = (Number(points.pelanggaran_ringan) || 0) + (Number(points.pelanggaran_sedang) || 0) + (Number(points.pelanggaran_berat) || 0);
-
-        // Calculate total to ensure consistency
-        const calculatedTotal = pointAwalNum + prestasiTotal + karakterTotal + keaktifanTotal - pelanggaranTotal;
-
-        
-        // Use object first to ensure correct order, then convert to array
-        // Order MUST match COLUMN_DEFS exactly for proper column mapping
-        const row = {
-          no: index + 1,
-          nama: student.nama || '-',
-          nis: student.nis || '-',
-          kelas: student.kelas || '-',
-          ghra: student.grha || '-',
-          pointAwal: pointAwalNum,
-          prestasi_akademik: Number(points.prestasi_akademik) || 0,
-          prestasi_nonakademik: Number(points.prestasi_nonakademik) || 0,
-          jumlahPrestasi: prestasiTotal,
-          tanggung_jawab: Number(points.tanggung_jawab) || 0,
-          disiplin: Number(points.disiplin) || 0,
-          kepedulian: Number(points.kepedulian) || 0,
-          kemandirian: Number(points.kemandirian) || 0,
-          spiritual: Number(points.spiritual) || 0,
-          kejujuran: Number(points.kejujuran) || 0,
-          kepercayaan_diri: Number(points.kepercayaan_diri) || 0,
-          jumlahKarakter: karakterTotal,
-          organisasi: Number(points.organisasi) || 0,
-          kepanitiaan: Number(points.kepanitiaan) || 0,
-          event: Number(points.event) || 0,
-          jumlahKeaktifan: keaktifanTotal,
-          pelanggaran_ringan: Number(points.pelanggaran_ringan) || 0,
-          pelanggaran_sedang: Number(points.pelanggaran_sedang) || 0,
-          pelanggaran_berat: Number(points.pelanggaran_berat) || 0,
-          jumlahPelanggaran: pelanggaranTotal,
-          totalIPC: calculatedTotal < 0 ? `${calculatedTotal} (MINUS)` : calculatedTotal,
-        };
-
-        // Debug: verify object has exactly 26 properties
-        if (Object.keys(row).length !== 26) {
-          console.error('ERROR: Row object has wrong number of properties:', Object.keys(row).length, 'expected 26');
-          console.error('Row keys:', Object.keys(row));
-        }
-
-        // Convert to array using explicit key order to match COLUMN_DEFS
-        const columnOrder = [
-          'no', 'nama', 'nis', 'kelas', 'ghra', 'pointAwal',
-          'prestasi_akademik', 'prestasi_nonakademik', 'jumlahPrestasi',
-          'tanggung_jawab', 'disiplin', 'kepedulian', 'kemandirian', 'spiritual', 'kejujuran', 'kepercayaan_diri', 'jumlahKarakter',
-          'organisasi', 'kepanitiaan', 'event', 'jumlahKeaktifan',
-          'pelanggaran_ringan', 'pelanggaran_sedang', 'pelanggaran_berat', 'jumlahPelanggaran',
-          'totalIPC'
-        ];
-
-        return columnOrder.map(key => row[key]);
-      });
-
-      // Create merged header structure
-      const headerRow1 = [
-        { content: 'NO', rowSpan: 2, styles: { valign: 'middle', halign: 'center' } },
-        { content: 'NAMA SISWA', rowSpan: 2, styles: { valign: 'middle', halign: 'left' } },
-        { content: 'NIS', rowSpan: 2, styles: { valign: 'middle', halign: 'center' } },
-        { content: 'KELAS', rowSpan: 2, styles: { valign: 'middle', halign: 'center' } },
-        { content: 'GHRA', rowSpan: 2, styles: { valign: 'middle', halign: 'center' } },
-        { content: 'Point\nAwal', rowSpan: 2, styles: { valign: 'middle', halign: 'center', fillColor: COLORS.headerTotal } }, // Added point awal with line break
-        { content: 'Prestasi', colSpan: 3, styles: { halign: 'center', fillColor: COLORS.headerPrestasi } },
-        { content: 'Perkembangan\nKarakter', colSpan: 8, styles: { halign: 'center', fillColor: COLORS.headerKarakter } },
-        { content: 'Keaktifan', colSpan: 4, styles: { halign: 'center', fillColor: COLORS.headerKeaktifan } },
-        { content: 'Pelanggaran', colSpan: 4, styles: { halign: 'center', fillColor: COLORS.headerPelanggaran } },
-        { content: 'Total\nIPC', rowSpan: 2, styles: { valign: 'middle', halign: 'center', fillColor: COLORS.headerTotal } },
-      ];
-
-      const headerRow2 = [
-        { content: 'Akademik', styles: { fillColor: COLORS.headerPrestasi, halign: 'center', valign: 'middle' } },
-        { content: 'Non-Akademik', styles: { fillColor: COLORS.headerPrestasi, halign: 'center', valign: 'middle' } },
-        { content: 'Jumlah', styles: { fillColor: COLORS.headerPrestasi, halign: 'center', valign: 'middle' } },
-
-        { content: 'Tg. Jawab', styles: { fillColor: COLORS.headerKarakter, halign: 'center', valign: 'middle' } },
-        { content: 'Disiplin', styles: { fillColor: COLORS.headerKarakter, halign: 'center', valign: 'middle' } },
-        { content: 'Peduli', styles: { fillColor: COLORS.headerKarakter, halign: 'center', valign: 'middle' } },
-        { content: 'Mandiri', styles: { fillColor: COLORS.headerKarakter, halign: 'center', valign: 'middle' } },
-        { content: 'Spiritual', styles: { fillColor: COLORS.headerKarakter, halign: 'center', valign: 'middle' } },
-        { content: 'Jujur', styles: { fillColor: COLORS.headerKarakter, halign: 'center', valign: 'middle' } },
-        { content: 'P. Diri', styles: { fillColor: COLORS.headerKarakter, halign: 'center', valign: 'middle' } },
-        { content: 'Jumlah', styles: { fillColor: COLORS.headerKarakter, halign: 'center', valign: 'middle' } },
-
-        { content: 'Org.', styles: { fillColor: COLORS.headerKeaktifan, halign: 'center', valign: 'middle' } },
-        { content: 'Panitia', styles: { fillColor: COLORS.headerKeaktifan, halign: 'center', valign: 'middle' } },
-        { content: 'Event', styles: { fillColor: COLORS.headerKeaktifan, halign: 'center', valign: 'middle' } },
-        { content: 'Jumlah', styles: { fillColor: COLORS.headerKeaktifan, halign: 'center', valign: 'middle' } },
-
-        { content: 'Ringan', styles: { fillColor: COLORS.headerPelanggaran, halign: 'center', valign: 'middle' } },
-        { content: 'Sedang', styles: { fillColor: COLORS.headerPelanggaran, halign: 'center', valign: 'middle' } },
-        { content: 'Berat', styles: { fillColor: COLORS.headerPelanggaran, halign: 'center', valign: 'middle' } },
-        { content: 'Jumlah', styles: { fillColor: COLORS.headerPelanggaran, halign: 'center', valign: 'middle' } },
-      ];
-
-      // Calculate dynamic margin to center table horizontally
-      const columnStyles = {
-        [COL.NO]: { cellWidth: 6 },
-        [COL.NAMA]: { cellWidth: 22, halign: 'left', fontSize: 6 },
-        [COL.NIS]: { cellWidth: 10 },
-        [COL.KELAS]: { cellWidth: 9 },
-        [COL.GHRA]: { cellWidth: 6 },
-        [COL.POINT_AWAL]: { cellWidth: 9 },
-        [COL.PRESTASI_AKADEMIK]: { cellWidth: 9 },
-        [COL.PRESTASI_NONAKADEMIK]: { cellWidth: 13 },
-        [COL.PRESTASI_JUMLAH]: { cellWidth: 8 },
-        [COL.KARAKTER_TJ]: { cellWidth: 9 },
-        [COL.KARAKTER_DISIPLIN]: { cellWidth: 9 },
-        [COL.KARAKTER_PEDULI]: { cellWidth: 9 },
-        [COL.KARAKTER_KEMANDIRIAN]: { cellWidth: 9 },
-        [COL.KARAKTER_SPIRITUAL]: { cellWidth: 9 },
-        [COL.KARAKTER_JUJUR]: { cellWidth: 7 },
-        [COL.KARAKTER_PD]: { cellWidth: 8 },
-        [COL.KARAKTER_JUMLAH]: { cellWidth: 8 },
-        [COL.KEAKTIFAN_ORGANISASI]: { cellWidth: 8 },
-        [COL.KEAKTIFAN_KEPANITIAAN]: { cellWidth: 9 },
-        [COL.KEAKTIFAN_EVENT]: { cellWidth: 7 },
-        [COL.KEAKTIFAN_JUMLAH]: { cellWidth: 8 },
-        [COL.PELANGGARAN_RINGAN]: { cellWidth: 9 },
-        [COL.PELANGGARAN_SEDANG]: { cellWidth: 9 },
-        [COL.PELANGGARAN_BERAT]: { cellWidth: 7 },
-        [COL.PELANGGARAN_JUMLAH]: { cellWidth: 8 },
-        [COL.TOTAL_IPC]: { cellWidth: 10 },
-      };
-
-      const totalTableWidth = Object.values(columnStyles).reduce((sum, c) => sum + c.cellWidth, 0);
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const marginX = Math.max(10, (pageWidth - totalTableWidth) / 2);
-
-      // Add table with merged headers
-      autoTable(doc, {
-        startY: y,
-        head: [headerRow1, headerRow2],
-        body: tableData,
-        theme: 'grid',
-        tableWidth: 'auto',
-        showHead: 'everyPage',
-        rowPageBreak: 'avoid',
-        styles: {
-          font: 'helvetica',
-          fontSize: 6,
-          cellPadding: 0.8,
-          halign: 'center',
-          valign: 'middle',
-          lineColor: COLORS.borderGray,
-          lineWidth: 0.1,
-          overflow: 'linebreak',
-          minCellHeight: 6.5,
-        },
-        headStyles: {
-          fontStyle: 'bold',
-          fontSize: 6.5,
-          fillColor: [230, 230, 230],
-          textColor: [0, 0, 0],
-          minCellHeight: 18,
-          valign: 'middle',
-          cellPadding: 0.6,
-          overflow: 'linebreak',
-        },
-        columnStyles,
-        margin: { left: marginX, right: marginX, top: 10, bottom: 20 },
-        didParseCell: (data) => {
-          if (data.section !== 'body') return;
-          const col = data.column.index;
-          const raw = data.cell.raw;
-
-          if (col === COL.PRESTASI_JUMLAH) {
-            data.cell.styles.fillColor = COLORS.cellJumlahPrestasi;
-            data.cell.styles.fontStyle = 'bold';
-          }
-          if (col === COL.KARAKTER_JUMLAH) {
-            data.cell.styles.fillColor = COLORS.cellJumlahKarakter;
-            data.cell.styles.fontStyle = 'bold';
-          }
-          if (col === COL.KEAKTIFAN_JUMLAH) {
-            data.cell.styles.fillColor = COLORS.cellJumlahKeaktifan;
-            data.cell.styles.fontStyle = 'bold';
-          }
-          if (col === COL.PELANGGARAN_JUMLAH) {
-            data.cell.styles.fillColor = COLORS.cellJumlahPelanggaran;
-            data.cell.styles.fontStyle = 'bold';
-          }
-          if (col === COL.TOTAL_IPC) {
-            data.cell.styles.fillColor = COLORS.headerTotal;
-            data.cell.styles.fontStyle = 'bold';
-          }
-
-          // Nilai negatif ditampilkan merah
-          if (typeof raw === 'number' && raw < 0) {
-            data.cell.styles.textColor = COLORS.textNegative;
-          }
-          // Handle string negative values
-          if (typeof raw === 'string' && raw.includes('MINUS')) {
-            data.cell.styles.textColor = COLORS.textNegative;
-          }
-        },
-      });
-
-      // Add footnote for abbreviations
-      const noteY = doc.lastAutoTable.finalY + 4;
-      doc.setFont('times', 'italic');
-      doc.setFontSize(7);
-      doc.text(
-        'Ket: T. Jawab = Tanggung Jawab, Peduli = Kepedulian, P. Diri = Kepercayaan Diri, Panitia = Kepanitiaan',
-        marginX,
-        noteY
-      );
-
-      // Signatures
-      const finalY = doc.lastAutoTable.finalY + 20;
-      const leftX = 20;
-      const rightX = doc.internal.pageSize.getWidth() - 90;
-
-      const formatDate = () => {
-        const options = { day: 'numeric', month: 'long', year: 'numeric' };
-        return new Date().toLocaleDateString('id-ID', options);
-      };
-
-      doc.setFont('times', 'normal');
-      doc.setFontSize(10);
-      doc.text('Mengetahui,', leftX, finalY);
-      doc.text(`Kubutambahan, ${formatDate()}`, rightX, finalY);
-
-      doc.setFont('times', 'bold');
-      const schoolName = schoolConfig?.school_name || 'SMK Negeri Bali Mandara';
-      doc.text(`Kepala ${schoolName.replace('SMK Negeri', 'SMKN')}`, leftX, finalY + 5);
-      doc.text('Wali Kelas', rightX, finalY + 5);
-
-      // Ruang tanda tangan
-      const ttdY = finalY + 22;
-      doc.setFont('times', 'bold');
-      doc.text(schoolConfig?.principal_name || '', leftX, ttdY);
-      doc.text(waliKelasData.nama || 'Wali Kelas Belum Ditentukan', rightX, ttdY);
-
-      doc.setFont('times', 'normal');
-      doc.setFontSize(9);
-      doc.text(schoolConfig?.principal_nip ? `NIP. ${schoolConfig.principal_nip}` : '', leftX, ttdY + 5);
-      if (waliKelasData.nip) {
-        doc.text(`NIP. ${waliKelasData.nip}`, rightX, ttdY + 5);
-      }
-
-      return doc.output('blob');
-    } catch (e) {
-      console.error('Error generating class report PDF:', e);
-      return null;
-    }
-  };
-
   const generateExcelBlob = async () => {
     // Refresh school config to get latest data
     await fetchSchoolConfig();
@@ -644,6 +280,7 @@ function LaporanCetak({ user }) {
     } else if (reportType === 'class') {
       // For class report, generate Excel with leger format using ExcelJS
       try {
+        const minIpc = await fetchMinIpc();
         // Prepare student data in the format expected by the Excel generator
         const formattedStudents = classStudents.map((student, index) => {
           const points = student.points || {};
@@ -669,6 +306,8 @@ function LaporanCetak({ user }) {
             pelanggaran_ringan: Number(points.pelanggaran_ringan) || 0,
             pelanggaran_sedang: Number(points.pelanggaran_sedang) || 0,
             pelanggaran_berat: Number(points.pelanggaran_berat) || 0,
+            pelanggaran_lainnya: Number(points.pelanggaran_lainnya) || 0,
+            ipc_awal: Number(points.point_awal) || Number(student.ipc_awal) || 80,
           };
         });
 
@@ -781,12 +420,13 @@ function LaporanCetak({ user }) {
             cell.value = values[def.key];
 
             const isNegative = typeof values[def.key] === "number" && values[def.key] < 0;
+            const isBelowMin = def.key === "totalIPC" && isBelowMinIpc(values[def.key], minIpc);
 
             styleCell(cell, {
               fill: def.jumlahFill ? EXCEL_COLORS[def.jumlahFill] : undefined,
               bold: !!def.jumlahFill,
               align: def.align || "center",
-              color: isNegative ? "FFC00000" : undefined,
+              color: isNegative || isBelowMin ? "FFC00000" : undefined,
             });
           });
         });
@@ -805,298 +445,51 @@ function LaporanCetak({ user }) {
     return null;
   };
 
-  // eslint-disable-next-line no-unused-vars
-  const generatePdfBlob = async () => {
-    // Refresh school config to get latest data
-    await fetchSchoolConfig();
-
-    let data = [];
-
-    if (reportType === 'individual') {
-      // If no data yet but a student is selected, fetch it
-      if (data.length === 0 && selectedStudentId) {
-        try {
-          const studentData = await fetchIpcCard(selectedStudentId);
-          data = [studentData];
-        } catch (error) {
-          console.error('Error fetching IPC card:', error);
-          return null;
-        }
-      }
-    } else if (reportType === 'class') {
-      // For class report, use the class students data
-      data = classStudents;
-    }
-
-    if (data.length === 0) {
-      return null;
-    }
-
-    // For class report, generate different PDF format
-    if (reportType === 'class') {
-      return generateClassReportPdf(data);
-    }
-
+  // Config sekolah terbaru untuk kop Excel (jangan pakai state yg bisa basi)
+  const getFreshSchoolConfig = async () => {
     try {
-      // Create jsPDF instance with selected options
-      const doc = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4'
+      const res = await api.get('/school-config');
+      return res.data;
+    } catch {
+      return schoolConfig || {};
+    }
+  };
+
+  // Download Excel Individual Point Card (layout Raport IPC resmi sekolah)
+  const handleDownloadIndividualExcel = async () => {
+    if (!selectedStudentId) {
+      alert('Pilih siswa terlebih dahulu');
+      return;
+    }
+    try {
+      setExcelLoading(true);
+      const cardData = await fetchIpcCard(selectedStudentId);
+      const school = await getFreshSchoolConfig();
+      const kopImage = await fetchKopImage(['/header.png']);
+      const minIpc = await fetchMinIpc();
+      const buffer = await createIndividualIpcExcelBuffer({
+        student: cardData.student,
+        wali: cardData.wali,
+        points: cardData.points,
+        ipcTotal: cardData.ipc_total,
+        school,
+        semester,
+        tahunPelajaran,
+        kopImage,
+        minIpc,
       });
-      
-      // Add content for each student
-      
-      data.forEach((cardData, index) => {
-        if (index > 0) {
-          doc.addPage();
-        }
-
-        const { student, wali, points, ipc_total } = cardData;
-        const breakdown = points || {
-          point_awal: student?.ipc_awal ?? 80,
-          prestasi_akademik: 0,
-          prestasi_nonakademik: 0,
-          tanggung_jawab: 0,
-          disiplin: 0,
-          kepedulian: 0,
-          kemandirian: 0,
-          spiritual: 0,
-          kejujuran: 0,
-          kepercayaan_diri: 0,
-          organisasi: 0,
-          kepanitiaan: 0,
-          event: 0,
-          pelanggaran_ringan: 0,
-          pelanggaran_sedang: 0,
-          pelanggaran_berat: 0
-        };
-
-        // Calculate total from breakdown to ensure synchronization
-        const calculateTotalFromBreakdown = (breakdown) => {
-          let total = Number(breakdown.point_awal) || 80;
-          total += Number(breakdown.prestasi_akademik) || 0;
-          total += Number(breakdown.prestasi_nonakademik) || 0;
-          total += Number(breakdown.tanggung_jawab) || 0;
-          total += Number(breakdown.disiplin) || 0;
-          total += Number(breakdown.kepedulian) || 0;
-          total += Number(breakdown.kemandirian) || 0;
-          total += Number(breakdown.spiritual) || 0;
-          total += Number(breakdown.kejujuran) || 0;
-          total += Number(breakdown.kepercayaan_diri) || 0;
-          total += Number(breakdown.organisasi) || 0;
-          total += Number(breakdown.kepanitiaan) || 0;
-          total += Number(breakdown.event) || 0;
-          total -= Number(breakdown.pelanggaran_ringan) || 0;
-          total -= Number(breakdown.pelanggaran_sedang) || 0;
-          total -= Number(breakdown.pelanggaran_berat) || 0;
-          return total;
-        };
-
-        const total = ipc_total ?? student?.ipc_total ?? calculateTotalFromBreakdown(breakdown);
-
-        // Format total with negative indicator
-        const formatTotal = (value) => {
-          if (value < 0) {
-            return `${value} (MINUS)`;
-          }
-          return value;
-        };
-
-        // Header Image
-        try {
-          const headerImg = '/header.png';
-          doc.addImage(headerImg, 'PNG', 20, 10, doc.internal.pageSize.getWidth() - 40, 40);
-        } catch (e) {
-          console.log('Header image not found, using text fallback');
-          // Fallback to text if image fails
-          doc.setFontSize(12);
-          doc.setFont('helvetica', 'bold');
-          doc.text('SMK NEGERI BALI MANDARA', doc.internal.pageSize.getWidth() / 2, 16, { align: 'center' });
-        }
-        
-        // Title
-        doc.setFontSize(10);
-        doc.setFont('times', 'bold');
-        doc.text('INDIVIDUAL POINT CARD', doc.internal.pageSize.getWidth() / 2, 55, { align: 'center' });
-        doc.text('SMK NEGERI BALI MANDARA', doc.internal.pageSize.getWidth() / 2, 60, { align: 'center' }); 
-        doc.text(`TAHUN PELAJARAN ${new Date().getFullYear()}/${new Date().getFullYear() + 1}`, doc.internal.pageSize.getWidth() / 2, 65, { align: 'center' });
-
-        // Student Info
-        let yPos = 70;
-        doc.setFontSize(8);
-        doc.setFont('times', 'bold');
-        
-        // Left column
-        doc.text('Nama:', 20, yPos);
-        doc.setFont('times', 'normal');
-        doc.text(student?.nama || '-', 20 + 20, yPos);
-        
-        yPos += 5;
-        doc.setFont('times', 'bold');
-        doc.text('NIS:', 20, yPos);
-        doc.setFont('times', 'normal');
-        doc.text(student?.nis || '-', 20 + 20, yPos);
-        
-        yPos += 5;
-        doc.setFont('times', 'bold');
-        doc.text('Wali Kelas:', 20, yPos);
-        doc.setFont('times', 'normal');
-        doc.text(wali?.nama || 'Wali Kelas Belum Ditentukan', 20 + 20, yPos);
-
-        // Right column
-        yPos = 70;
-        const rightX = doc.internal.pageSize.getWidth() - 65;
-        doc.setFont('times', 'bold');
-        doc.text('Kelas:', rightX, yPos);
-        doc.setFont('times', 'normal');
-        doc.text(student?.kelas || '-', rightX + 15, yPos);
-        
-        yPos += 5;
-        doc.setFont('times', 'bold');
-        doc.text('Jurusan:', rightX, yPos);
-        doc.setFont('times', 'normal');
-        doc.text(student?.jurusan || '-', rightX + 15, yPos);
-        
-        yPos += 5;
-        doc.setFont('times', 'bold');
-        doc.text('Grha:', rightX, yPos);
-        doc.setFont('times', 'normal');
-        doc.text(student?.grha || '-', rightX + 15, yPos);
-        
-        yPos += 5;
-        doc.setFont('times', 'bold');
-        doc.text('Tahun Pelajaran:', rightX, yPos);
-        doc.setFont('times', 'normal');
-        doc.text(student?.tahun_pelajaran || '-', rightX + 25, yPos);
-        
-        // Add more spacing before table to prevent overlap
-        yPos += 10;
-        doc.setDrawColor(200, 200, 200);
-        doc.setLineWidth(0.3);
-        doc.line(20, yPos, doc.internal.pageSize.getWidth() - 20, yPos);
-
-        // Table using jspdf-autotable
-        const tableData = [
-          ['I Point Awal', ''],
-          ['', breakdown.point_awal],
-          ['II Prestasi', ''],
-          ['1. Akademik', breakdown.prestasi_akademik],
-          ['2. Non-Akademik', breakdown.prestasi_nonakademik],
-          ['Jumlah Prestasi', (Number(breakdown.prestasi_akademik) || 0) + (Number(breakdown.prestasi_nonakademik) || 0)],
-          ['III Perkembangan Karakter', ''],
-          ['1. Tanggung Jawab', breakdown.tanggung_jawab],
-          ['2. Disiplin', breakdown.disiplin],
-          ['3. Kepedulian', breakdown.kepedulian],
-          ['4. Kemandirian', breakdown.kemandirian],
-          ['5. Spiritual', breakdown.spiritual],
-          ['6. Kejujuran', breakdown.kejujuran],
-          ['7. Kepercayaan Diri', breakdown.kepercayaan_diri],
-          ['Jumlah Perkembangan Karakter', (Number(breakdown.tanggung_jawab) || 0) + (Number(breakdown.disiplin) || 0) + (Number(breakdown.kepedulian) || 0) + (Number(breakdown.kemandirian) || 0) + (Number(breakdown.spiritual) || 0) + (Number(breakdown.kejujuran) || 0) + (Number(breakdown.kepercayaan_diri) || 0)],
-          ['IV Organisasi', ''],
-          ['', breakdown.organisasi],
-          ['V Kepanitiaan', ''],
-          ['', breakdown.kepanitiaan],
-          ['VI Event', ''],
-          ['', breakdown.event],
-          ['Jumlah Keaktifan', (Number(breakdown.organisasi) || 0) + (Number(breakdown.kepanitiaan) || 0) + (Number(breakdown.event) || 0)],
-          ['VII Pelanggaran', ''],
-          ['1. Ringan', breakdown.pelanggaran_ringan],
-          ['2. Sedang', breakdown.pelanggaran_sedang],
-          ['3. Berat', breakdown.pelanggaran_berat],
-          ['Jumlah Pelanggaran', (Number(breakdown.pelanggaran_ringan) || 0) + (Number(breakdown.pelanggaran_sedang) || 0) + (Number(breakdown.pelanggaran_berat) || 0)],
-          ['TOTAL POINT IPC', formatTotal(total)]
-        ];
-
-        autoTable(doc, {
-          startY: 95,
-          head: [['Point IPC', 'Point']],
-          body: tableData,
-          theme: 'grid',
-          styles: {
-            font: 'times',
-            fontSize: 8,
-            cellPadding: 1.5,
-            lineColor: [0, 0, 0],
-            lineWidth: 0.1,
-            textColor: [0, 0, 0]
-          },
-          headStyles: {
-            fillColor: [240, 240, 240],
-            fontStyle: 'bold',
-            halign: 'center',
-            fontSize: 8,
-            textColor: [0, 0, 0]
-          },
-          columnStyles: {
-            0: { cellWidth: 'auto' },
-            1: { cellWidth: 'auto', halign: 'right' }
-          },
-          margin: { left: 20, right: 20, top: 10, bottom: 20 },
-          didParseCell: function(data) {
-            // Style section headers (rows where first cell contains Roman numerals or section names)
-            const sectionHeaders = ['I Point Awal', 'II Prestasi', 'III Perkembangan Karakter', 'IV Organisasi', 'V Kepanitiaan', 'VI Event', 'VII Pelanggaran', 'TOTAL POINT IPC'];
-            if (sectionHeaders.includes(data.row.raw[0])) {
-              data.cell.styles.fillColor = [224, 224, 224];
-              data.cell.styles.fontStyle = 'bold';
-            }
-            // Style subtotal rows
-            const subtotalRows = ['Jumlah Prestasi', 'Jumlah Perkembangan Karakter', 'Jumlah Keaktifan', 'Jumlah Pelanggaran'];
-            if (subtotalRows.includes(data.row.raw[0])) {
-              data.cell.styles.fillColor = [230, 240, 255];
-              data.cell.styles.fontStyle = 'bold';
-            }
-            // Style total row specifically
-            if (data.row.raw[0] === 'TOTAL POINT IPC') {
-              data.cell.styles.fillColor = [240, 240, 240];
-              data.cell.styles.fontStyle = 'bold';
-            }
-            // Style negative values in red
-            if (data.section === 'body' && data.column.index === 1 && typeof data.cell.raw === 'number' && data.cell.raw < 0) {
-              data.cell.styles.textColor = [255, 0, 0];
-            }
-          }
-        });
-
-        // Signatures - get the final Y position from the table
-        const finalY = doc.lastAutoTable.finalY || 78;
-        const sigY = finalY + 8;
-        const leftSigX = 20;
-        const rightSigX = doc.internal.pageSize.getWidth() - 75;
-        
-        const formatDate = () => {
-          const options = { day: 'numeric', month: 'long', year: 'numeric' };
-          return new Date().toLocaleDateString('id-ID', options);
-        };
-
-        doc.setFontSize(8);
-        doc.setFont('times', 'normal');
-        doc.text('Mengetahui,', leftSigX, sigY);
-        doc.text(`Kubutambahan, ${formatDate()}`, rightSigX, sigY);
-        
-        doc.setFont('times', 'bold');
-        doc.setFontSize(8);
-        const schoolName = schoolConfig?.school_name || 'SMK Negeri Bali Mandara';
-        doc.text(`Kepala ${schoolName.replace('SMK Negeri', 'SMKN')}`, leftSigX, sigY + 5);
-        doc.text('Wali Kelas', rightSigX, sigY + 5);
-        
-        doc.setFont('times', 'bold');
-        doc.setFontSize(8);
-        doc.text(schoolConfig?.principal_name || '', leftSigX, sigY + 20);
-        doc.text(wali?.nama || 'Wali Kelas Belum Ditentukan', rightSigX, sigY + 20);
-
-        doc.setFont('times', 'normal');
-        doc.setFontSize(7);
-        doc.text(schoolConfig?.principal_nip ? `NIP. ${schoolConfig.principal_nip}` : '', leftSigX, sigY + 25);
-        if (wali?.nip) {
-          doc.text(`NIP. ${wali.nip}`, rightSigX, sigY + 25);
-        }
-      });
-
-      return doc.output('blob');
+      const url = URL.createObjectURL(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+      const link = document.createElement('a');
+      link.href = url;
+      const safeName = String(cardData.student?.nama || 'SISWA').replace(/[\\/:*?"<>|]/g, '_');
+      link.download = `IPC_${safeName}_${cardData.student?.nis || ''}.xlsx`;
+      link.click();
+      URL.revokeObjectURL(url);
     } catch (e) {
       console.error(e);
-      return null;
+      alert('Gagal membuat Excel');
+    } finally {
+      setExcelLoading(false);
     }
   };
 
@@ -1121,154 +514,6 @@ function LaporanCetak({ user }) {
       alert('Gagal membuat Excel');
     } finally {
       setExcelLoading(false);
-    }
-  };
-
-  const handleDownloadPdf = async () => {
-    let filename;
-
-    if (reportType === 'individual') {
-      if (!selectedStudentId) {
-        alert('Pilih siswa terlebih dahulu');
-        return;
-      }
-
-      try {
-        setIpcLoading(true);
-        const token = localStorage.getItem('token');
-        
-        // Call backend endpoint for PDF generation
-        const response = await axios.get(`/reports/ipc-card-pdf/${selectedStudentId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-          responseType: 'blob'
-        });
-
-        // Create download link
-        const url = window.URL.createObjectURL(new Blob([response.data]));
-        const link = document.createElement('a');
-        link.href = url;
-        
-        // Get filename from Content-Disposition header or use default
-        const contentDisposition = response.headers['content-disposition'];
-        if (contentDisposition) {
-          const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-          if (filenameMatch && filenameMatch[1]) {
-            filename = filenameMatch[1].replace(/['"]/g, '');
-          }
-        }
-        
-        if (!filename) {
-          filename = `IPC_SISWA.pdf`;
-        }
-        
-        link.download = filename;
-        link.click();
-        URL.revokeObjectURL(url);
-      } catch (e) {
-        console.error(e);
-        alert('Gagal membuat PDF');
-      } finally {
-        setIpcLoading(false);
-      }
-    } else {
-      // Class report - use backend endpoint for PDF generation
-      if (!selectedClass) {
-        alert('Pilih kelas terlebih dahulu');
-        return;
-      }
-
-      try {
-        setIpcLoading(true);
-        const token = localStorage.getItem('token');
-        
-        // Call backend endpoint for class report PDF generation
-        const response = await axios.get(`/reports/leger-pdf/${encodeURIComponent(selectedClass)}`, {
-          headers: { Authorization: `Bearer ${token}` },
-          responseType: 'blob'
-        });
-
-        // Create download link
-        const url = window.URL.createObjectURL(new Blob([response.data]));
-        const link = document.createElement('a');
-        link.href = url;
-        
-        // Get filename from Content-Disposition header or use default
-        const contentDisposition = response.headers['content-disposition'];
-        if (contentDisposition) {
-          const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-          if (filenameMatch && filenameMatch[1]) {
-            filename = filenameMatch[1].replace(/['"]/g, '');
-          }
-        }
-        
-        if (!filename) {
-          filename = `Leger_IPC_Kelas_${selectedClass}.pdf`;
-        }
-        
-        link.download = filename;
-        link.click();
-        URL.revokeObjectURL(url);
-      } catch (e) {
-        console.error(e);
-        alert('Gagal membuat PDF');
-      } finally {
-        setIpcLoading(false);
-      }
-    }
-  };
-
-  const handleGeneratePreview = async () => {
-    if (reportType === 'individual') {
-      if (!selectedStudentId) {
-        alert('Pilih siswa terlebih dahulu');
-        return;
-      }
-
-      try {
-        setIpcLoading(true);
-        const token = localStorage.getItem('token');
-        
-        // Call backend endpoint for PDF preview (inline)
-        const response = await axios.get(`/reports/ipc-card-preview/${selectedStudentId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-          responseType: 'blob'
-        });
-
-        // Create preview URL from blob
-        const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
-        setPdfPreviewUrl(url);
-      } catch (e) {
-        console.error(e);
-        alert('Gagal membuat preview PDF');
-      } finally {
-        setIpcLoading(false);
-      }
-    } else {
-      // Class report - use backend endpoint for PDF preview
-      if (!selectedClass) {
-        alert('Pilih kelas terlebih dahulu');
-        return;
-      }
-
-      try {
-        setIpcLoading(true);
-        const token = localStorage.getItem('token');
-        
-        // Call backend endpoint for class report PDF preview (inline)
-        const response = await axios.get(`/reports/leger-preview/${encodeURIComponent(selectedClass)}`, {
-          headers: { Authorization: `Bearer ${token}` },
-          responseType: 'blob'
-        });
-
-        // Create preview URL from blob
-        const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
-        setPdfPreviewUrl(url);
-      } catch (e) {
-        console.error(e);
-        alert('Gagal membuat preview PDF');
-      } finally {
-        setIpcLoading(false);
-      }
     }
   };
 
@@ -1333,7 +578,36 @@ function LaporanCetak({ user }) {
           <>
             <p style={{ marginBottom: '14px', color: 'var(--text-secondary)', fontSize: '14px' }}>
               Format cetak mengikuti lembar IPC resmi sekolah (satu siswa per halaman A4).
+              Hanya point yang tercatat sampai Semester {semester} TP {tahunPelajaran} yang dihitung.
             </p>
+
+            <div style={{ display: 'flex', gap: '16px', marginBottom: '14px', flexWrap: 'wrap' }}>
+              <div>
+                <label htmlFor="ipc-semester-select" style={{ marginRight: '8px', fontWeight: 'bold' }}>Semester:</label>
+                <select
+                  id="ipc-semester-select"
+                  value={semester}
+                  onChange={(e) => setSemester(e.target.value)}
+                  style={{ padding: '8px', borderRadius: '5px', border: '1px solid #ddd', minWidth: '120px' }}
+                >
+                  <option value="Ganjil">Ganjil</option>
+                  <option value="Genap">Genap</option>
+                </select>
+              </div>
+              <div>
+                <label htmlFor="ipc-tahun-select" style={{ marginRight: '8px', fontWeight: 'bold' }}>Tahun Pelajaran:</label>
+                <select
+                  id="ipc-tahun-select"
+                  value={tahunPelajaran}
+                  onChange={(e) => setTahunPelajaran(e.target.value)}
+                  style={{ padding: '8px', borderRadius: '5px', border: '1px solid #ddd', minWidth: '140px' }}
+                >
+                  {tahunOptions.map(tp => (
+                    <option key={tp} value={tp}>{tp}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
 
             <div className="ipc-print-toolbar">
               <div>
@@ -1350,11 +624,8 @@ function LaporanCetak({ user }) {
                   ))}
                 </select>
               </div>
-              <button type="button" onClick={handleGeneratePreview} disabled={(!selectedStudentId) || ipcLoading}>
-                {ipcLoading ? 'Membuat Preview PDF...' : 'Preview PDF'}
-              </button>
-              <button type="button" onClick={handleDownloadPdf} disabled={(!selectedStudentId) || ipcLoading}>
-                {ipcLoading ? 'Membuat PDF...' : 'Download PDF'}
+              <button type="button" onClick={handleDownloadIndividualExcel} disabled={(!selectedStudentId) || excelLoading} className="btn btn-success">
+                {excelLoading ? 'Membuat Excel...' : 'Download Excel'}
               </button>
             </div>
           </>
@@ -1370,12 +641,6 @@ function LaporanCetak({ user }) {
                   {selectedClass ? `${classStudents.length} siswa di kelas ${selectedClass}` : 'Pilih kelas terlebih dahulu'}
                 </span>
               </div>
-              <button type="button" onClick={handleGeneratePreview} disabled={(!selectedClass) || ipcLoading}>
-                {ipcLoading ? 'Membuat Preview PDF...' : 'Preview PDF'}
-              </button>
-              <button type="button" onClick={handleDownloadPdf} disabled={(!selectedClass) || ipcLoading}>
-                {ipcLoading ? 'Membuat PDF...' : 'Download PDF'}
-              </button>
               <button type="button" onClick={handleDownloadExcel} disabled={(!selectedClass) || excelLoading} className="btn btn-success">
                 {excelLoading ? 'Membuat Excel...' : 'Download Excel'}
               </button>
@@ -1384,26 +649,6 @@ function LaporanCetak({ user }) {
         )}
       </div>
 
-      {pdfPreviewUrl && (
-        <div className="ipc-print-preview-wrap">
-          <h3 className="ipc-print-no-print" style={{ marginBottom: '16px' }}>
-            Preview PDF
-            {reportType === 'individual' && selectedStudentId
-              ? ` — Siswa Terpilih`
-              : reportType === 'class' && selectedClass
-              ? ` — Kelas ${selectedClass}`
-              : ''}
-          </h3>
-
-          <div style={{ width: '100%', height: '800px', border: '1px solid #ddd', borderRadius: '8px', overflow: 'hidden' }}>
-            <iframe
-              src={pdfPreviewUrl}
-              style={{ width: '100%', height: '100%', border: 'none' }}
-              title="PDF Preview"
-            />
-          </div>
-        </div>
-      )}
     </div>
   );
 }

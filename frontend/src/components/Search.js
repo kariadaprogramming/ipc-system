@@ -1,46 +1,62 @@
-import React, { useState } from 'react';
-import axios from 'axios';
+import React, { useState, useEffect, useCallback } from 'react';
+import api from '../utils/api';
+import { useMinIpc, isBelowMinIpc } from '../utils/minIpc';
+import { formatDisplayText } from '../utils/formatDisplayText';
 
 function Search() {
+  const minIpc = useMinIpc();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [debouncedQuery, setDebouncedQuery] = useState('');
 
-  const handleSearch = async () => {
-    if (!query.trim()) return;
-    
-    setLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-       const response = await axios.get(`/search/students?query=${encodeURIComponent(query)}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setResults(response.data);
-    } catch (error) {
-      console.error('Error searching:', error);
-    } finally {
-      setLoading(false);
+  // Debounce search query (300ms delay)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(query);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  // Search when debounced query changes
+  useEffect(() => {
+    if (!debouncedQuery.trim()) {
+      setResults([]);
+      return;
     }
-  };
 
-  const handleViewDetails = async (student) => {
+    const searchStudents = async () => {
+      setLoading(true);
+      try {
+        const response = await api.get(`/search/students?query=${encodeURIComponent(debouncedQuery)}`);
+        setResults(response.data);
+      } catch (error) {
+        console.error('Error searching:', error);
+        setResults([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    searchStudents();
+  }, [debouncedQuery]);
+
+  const handleViewDetails = useCallback(async (student) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`/search/student/${student.id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get(`/search/student/${student.id}`);
       setSelectedStudent(response.data);
     } catch (error) {
       console.error('Error fetching details:', error);
     }
-  };
+  }, []);
 
   return (
     <div>
       <h2>Search Siswa</h2>
       <div className="card">
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           <input
             type="text"
             value={query}
@@ -48,9 +64,7 @@ function Search() {
             placeholder="Cari berdasarkan nama atau NIS..."
             style={{ flex: 1, padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
           />
-          <button className="btn btn-primary" onClick={handleSearch} disabled={loading}>
-            {loading ? 'Mencari...' : 'Cari'}
-          </button>
+          {loading && <span style={{ fontSize: '12px', color: '#666' }}>Mencari...</span>}
         </div>
       </div>
 
@@ -77,7 +91,7 @@ function Search() {
                   <td>{student.nis}</td>
                   <td>{student.kelas}</td>
                   <td>{student.grha}</td>
-                  <td>{student.ipc_total}</td>
+                  <td style={isBelowMinIpc(student.ipc_total, minIpc) ? { color: '#dc2626', fontWeight: 'bold' } : undefined}>{student.ipc_total}</td>
                   <td>{student.total_prestasi_akademik}</td>
                   <td>{student.total_prestasi_nonakademik}</td>
                   <td>
@@ -101,7 +115,7 @@ function Search() {
             <p><strong>NIS:</strong> {selectedStudent.student.nis}</p>
             <p><strong>Kelas:</strong> {selectedStudent.student.kelas}</p>
             <p><strong>Grha:</strong> {selectedStudent.student.grha}</p>
-            <p><strong>IPC Total:</strong> {selectedStudent.student.ipc_total}</p>
+            <p><strong>IPC Total:</strong> <span style={isBelowMinIpc(selectedStudent.student.ipc_total, minIpc) ? { color: '#dc2626', fontWeight: 'bold' } : undefined}>{selectedStudent.student.ipc_total}</span></p>
           </div>
 
           <h4>Prestasi Akademik: {selectedStudent.total_prestasi_akademik}</h4>
@@ -119,8 +133,8 @@ function Search() {
                 {selectedStudent.prestasi.filter(p => p.jenis === 'akademik').map(p => (
                   <tr key={p.id}>
                     <td>{p.nama_lomba}</td>
-                    <td>{p.juara}</td>
-                    <td>{p.kategori}</td>
+                    <td>{formatDisplayText(p.juara)}</td>
+                    <td>{formatDisplayText(p.kategori)}</td>
                     <td>{p.point}</td>
                   </tr>
                 ))}
@@ -145,8 +159,8 @@ function Search() {
                 {selectedStudent.prestasi.filter(p => p.jenis === 'nonakademik').map(p => (
                   <tr key={p.id}>
                     <td>{p.nama_lomba}</td>
-                    <td>{p.juara}</td>
-                    <td>{p.kategori}</td>
+                    <td>{formatDisplayText(p.juara)}</td>
+                    <td>{formatDisplayText(p.kategori)}</td>
                     <td>{p.point}</td>
                   </tr>
                 ))}

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { auth, checkInputAccess, superAdminOnly } = require('../middleware/auth');
+const { auth, checkInputAccess, superAdminOnly, checkPermission } = require('../middleware/auth');
 const db = require('../config/database');
 const multer = require('multer');
 const path = require('path');
@@ -52,7 +52,7 @@ router.get('/user/:userId', auth, async (req, res) => {
 });
 
 // Create pelanggaran
-router.post('/', auth, checkInputAccess('pelanggaran'), upload.single('foto'), async (req, res) => {
+router.post('/', auth, checkPermission('pelanggaran'), upload.single('foto'), async (req, res) => {
     try {
         const { nama, nis, kelas, grha, keterangan, jenis_pelanggaran } = req.body;
         let foto = req.file ? req.file.filename : null;
@@ -74,13 +74,13 @@ router.post('/', auth, checkInputAccess('pelanggaran'), upload.single('foto'), a
         const userId = await resolveStudentIdByNis(nis, req.user.id);
 
         const [result] = await db.query(
-            'INSERT INTO pelanggaran (user_id, nama, nis, kelas, grha, keterangan, foto, jenis_pelanggaran, point_dikurangi) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [userId, nama, nis, kelas, grha, keterangan, foto, jenis_pelanggaran, point_dikurangi]
+            'INSERT INTO pelanggaran (user_id, submitted_by, nama, nis, kelas, grha, keterangan, foto, jenis_pelanggaran, point_dikurangi) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [userId, req.user.id, nama, nis, kelas, grha, keterangan, foto, jenis_pelanggaran, point_dikurangi]
         );
 
         await db.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Submit Pelanggaran', `Submitted pelanggaran: ${jenis_pelanggaran}`]
+            [req.user.id, 'SUBMIT_PELANGGARAN', `Submitted pelanggaran: ${jenis_pelanggaran}`]
         );
 
         res.status(201).json({ message: 'Pelanggaran submitted for approval', id: result.insertId });
@@ -128,7 +128,7 @@ router.put('/:id/approve', auth, superAdminOnly, async (req, res) => {
 
         await db.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Approve Pelanggaran', `Approved pelanggaran ID ${pelanggaranId}`]
+            [req.user.id, 'APPROVE_PELANGGARAN', `Approved pelanggaran ID ${pelanggaranId}`]
         );
 
         res.json({ message: 'Pelanggaran approved successfully' });
@@ -148,7 +148,7 @@ router.put('/:id/reject', auth, superAdminOnly, async (req, res) => {
 
         await db.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Reject Pelanggaran', `Rejected pelanggaran ID ${pelanggaranId}`]
+            [req.user.id, 'REJECT_PELANGGARAN', `Rejected pelanggaran ID ${pelanggaranId}`]
         );
 
         res.json({ message: 'Pelanggaran rejected' });
@@ -218,7 +218,7 @@ router.put('/:id', auth, upload.single('foto'), async (req, res) => {
         // Log activity
         await db.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Update Pelanggaran', `Updated pelanggaran ID ${pelanggaranId}`]
+            [req.user.id, 'UPDATE_PELANGGARAN', `Updated pelanggaran ID ${pelanggaranId}`]
         );
 
         res.json({ message: 'Pelanggaran updated successfully' });
@@ -269,7 +269,7 @@ router.delete('/:id', auth, superAdminOnly, async (req, res) => {
         // Log activity
         await db.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Delete Pelanggaran', `Deleted pelanggaran ID ${pelanggaranId}`]
+            [req.user.id, 'DELETE_PELANGGARAN', `Deleted pelanggaran ID ${pelanggaranId}`]
         );
 
         res.json({ message: 'Pelanggaran deleted successfully' });

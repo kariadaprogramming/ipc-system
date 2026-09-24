@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import API_BASE_URL from '../config';
+import { formatDisplayText } from '../utils/formatDisplayText';
 
 const PAGE_BG = "#f8fafc";
 const INK = "#0f172a";
@@ -8,12 +9,15 @@ const SLATE = "#64748b";
 
 const BLUE = { bg: "#eff6ff", text: "#2563eb", border: "#c6dafc", solid: "#2563eb", dark: "#1d4ed8" };
 
+const MEDALS = { 1: "🥇", 2: "🥈", 3: "🥉" };
+
 function Leaderboard() {
   const [activeTab, setActiveTab] = useState('akademik');
   const [akademikData, setAkademikData] = useState([]);
   const [nonAkademikData, setNonAkademikData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [lastUpdated, setLastUpdated] = useState(null);
 
   useEffect(() => {
     fetchLeaderboardData();
@@ -22,19 +26,14 @@ function Leaderboard() {
   const fetchLeaderboardData = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-      
       const [akademikRes, nonAkademikRes] = await Promise.all([
-        axios.get('/search/leaderboard/akademik', {
-          headers: { Authorization: `Bearer ${token}` }
-        }),
-        axios.get('/search/leaderboard/nonakademik', {
-          headers: { Authorization: `Bearer ${token}` }
-        })
+        api.get('/search/leaderboard/akademik'),
+        api.get('/search/leaderboard/nonakademik')
       ]);
 
       setAkademikData(akademikRes.data);
       setNonAkademikData(nonAkademikRes.data);
+      setLastUpdated(new Date());
     } catch (error) {
       console.error('Error fetching leaderboard:', error);
       setError('Gagal memuat data peringkat');
@@ -49,6 +48,8 @@ function Leaderboard() {
 
   const currentData = activeTab === 'akademik' ? akademikData : nonAkademikData;
   const title = activeTab === 'akademik' ? "Peringkat akademik" : "Peringkat non-akademik";
+  const top3 = currentData.filter((s) => s.rank <= 3).sort((a, b) => a.rank - b.rank);
+  const totalPrestasi = currentData.reduce((sum, s) => sum + (s.total_prestasi || 0), 0);
 
   if (loading) {
     return (
@@ -90,8 +91,8 @@ function Leaderboard() {
         fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
         background: PAGE_BG,
         minHeight: "100vh",
-        padding: "20px 16px 48px",
-        maxWidth: '1100px',
+        padding: "clamp(16px, 3vw, 28px) clamp(12px, 2vw, 32px) clamp(40px, 6vw, 60px)",
+        maxWidth: '100%',
         margin: '0 auto',
         color: INK,
       }}
@@ -124,23 +125,29 @@ function Leaderboard() {
           gap:12px;
           margin-bottom:20px;
         }
+        @media (max-width: 480px){
+          .header-row{gap:10px;margin-bottom:16px;}
+        }
         .header-icon{
           flex:0 0 auto;
-          width:40px;height:40px;
+          width:clamp(36px, 5vw, 40px);
+          height:clamp(36px, 5vw, 40px);
           border-radius:10px;
           background:var(--amber-bg);
           display:flex;align-items:center;justify-content:center;
-          font-size:20px;
+          font-size:clamp(18px, 4vw, 20px);
         }
         .header-text h1{
           margin:0 0 2px;
-          font-size:clamp(18px,4vw,22px);
+          font-size:clamp(16px, 4vw, 22px);
           font-weight:700;
+          line-height:1.3;
         }
         .header-text p{
           margin:0;
-          font-size:13.5px;
+          font-size:clamp(12px, 2.5vw, 13.5px);
           color:var(--gray-500);
+          line-height:1.4;
         }
         .controls{
           display:flex;
@@ -150,6 +157,14 @@ function Leaderboard() {
           justify-content:space-between;
           margin-bottom:20px;
         }
+        @media (max-width: 640px){
+          .controls{
+            flex-direction:column;
+            align-items:stretch;
+            gap:10px;
+            margin-bottom:16px;
+          }
+        }
         .tabs{
           display:flex;
           gap:8px;
@@ -158,13 +173,13 @@ function Leaderboard() {
           border-radius:12px;
           box-shadow:var(--shadow);
           width:100%;
-          max-width:340px;
+          max-width:clamp(280px, 100%, 340px);
         }
         .tab{
           flex:1;
           border:none;
           background:transparent;
-          padding:9px 12px;
+          padding:clamp(8px, 2vw, 9px) clamp(10px, 2vw, 12px);
           border-radius:9px;
           cursor:pointer;
           font-family:inherit;
@@ -172,8 +187,8 @@ function Leaderboard() {
           transition:background .15s ease, color .15s ease;
           color:var(--gray-700);
         }
-        .tab strong{display:block;font-size:13.5px;font-weight:700;}
-        .tab span{display:block;font-size:11.5px;opacity:.85;margin-top:1px;}
+        .tab strong{display:block;font-size:clamp(12px, 2.5vw, 13.5px);font-weight:700;}
+        .tab span{display:block;font-size:clamp(10px, 2vw, 11.5px);opacity:.85;margin-top:1px;}
         .tab.active{
           background:var(--blue);
           color:var(--white);
@@ -188,12 +203,15 @@ function Leaderboard() {
           padding:10px 16px;
           border-radius:10px;
           font-family:inherit;
-          font-size:13.5px;
+          font-size:clamp(12px, 2.5vw, 13.5px);
           font-weight:600;
           cursor:pointer;
           box-shadow:var(--shadow);
           transition:background .15s ease, transform .1s ease;
           white-space:nowrap;
+        }
+        @media (max-width: 640px){
+          .refresh-btn{justify-content:center;width:100%;}
         }
         .refresh-btn:hover{background:var(--blue-dark);}
         .refresh-btn:active{transform:scale(.97);}
@@ -210,50 +228,60 @@ function Leaderboard() {
           margin-bottom:20px;
         }
         .card-head{
-          padding:18px 20px;
+          padding:clamp(16px, 3vw, 18px) clamp(16px, 3vw, 20px);
           border-bottom:1px solid var(--gray-100);
         }
         .card-head h2{
           margin:0 0 3px;
-          font-size:16px;
+          font-size:clamp(14px, 3vw, 16px);
           display:flex;
           align-items:center;
           gap:8px;
+          line-height:1.3;
         }
         .card-head p{
           margin:0;
-          font-size:13px;
+          font-size:clamp(12px, 2.5vw, 13px);
           color:var(--gray-500);
+          line-height:1.4;
         }
-        .table-wrap{display:block;}
+        .table-wrap{
+          display:block;
+          overflow-x:auto;
+          -webkit-overflow-scrolling:touch;
+        }
         table{
           width:100%;
           border-collapse:collapse;
+          min-width:600px;
         }
         thead th{
           text-align:left;
-          font-size:12.5px;
+          font-size:clamp(11px, 2.5vw, 12.5px);
           font-weight:600;
           color:var(--gray-500);
           background:var(--gray-50);
-          padding:12px 20px;
+          padding:clamp(10px, 2vw, 12px) clamp(16px, 3vw, 20px);
           border-bottom:1px solid var(--gray-200);
+          white-space:nowrap;
         }
         tbody td{
-          padding:16px 20px;
+          padding:clamp(12px, 2vw, 16px) clamp(16px, 3vw, 20px);
           border-bottom:1px solid var(--gray-100);
           vertical-align:middle;
-          font-size:14px;
+          font-size:clamp(13px, 2.5vw, 14px);
         }
         tbody tr:last-child td{border-bottom:none;}
         .pos-badge{
-          width:30px;height:30px;
+          width:clamp(26px, 4vw, 30px);
+          height:clamp(26px, 4vw, 30px);
           border-radius:50%;
           display:flex;align-items:center;justify-content:center;
           font-weight:700;
-          font-size:13px;
+          font-size:clamp(11px, 2.5vw, 13px);
           background:var(--gray-100);
           color:var(--gray-700);
+          flex-shrink:0;
         }
         .pos-badge.top{
           background:var(--amber-bg);
@@ -264,55 +292,99 @@ function Leaderboard() {
           display:flex;
           align-items:center;
           gap:10px;
+          min-width:0;
         }
         .avatar{
-          width:34px;height:34px;
+          width:clamp(30px, 5vw, 34px);
+          height:clamp(30px, 5vw, 34px);
           border-radius:50%;
           background:var(--blue-light);
           color:var(--blue);
           display:flex;align-items:center;justify-content:center;
           font-weight:700;
-          font-size:14px;
+          font-size:clamp(12px, 2.5vw, 14px);
           flex:0 0 auto;
         }
-        .student-name{font-weight:600;font-size:14px;}
-        .student-nis{font-size:12px;color:var(--gray-500);}
+        .student-name{
+          font-weight:600;
+          font-size:clamp(13px, 2.5vw, 14px);
+          white-space:nowrap;
+          overflow:hidden;
+          text-overflow:ellipsis;
+        }
+        .student-nis{
+          font-size:clamp(11px, 2vw, 12px);
+          color:var(--gray-500);
+        }
         .pill{
           display:inline-block;
           padding:3px 10px;
           border-radius:999px;
-          font-size:12.5px;
+          font-size:clamp(11px, 2vw, 12.5px);
           font-weight:600;
+          white-space:nowrap;
         }
         .pill.kelas{background:var(--green-bg);color:var(--green-text);}
         .pill.grha{background:var(--amber-bg);color:var(--amber-text);}
         .total-badge{
-          width:26px;height:26px;
+          width:clamp(22px, 4vw, 26px);
+          height:clamp(22px, 4vw, 26px);
           border-radius:50%;
           background:var(--blue-light);
           color:var(--blue);
           display:flex;align-items:center;justify-content:center;
           font-weight:700;
-          font-size:12.5px;
+          font-size:clamp(11px, 2vw, 12.5px);
+          flex-shrink:0;
         }
         .detail-box{
           background:var(--amber-bg);
           border:1px solid var(--amber-border);
           border-left:4px solid var(--amber-text);
           border-radius:10px;
-          padding:10px 14px;
+          padding:clamp(8px, 2vw, 10px) clamp(12px, 2vw, 14px);
+          flex-shrink:0;
         }
         .detail-title{
           display:flex;align-items:center;gap:6px;
           font-weight:700;
-          font-size:13.5px;
+          font-size:clamp(12px, 2.5vw, 13.5px);
           color:var(--amber-text);
           margin-bottom:2px;
+          line-height:1.3;
         }
-        .detail-sub{font-size:12.5px;color:var(--amber-text);opacity:.85;}
+        .detail-sub{
+          font-size:clamp(11px, 2vw, 12.5px);
+          color:var(--amber-text);
+          opacity:.85;
+          line-height:1.3;
+        }
+        .detail-scroll{
+          max-height:120px;
+          overflow-y:auto;
+          overflow-x:hidden;
+          display:flex;
+          flex-direction:column;
+          gap:6px;
+          padding-right:4px;
+        }
+        .detail-scroll::-webkit-scrollbar{
+          width:6px;
+        }
+        .detail-scroll::-webkit-scrollbar-track{
+          background:var(--gray-100);
+          border-radius:3px;
+        }
+        .detail-scroll::-webkit-scrollbar-thumb{
+          background:var(--amber-text);
+          border-radius:3px;
+        }
+        .detail-scroll::-webkit-scrollbar-thumb:hover{
+          background:var(--amber-border);
+        }
         .mobile-list{display:none;}
         .m-item{
-          padding:16px 18px;
+          padding:clamp(14px, 3vw, 16px) clamp(16px, 3vw, 18px);
           border-bottom:1px solid var(--gray-100);
         }
         .m-item:last-child{border-bottom:none;}
@@ -336,71 +408,176 @@ function Leaderboard() {
           display:flex;
           align-items:center;
           gap:6px;
-          font-size:12.5px;
+          font-size:clamp(11px, 2vw, 12.5px);
           color:var(--gray-500);
           margin-bottom:10px;
         }
-        .keterangan{
+        .podium-card .card-head{
+          background:linear-gradient(135deg, var(--amber-bg), var(--white));
+        }
+        .podium{
+          display:flex;
+          align-items:flex-end;
+          justify-content:center;
+          gap:clamp(8px, 3vw, 20px);
+          padding:clamp(20px, 4vw, 28px) clamp(16px, 3vw, 24px) 0;
+        }
+        .podium-slot{
+          display:flex;
+          flex-direction:column;
+          align-items:center;
+          text-align:center;
+          flex:1;
+          max-width:200px;
+          min-width:0;
+        }
+        .podium-slot.first{order:2;}
+        .podium-slot.second{order:1;}
+        .podium-slot.third{order:3;}
+        .podium-medal{
+          font-size:clamp(20px, 4vw, 26px);
+          margin-bottom:8px;
+          line-height:1;
+        }
+        .podium-avatar{
+          width:clamp(48px, 8vw, 64px);
+          height:clamp(48px, 8vw, 64px);
+          border-radius:50%;
+          background:var(--blue-light);
+          color:var(--blue);
+          display:flex;align-items:center;justify-content:center;
+          font-weight:700;
+          font-size:clamp(16px, 3vw, 20px);
+          flex:0 0 auto;
+          overflow:hidden;
+          margin-bottom:10px;
+          border:3px solid var(--white);
+          box-shadow:0 0 0 2px var(--amber-border), var(--shadow);
+        }
+        .podium-slot.second .podium-avatar,
+        .podium-slot.third .podium-avatar{
+          width:clamp(42px, 7vw, 56px);
+          height:clamp(42px, 7vw, 56px);
+          font-size:clamp(14px, 2.5vw, 18px);
+          box-shadow:0 0 0 2px var(--gray-200), var(--shadow);
+        }
+        .podium-name{
+          font-weight:700;
+          font-size:clamp(13px, 2.5vw, 14.5px);
+          color:var(--gray-900);
+          white-space:nowrap;
+          overflow:hidden;
+          text-overflow:ellipsis;
+          max-width:100%;
+          margin-bottom:2px;
+        }
+        .podium-meta{
+          font-size:clamp(11px, 2vw, 12px);
+          color:var(--gray-500);
+          margin-bottom:6px;
+        }
+        .podium-total{
+          display:inline-flex;
+          align-items:center;
+          gap:5px;
+          background:var(--blue-light);
+          color:var(--blue);
+          border-radius:999px;
+          padding:4px 12px;
+          font-size:clamp(11px, 2vw, 12.5px);
+          font-weight:700;
+          margin-bottom:12px;
+        }
+        .podium-step{
+          width:100%;
+          border-radius:10px 10px 0 0;
+          display:flex;
+          align-items:flex-start;
+          justify-content:center;
+          padding-top:clamp(8px, 2vw, 12px);
+          font-weight:800;
+          font-size:clamp(14px, 3vw, 18px);
+        }
+        .podium-slot.first .podium-step{
+          height:clamp(64px, 12vw, 88px);
+          background:linear-gradient(180deg, var(--amber-bg), #fffbeb);
+          color:var(--amber-text);
+          border:1px solid var(--amber-border);
+          border-bottom:none;
+        }
+        .podium-slot.second .podium-step{
+          height:clamp(44px, 9vw, 64px);
+          background:var(--gray-100);
+          color:var(--gray-700);
+          border:1px solid var(--gray-200);
+          border-bottom:none;
+        }
+        .podium-slot.third .podium-step{
+          height:clamp(32px, 7vw, 48px);
+          background:var(--gray-50);
+          color:var(--gray-500);
+          border:1px solid var(--gray-200);
+          border-bottom:none;
+        }
+        .stats-strip{
+          display:grid;
+          grid-template-columns:repeat(3, 1fr);
+          gap:clamp(8px, 2vw, 12px);
           background:var(--white);
           border-radius:var(--radius);
           box-shadow:var(--shadow);
-          padding:18px 20px;
+          padding:clamp(14px, 3vw, 18px) clamp(16px, 3vw, 20px);
+          margin-bottom:20px;
         }
-        .keterangan h3{
-          display:flex;align-items:center;gap:8px;
-          margin:0 0 14px;
-          font-size:15px;
+        .stat-item{
+          display:flex;
+          flex-direction:column;
+          align-items:center;
+          text-align:center;
+          gap:3px;
+          padding:clamp(6px, 1.5vw, 10px) clamp(6px, 1.5vw, 10px);
+          border-right:1px solid var(--gray-100);
         }
-        .keterangan-grid{
-          display:grid;
-          grid-template-columns:repeat(5,1fr);
-          gap:12px;
-          margin-bottom:16px;
+        .stat-item:last-child{border-right:none;}
+        .stat-value{
+          font-weight:800;
+          font-size:clamp(18px, 4vw, 24px);
+          color:var(--gray-900);
+          line-height:1.2;
+          display:flex;
+          align-items:center;
+          gap:6px;
         }
-        .k-item{
-          border:1px solid var(--gray-200);
-          border-radius:10px;
-          padding:12px 14px;
+        .stat-label{
+          font-size:clamp(11px, 2vw, 12.5px);
+          color:var(--gray-500);
+          line-height:1.3;
         }
-        .k-item .k-title{
-          display:flex;align-items:center;gap:6px;
-          font-weight:700;
-          font-size:13px;
-          color:var(--blue);
-          margin-bottom:2px;
+        .empty-podium{
+          background:var(--white);
+          border-radius:var(--radius);
+          box-shadow:var(--shadow);
+          padding:clamp(24px, 5vw, 36px);
+          text-align:center;
+          color:var(--gray-500);
+          font-size:clamp(13px, 2.5vw, 14px);
+          margin-bottom:20px;
         }
-        .k-item .k-sub{font-size:12px;color:var(--gray-500);}
-        .note{
-          background:var(--amber-bg);
-          border:1px solid var(--amber-border);
-          border-left:4px solid var(--amber-text);
-          border-radius:8px;
-          padding:12px 16px;
-          font-size:13px;
-          color:var(--amber-text);
-        }
-        @media (max-width: 860px){
-          .keterangan-grid{grid-template-columns:repeat(3,1fr);}
-        }
-        @media (max-width: 640px){
-          .page{padding:14px 12px 36px;}
-          .header-row{margin-bottom:16px;}
-          .controls{
-            flex-direction:column;
-            align-items:stretch;
-            gap:10px;
-            margin-bottom:16px;
-          }
-          .tabs{max-width:none;}
-          .refresh-btn{justify-content:center;width:100%;}
-          .card-head{padding:16px;}
+        @media (max-width: 768px){
           .table-wrap{display:none;}
           .mobile-list{display:block;}
-          .keterangan{padding:16px;}
-          .keterangan-grid{grid-template-columns:repeat(2,1fr);gap:10px;}
         }
-        @media (max-width: 380px){
-          .keterangan-grid{grid-template-columns:1fr;}
+        @media (max-width: 560px){
+          .stats-strip{grid-template-columns:1fr;gap:0;}
+          .stat-item{
+            flex-direction:row;
+            justify-content:space-between;
+            border-right:none;
+            border-bottom:1px solid var(--gray-100);
+            padding:10px 4px;
+          }
+          .stat-item:last-child{border-bottom:none;}
+          .stat-value{font-size:clamp(16px, 4vw, 20px);}
         }
       `}</style>
 
@@ -443,6 +620,63 @@ function Leaderboard() {
           </svg>
           Refresh data
         </button>
+      </div>
+
+      {/* Podium top 3 */}
+      {top3.length > 0 ? (
+        <div className="card podium-card" style={{ marginBottom: '12px' }}>
+          <div className="card-head">
+            <h2>🏆 Podium Top 3</h2>
+            <p>{title} — siswa dengan prestasi terbanyak</p>
+          </div>
+          <div className="podium">
+            {[
+              { student: top3.find((s) => s.rank === 2), cls: 'second', medal: MEDALS[2] },
+              { student: top3.find((s) => s.rank === 1), cls: 'first', medal: MEDALS[1] },
+              { student: top3.find((s) => s.rank === 3), cls: 'third', medal: MEDALS[3] },
+            ].filter((slot) => slot.student).map((slot) => {
+              const s = slot.student;
+              return (
+                <div key={s.id} className={`podium-slot ${slot.cls}`}>
+                  <div className="podium-medal">{slot.medal}</div>
+                  <div className="podium-avatar">
+                    {s.foto ? (
+                      <img
+                        src={`${API_BASE_URL.replace('/api', '')}${s.foto}`}
+                        alt={s.nama}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    ) : (
+                      <span>{initials(s.nama)}</span>
+                    )}
+                  </div>
+                  <div className="podium-name" title={s.nama}>{s.nama}</div>
+                  <div className="podium-meta">{s.kelas} · {s.grha || '-'}</div>
+                  <div className="podium-total">🏅 {s.total_prestasi} prestasi</div>
+                  <div className="podium-step">{s.rank}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        <div className="empty-podium">Belum ada data peringkat untuk ditampilkan.</div>
+      )}
+
+      {/* Stats strip */}
+      <div className="stats-strip">
+        <div className="stat-item">
+          <div className="stat-value">👥 {currentData.length}</div>
+          <div className="stat-label">Siswa dalam peringkat</div>
+        </div>
+        <div className="stat-item">
+          <div className="stat-value">🏅 {totalPrestasi}</div>
+          <div className="stat-label">Total prestasi</div>
+        </div>
+        <div className="stat-item">
+          <div className="stat-value">🕒 {lastUpdated ? lastUpdated.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-'}</div>
+          <div className="stat-label">Terakhir diperbarui</div>
+        </div>
       </div>
 
       {/* Ranking card */}
@@ -499,12 +733,14 @@ function Leaderboard() {
                       <td><span className="total-badge">{s.total_prestasi}</span></td>
                       <td>
                         {s.detail_prestasi && s.detail_prestasi.length > 0 ? (
-                          s.detail_prestasi.map((d, i) => (
-                            <div key={i} className="detail-box" style={{ marginBottom: i < s.detail_prestasi.length - 1 ? 6 : 0 }}>
-                              <div className="detail-title">🏅 {d.nama_lomba}</div>
-                              <div className="detail-sub">{d.juara}</div>
-                            </div>
-                          ))
+                          <div className="detail-scroll">
+                            {s.detail_prestasi.map((d, i) => (
+                              <div key={i} className="detail-box">
+                                <div className="detail-title">🏅 {d.nama_lomba}</div>
+                                <div className="detail-sub">{formatDisplayText(d.juara)}</div>
+                              </div>
+                            ))}
+                          </div>
                         ) : (
                           <span style={{ opacity: 0.6, fontStyle: 'italic' }}>Tidak ada detail</span>
                         )}
@@ -551,12 +787,14 @@ function Leaderboard() {
                   </div>
                   <div className="m-total">📋 Total prestasi: <span className="total-badge">{s.total_prestasi}</span></div>
                   {s.detail_prestasi && s.detail_prestasi.length > 0 ? (
-                    s.detail_prestasi.map((d, i) => (
-                      <div key={i} className="detail-box" style={{ marginBottom: i < s.detail_prestasi.length - 1 ? 6 : 0 }}>
-                        <div className="detail-title">🏅 {d.nama_lomba}</div>
-                        <div className="detail-sub">{d.juara}</div>
-                      </div>
-                    ))
+                    <div className="detail-scroll">
+                      {s.detail_prestasi.map((d, i) => (
+                        <div key={i} className="detail-box">
+                          <div className="detail-title">🏅 {d.nama_lomba}</div>
+                          <div className="detail-sub">{formatDisplayText(d.juara)}</div>
+                        </div>
+                      ))}
+                    </div>
                   ) : (
                     <span style={{ opacity: 0.6, fontStyle: 'italic' }}>Tidak ada detail</span>
                   )}
@@ -565,34 +803,6 @@ function Leaderboard() {
             })
           )}
         </div>
-      </div>
-
-      {/* Keterangan */}
-      <div className="keterangan">
-        <h3>📄 Keterangan</h3>
-        <div className="keterangan-grid">
-          <div className="k-item">
-            <div className="k-title">👤 Nama</div>
-            <div className="k-sub">Nama siswa</div>
-          </div>
-          <div className="k-item">
-            <div className="k-title">🏷️ Kelas</div>
-            <div className="k-sub">Kelas siswa</div>
-          </div>
-          <div className="k-item">
-            <div className="k-title">🏅 Grha</div>
-            <div className="k-sub">Asrama siswa</div>
-          </div>
-          <div className="k-item">
-            <div className="k-title">📋 Total</div>
-            <div className="k-sub">Jumlah prestasi</div>
-          </div>
-          <div className="k-item">
-            <div className="k-title">📄 Detail</div>
-            <div className="k-sub">Info lomba & juara</div>
-          </div>
-        </div>
-        <div className="note">Lingkaran bernomor menandai peringkat 1 sampai 3. Data diperbarui otomatis.</div>
       </div>
     </div>
   );

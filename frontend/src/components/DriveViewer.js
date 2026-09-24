@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import API_BASE_URL from '../config';
 
 function DriveViewer() {
@@ -35,10 +35,7 @@ function DriveViewer() {
   const fetchFolders = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/file-viewer/folders', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/file-viewer/folders');
       setFolders(response.data);
     } catch (error) {
       console.error('Error fetching folders:', error);
@@ -50,10 +47,7 @@ function DriveViewer() {
   const fetchFiles = async (folderName) => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`/file-viewer/files/${folderName}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get(`/file-viewer/files/${folderName}`);
       setFiles(response.data);
       setSelectedFolder(folderName);
       // Load student data for files
@@ -71,10 +65,7 @@ function DriveViewer() {
     }
 
     try {
-      const token = localStorage.getItem('token');
-      await axios.delete(`/file-viewer/file/${selectedFolder}/${fileName}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.delete(`/file-viewer/file/${selectedFolder}/${fileName}`);
       // Refresh file list
       fetchFiles(selectedFolder);
     } catch (error) {
@@ -124,10 +115,7 @@ function DriveViewer() {
     if (studentsData[nis]) return studentsData[nis];
 
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`/users/nis/${nis}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get(`/users/nis/${nis}`);
       setStudentsData(prev => ({ ...prev, [nis]: response.data }));
       return response.data;
     } catch (error) {

@@ -1,13 +1,80 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import api from '../utils/api';
 
 function Navbar({ user, onLogout, isMobileMenuOpen, toggleMobileMenu }) {
-  // const [permissions, setPermissions] = useState(null);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [permissions, setPermissions] = useState(null);
   const location = useLocation();
   const navigate = useNavigate();
 
   console.log('Navbar - User:', user);
   console.log('Navbar - User Role:', user?.role);
+
+  // Fetch pending approvals count for superadmin
+  useEffect(() => {
+    if (user?.role === 'superadmin') {
+      fetchPendingCount();
+
+      // Refresh count every 30 seconds
+      const interval = setInterval(fetchPendingCount, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [user]);
+
+  // Fetch unread notifications count for siswa/guru
+  useEffect(() => {
+    if (user?.role === 'siswa' || user?.role === 'guru') {
+      fetchUnreadCount();
+
+      // Refresh count every 30 seconds
+      const interval = setInterval(fetchUnreadCount, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [user]);
+
+  // Refresh unread count when navigating to notifications page
+  useEffect(() => {
+    if (location.pathname === '/notifications' && (user?.role === 'siswa' || user?.role === 'guru')) {
+      fetchUnreadCount();
+    }
+  }, [location.pathname, user]);
+
+  const fetchPendingCount = async () => {
+    try {
+      const response = await api.get('/approvals-v2/pending-count');
+      setPendingCount(response.data.total || 0);
+    } catch (error) {
+      console.error('Error fetching pending count:', error);
+    }
+  };
+
+  const fetchUnreadCount = async () => {
+    try {
+      const response = await api.get('/approvals-v2/notifications/count');
+      setUnreadCount(response.data.count || 0);
+    } catch (error) {
+      console.error('Error fetching unread count:', error);
+    }
+  };
+
+  const fetchPermissions = useCallback(async () => {
+    if (!user) return;
+    try {
+      const response = await api.get('/permissions/my-permissions');
+      setPermissions(response.data);
+      console.log('Navbar - Permissions:', response.data);
+    } catch (error) {
+      console.error('Error fetching permissions:', error);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      fetchPermissions();
+    }
+  }, [user, fetchPermissions]);
 
   // Permission fetching disabled for now
   // const fetchPermissions = useCallback(async () => {
@@ -35,9 +102,9 @@ function Navbar({ user, onLogout, isMobileMenuOpen, toggleMobileMenu }) {
     { path: '/input-organisasi', label: 'Organisasi', show: true },
     { path: '/input-kepanitiaan', label: 'Kepanitiaan', show: true },
     { path: '/input-event', label: 'Event', show: true },
-    // Pelanggaran and Perilaku only for superadmin
-    { path: '/input-pelanggaran', label: 'Pelanggaran', show: user?.role === 'superadmin' },
-    { path: '/input-perilaku', label: 'Perilaku', show: user?.role === 'superadmin' },
+    // Pelanggaran and Perilaku: superadmin always has access, guru needs permission
+    { path: '/input-pelanggaran', label: 'Pelanggaran', show: user?.role === 'superadmin' || (user?.role === 'guru' && permissions?.can_input_pelanggaran) },
+    { path: '/input-perilaku', label: 'Perilaku', show: user?.role === 'superadmin' || (user?.role === 'guru' && permissions?.can_input_perilaku) },
     // Kelola Akun for superadmin
     { path: '/kelola-akun', label: 'Kelola Akun', show: user?.role === 'superadmin' },
     { path: '/edit-ipc-awal', label: 'Edit IPC Awal', show: user?.role === 'superadmin' },
@@ -74,7 +141,7 @@ function Navbar({ user, onLogout, isMobileMenuOpen, toggleMobileMenu }) {
         <ul className="sidebar-nav">
           {filteredNavItems.map(item => (
             <li key={item.path}>
-              <a 
+              <a
                 href={item.path}
                 className={location.pathname === item.path ? 'active' : ''}
                 onClick={(e) => {
@@ -86,8 +153,47 @@ function Navbar({ user, onLogout, isMobileMenuOpen, toggleMobileMenu }) {
                     toggleMobileMenu();
                   }
                 }}
+                style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '8px' }}
               >
                 {item.label}
+                {item.path === '/approvals' && pendingCount > 0 && (
+                  <span
+                    style={{
+                      backgroundColor: '#ef4444',
+                      color: 'white',
+                      borderRadius: '50%',
+                      minWidth: '20px',
+                      height: '20px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '11px',
+                      fontWeight: 'bold',
+                      padding: '0 6px'
+                    }}
+                  >
+                    {pendingCount}
+                  </span>
+                )}
+                {item.path === '/notifications' && unreadCount > 0 && (
+                  <span
+                    style={{
+                      backgroundColor: '#ef4444',
+                      color: 'white',
+                      borderRadius: '50%',
+                      minWidth: '20px',
+                      height: '20px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '11px',
+                      fontWeight: 'bold',
+                      padding: '0 6px'
+                    }}
+                  >
+                    {unreadCount}
+                  </span>
+                )}
               </a>
             </li>
           ))}

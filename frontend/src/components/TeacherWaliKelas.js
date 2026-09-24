@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
+import { useMinIpc, isBelowMinIpc } from '../utils/minIpc';
 
 function getIpcDetailRows(points = {}) {
   return [
@@ -15,6 +16,7 @@ function getIpcDetailRows(points = {}) {
 }
 
 function TeacherWaliKelas() {
+  const minIpc = useMinIpc();
   const [classData, setClassData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -29,10 +31,7 @@ function TeacherWaliKelas() {
 
   const fetchMyClass = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/wali-kelas/my-class', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/wali-kelas/my-class');
       setClassData(response.data);
       setLoading(false);
     } catch (error) {
@@ -49,10 +48,7 @@ function TeacherWaliKelas() {
     setIpcDetail(null);
     
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`/reports/ipc-card/${student.id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get(`/reports/ipc-card/${student.id}`);
       setIpcDetail(response.data);
     } catch (error) {
       console.error('Error fetching IPC detail:', error);
@@ -306,7 +302,7 @@ function TeacherWaliKelas() {
                   </td>
                   <td style={{ padding: '12px', textAlign: 'center' }}>
                     <span style={{ 
-                      backgroundColor: getIpcColor(student.ipc_total),
+                      backgroundColor: isBelowMinIpc(student.ipc_total || 80, minIpc) ? '#dc3545' : getIpcColor(student.ipc_total),
                       color: 'white',
                       padding: '4px 8px',
                       borderRadius: '4px',
@@ -518,7 +514,7 @@ function TeacherWaliKelas() {
                   </div>
                   <div style={{ 
                     padding: '15px', 
-                    backgroundColor: getIpcColor(selectedStudent.ipc_total || 80), 
+                    backgroundColor: isBelowMinIpc(selectedStudent.ipc_total || 80, minIpc) ? '#dc3545' : getIpcColor(selectedStudent.ipc_total || 80), 
                     borderRadius: '8px',
                     textAlign: 'center',
                     color: 'white'

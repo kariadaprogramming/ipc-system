@@ -1,6 +1,6 @@
 # IPC School System
 
-Sistem Indeks Prestasi dan Karakter untuk sekolah dengan fitur lengkap untuk mengelola prestasi, organisasi, event, pelanggaran, dan perilaku siswa.
+Sistem Individual Point Card untuk sekolah dengan fitur lengkap untuk mengelola prestasi, organisasi, event, pelanggaran, dan perilaku siswa.
 
 ## Tampilan Web 
 
@@ -110,7 +110,7 @@ Sistem Indeks Prestasi dan Karakter untuk sekolah dengan fitur lengkap untuk men
 
 ### Backend
 - Node.js (Express.js)
-- MySQL
+- PostgreSQL (via `pg` / node-postgres)
 - JWT Authentication
 - Multer (file upload)
 - Bcrypt (password hashing)
@@ -124,18 +124,34 @@ Sistem Indeks Prestasi dan Karakter untuk sekolah dengan fitur lengkap untuk men
 
 ### Prasyarat
 - Node.js (v14 atau lebih tinggi)
-- MySQL / XAMPP
+- PostgreSQL (v14 atau lebih tinggi) — download: https://www.postgresql.org/download/
+  (installer Windows EDB sudah termasuk pgAdmin 4; catat password user `postgres`)
 - npm atau yarn
 
 ### Langkah-langkah
 
 #### 1. Setup Database
-1. Buka phpMyAdmin
-2. Buat database baru bernama `ipc_school`
-3. Import file `backend/database/skema.sql` ke database `ipc_school`
-4. Pastikan database berhasil dibuat dengan semua tabel
+Cara otomatis (disarankan) — membuat database + mengimpor seluruh skema:
+```bash
+cd backend
+npm install
+npm run db:setup
+```
+`npm run db:setup` membaca koneksi dari `backend/.env`, membuat database
+`ipc_school` jika belum ada, lalu mengimpor `database/skema.sql`
+(semua tabel + data awal IPC).
 
-**Catatan**: Gunakan file `skema.sql` untuk instalasi baru. File `ipc_school.sql` berisi data contoh dan `biodata_approval_schema.sql` sudah termasuk dalam skema.sql.
+Cara manual:
+1. Buat database baru bernama `ipc_school` — via pgAdmin
+   (klik kanan *Databases* → *Create*) atau terminal: `createdb -U postgres ipc_school`
+2. Import file `backend/database/skema.sql` ke database `ipc_school`:
+   `psql -U postgres -d ipc_school -f backend/database/skema.sql`
+3. Pastikan database berhasil dibuat dengan semua tabel (`\dt` di psql)
+
+> 🖱️ Baru pertama kali pakai PostgreSQL? Lihat panduan klik-per-klik
+> **pgAdmin 4 di Windows** di `REQUIREMENTS.md` (Step 4).
+
+**Catatan**: Gunakan file `skema.sql` untuk instalasi baru.
 
 #### 2. Setup Backend
 ```bash
@@ -147,8 +163,9 @@ npm install
 Edit file `backend/.env` sesuai konfigurasi database Anda:
 ```
 DB_HOST=localhost
-DB_USER=root
+DB_USER=postgres
 DB_PASSWORD=
+DB_PORT=5432
 DB_NAME=ipc_school
 PORT=5000
 JWT_SECRET=your_jwt_secret_key_here_change_in_production
@@ -375,9 +392,10 @@ full project ipcs/
 ## Troubleshooting
 
 ### Database Connection Error
-- Pastikan MySQL/XAMPP sedang berjalan
-- Cek konfigurasi di file `backend/.env`
-- Pastikan database `ipc_school` sudah dibuat
+- Pastikan PostgreSQL sedang berjalan (`pg_isready` harus menjawab `accepting connections`;
+  Windows: cek *Services* → `postgresql-x64-*` → *Running*)
+- Cek konfigurasi di file `backend/.env` (terutama `DB_PASSWORD` = password user `postgres`)
+- Pastikan database `ipc_school` sudah dibuat (`npm run db:setup` membuatnya otomatis)
 
 ### CORS Error
 - Pastikan backend berjalan di port 5000

@@ -2,7 +2,7 @@
 
 ## Overview
 
-This guide explains how to synchronize IPC (Indeks Prestasi dan Karakter) points across all output formats (Database, PDF Preview, Excel Export, etc.) to ensure consistency.
+This guide explains how to synchronize IPC (Individual Point Card) points across all output formats (Database, PDF Preview, Excel Export, etc.) to ensure consistency.
 
 ## Problem Statement
 

@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import API_BASE_URL from '../config';
+import { useMinIpc, isBelowMinIpc } from '../utils/minIpc';
+import { formatDisplayText } from '../utils/formatDisplayText';
 import StudentRecordsHistory from './StudentRecordsHistory';
 
 function StudentDetail({ student, onClose }) {
+    const minIpc = useMinIpc();
     const [records, setRecords] = useState(null);
     const [ipcHistory, setIpcHistory] = useState([]);
     const [ipcCard, setIpcCard] = useState(null);
@@ -24,20 +27,13 @@ function StudentDetail({ student, onClose }) {
 
         const fetchData = async () => {
             try {
-                const token = localStorage.getItem('token');
                 const [recordsRes, historyRes] = await Promise.all([
-                    axios.get(`/users/${student.id}/records`, {
-                        headers: { Authorization: `Bearer ${token}` }
-                    }),
-                    axios.get(`/users/${student.id}/ipc-history`, {
-                        headers: { Authorization: `Bearer ${token}` }
-                    })
+                    api.get(`/users/${student.id}/records`),
+                    api.get(`/users/${student.id}/ipc-history`)
                 ]);
                 setRecords(recordsRes.data);
                 setIpcHistory(historyRes.data || []);
-                const ipcCardRes = await axios.get(`/reports/ipc-card/${student.id}`, {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
+                const ipcCardRes = await api.get(`/reports/ipc-card/${student.id}`);
                 setIpcCard(ipcCardRes.data);
             } catch (err) {
                 setError(err.response?.data?.message || 'Gagal memuat detail siswa');
@@ -130,7 +126,7 @@ function StudentDetail({ student, onClose }) {
                                         <strong>IPC:</strong>{' '}
                                         <span style={{ 
                                             fontSize: 20, 
-                                            color: (student.ipc_total ?? 0) < 0 ? '#dc2626' : '#3498db', 
+                                            color: (student.ipc_total ?? 0) < 0 || isBelowMinIpc(student.ipc_total ?? 0, minIpc) ? '#dc2626' : '#3498db', 
                                             fontWeight: 'bold' 
                                         }}>
                                             {(student.ipc_total ?? 0) < 0 ? `${student.ipc_total ?? 0} (MINUS)` : (student.ipc_total ?? 0)}
@@ -193,12 +189,12 @@ function StudentDetail({ student, onClose }) {
                                     <tbody>
                                         {ipcHistory.map((row) => (
                                             <tr key={row.id}>
-                                                <td>{row.jenis_perubahan}</td>
+                                                <td>{formatDisplayText(row.jenis_perubahan)}</td>
                                                 <td style={{ color: row.point_change >= 0 ? 'green' : 'red' }}>
                                                     {row.point_change >= 0 ? '+' : ''}{row.point_change}
                                                 </td>
                                                 <td>{row.ipc_sebelum} → {row.ipc_sesudah}</td>
-                                                {!isMobile && <td>{row.keterangan}</td>}
+                                                {!isMobile && <td>{formatDisplayText(row.keterangan)}</td>}
                                                 {!isMobile && <td>{new Date(row.created_at).toLocaleDateString('id-ID')}</td>}
                                             </tr>
                                         ))}

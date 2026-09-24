@@ -1,19 +1,7 @@
 // API Configuration
-// Automatically detects environment based on hostname
-// Uses localhost for local development, production IP for remote access
+// Uses relative paths for consolidated single-server deployment
+// Frontend and backend are served from the same origin
 
-const getApiBaseUrl = () => {
-  const hostname = window.location.hostname;
-  
-  // Local development
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    return 'http://localhost:5000/api';
-  }
-  
-  // Production server
-  return 'http://202.162.215.133:5000/api';
-};
-
-const API_BASE_URL = getApiBaseUrl();
+const API_BASE_URL = '/api';
 
 export default API_BASE_URL;

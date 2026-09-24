@@ -27,18 +27,26 @@ const logoUpload = multer({ storage: logoStorage });
 router.get('/public', async (req, res) => {
   try {
     const [rows] = await db.query(
-      'SELECT school_name, school_description, logo_url FROM school_config LIMIT 1'
+      'SELECT school_name, school_description, logo_url, support_link FROM school_config LIMIT 1'
     );
 
     if (rows.length === 0) {
       return res.json({
         school_name: 'SMK Negeri Bali Mandara',
         school_description: 'Sistem Individual Point Card (IPC) • Panel Admin',
-        logo_url: null
+        logo_url: null,
+        support_link: null
       });
     }
 
-    res.json(rows[0]);
+    // Transform logo_url to ensure it's a proper relative path
+    const config = rows[0];
+    if (config.logo_url && !config.logo_url.startsWith('http')) {
+      // Ensure relative path starts with /
+      config.logo_url = config.logo_url.startsWith('/') ? config.logo_url : `/${config.logo_url}`;
+    }
+
+    res.json(config);
   } catch (error) {
     console.error('Error fetching public school config:', error);
     res.status(500).json({ message: 'Failed to fetch school configuration' });
@@ -52,7 +60,7 @@ router.use(auth);
 router.get('/', async (req, res) => {
   try {
     const [rows] = await db.query(
-      'SELECT * FROM school_config LIMIT 1'
+      'SELECT id, school_name, school_description, principal_name, principal_nip, logo_url, support_link, created_at, updated_at FROM school_config LIMIT 1'
     );
 
     if (rows.length === 0) {
@@ -64,12 +72,19 @@ router.get('/', async (req, res) => {
         principal_name: 'Nama Kepala Sekolah',
         principal_nip: '',
         logo_url: null,
+        support_link: null,
         created_at: null,
         updated_at: null
       });
     }
 
-    res.json(rows[0]);
+    const config = rows[0];
+    // Transform logo_url to ensure it's a proper relative path
+    if (config.logo_url && !config.logo_url.startsWith('http')) {
+      config.logo_url = config.logo_url.startsWith('/') ? config.logo_url : `/${config.logo_url}`;
+    }
+
+    res.json(config);
   } catch (error) {
     console.error('Error fetching school config:', error);
     res.status(500).json({ message: 'Failed to fetch school configuration' });
@@ -79,7 +94,7 @@ router.get('/', async (req, res) => {
 // PUT school configuration (superadmin only)
 router.put('/', async (req, res) => {
   try {
-    const { school_name, school_description, principal_name, principal_nip, logo_url } = req.body;
+    const { school_name, school_description, principal_name, principal_nip, logo_url, support_link } = req.body;
     
     // Check if user is superadmin
     if (req.user.role !== 'superadmin') {
@@ -93,16 +108,16 @@ router.put('/', async (req, res) => {
       // Update existing config
       await db.query(
         `UPDATE school_config 
-         SET school_name = ?, school_description = ?, principal_name = ?, principal_nip = ?, logo_url = ?, updated_at = NOW()
+         SET school_name = ?, school_description = ?, principal_name = ?, principal_nip = ?, logo_url = ?, support_link = ?, updated_at = NOW()
          WHERE id = ?`,
-        [school_name, school_description, principal_name, principal_nip, logo_url, existing[0].id]
+        [school_name, school_description, principal_name, principal_nip, logo_url, support_link ?? null, existing[0].id]
       );
     } else {
       // Insert new config
       await db.query(
-        `INSERT INTO school_config (school_name, school_description, principal_name, principal_nip, logo_url, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, NOW(), NOW())`,
-        [school_name, school_description, principal_name, principal_nip, logo_url]
+        `INSERT INTO school_config (school_name, school_description, principal_name, principal_nip, logo_url, support_link, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+        [school_name, school_description, principal_name, principal_nip, logo_url, support_link ?? null]
       );
     }
     

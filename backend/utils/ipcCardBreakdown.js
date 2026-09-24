@@ -32,7 +32,10 @@ function createEmptyPoints(ipcAwal = 80) {
         pelanggaran_ringan: 0,
         pelanggaran_sedang: 0,
         pelanggaran_berat: 0,
-        pelanggaran_lainnya: 0
+        pelanggaran_lainnya: 0,
+        // Semua tingkat pelanggaran untuk cetakan individual:
+        // [{ id, name, point_value, total }] — total bertanda (negatif = pengurangan).
+        pelanggaran_levels: []
     };
 }
 
@@ -79,14 +82,16 @@ function calculateBreakdownTotal(points) {
     total += points.organisasi || 0;
     total += points.kepanitiaan || 0;
     total += points.event || 0;
-    total -= points.pelanggaran_ringan || 0;
-    total -= points.pelanggaran_sedang || 0;
-    total -= points.pelanggaran_berat || 0;
-    total -= points.pelanggaran_lainnya || 0;
+    // Pelanggaran disimpan sebagai point negatif (pengurangan), sama seperti
+    // yang diterapkan applyIpcChange ke users.ipc_total — jadi cukup dijumlahkan.
+    total += points.pelanggaran_ringan || 0;
+    total += points.pelanggaran_sedang || 0;
+    total += points.pelanggaran_berat || 0;
+    total += points.pelanggaran_lainnya || 0;
     return total;
 }
 
-async function buildIpcCardBreakdown(userId) {
+async function buildIpcCardBreakdown(userId, cutoff = null) {
     const [students] = await db.query(
         `SELECT id, nama, nis, kelas, grha, ipc_total, ipc_awal
          FROM users
@@ -101,9 +106,14 @@ async function buildIpcCardBreakdown(userId) {
     const student = students[0];
     const points = createEmptyPoints(student.ipc_awal ?? 80);
 
+    // Cutoff opsional (string 'YYYY-MM-DD'): hanya record dengan
+    // created_at SEBELUM tanggal ini yang dihitung. Tanpa cutoff = semua.
+    const before = cutoff ? ' AND created_at < ?' : '';
+    const beforeParam = (params) => (cutoff ? [...params, cutoff] : params);
+
     const [prestasi] = await db.query(
-        `SELECT jenis, point FROM prestasi WHERE user_id = ? AND status = 'approved'`,
-        [userId]
+        `SELECT jenis, point FROM prestasi WHERE user_id = ? AND status = 'approved'${before}`,
+        beforeParam([userId])
     );
     prestasi.forEach((row) => {
         if (row.jenis === 'akademik') {
@@ -114,45 +124,97 @@ async function buildIpcCardBreakdown(userId) {
     });
 
     const [organisasi] = await db.query(
-        `SELECT point FROM organisasi WHERE user_id = ? AND status = 'approved'`,
-        [userId]
+        `SELECT point FROM organisasi WHERE user_id = ? AND status = 'approved'${before}`,
+        beforeParam([userId])
     );
     points.organisasi = organisasi.reduce((sum, row) => sum + (row.point || 0), 0);
 
     const [kepanitiaan] = await db.query(
-        `SELECT point FROM kepanitiaan WHERE user_id = ? AND status = 'approved'`,
-        [userId]
+        `SELECT point FROM kepanitiaan WHERE user_id = ? AND status = 'approved'${before}`,
+        beforeParam([userId])
     );
     points.kepanitiaan = kepanitiaan.reduce((sum, row) => sum + (row.point || 0), 0);
 
     const [event] = await db.query(
-        `SELECT point FROM event WHERE user_id = ? AND status = 'approved'`,
-        [userId]
+        `SELECT point FROM event WHERE user_id = ? AND status = 'approved'${before}`,
+        beforeParam([userId])
     );
     points.event = event.reduce((sum, row) => sum + (row.point || 0), 0);
 
-    const [pelanggaran] = await db.query(
-        `SELECT jenis_pelanggaran, point_dikurangi FROM pelanggaran WHERE user_id = ? AND status = 'approved'`,
-        [userId]
+    const [levels] = await db.query(
+        'SELECT id, name, point_value, is_active FROM ipc_pelanggaran_level'
     );
+
+    // jenis_pelanggaran menyimpan NAMA DETAIL (bukan nama tingkat), jadi record
+    // dipetakan: detail -> tingkat, dengan fallback nama record = nama tingkat
+    // (data lama). created_at perlu diberi alias p. karena ada banyak tabel.
+    const beforeP = cutoff ? ' AND p.created_at < ?' : '';
+    const [pelanggaran] = await db.query(
+        `SELECT p.jenis_pelanggaran, p.point_dikurangi,
+                COALESCE(d.level_id, by_name.id) AS level_id
+         FROM pelanggaran p
+         LEFT JOIN ipc_pelanggaran_detail d ON d.name = p.jenis_pelanggaran
+         LEFT JOIN ipc_pelanggaran_level by_name ON by_name.name = p.jenis_pelanggaran
+         WHERE p.user_id = ? AND p.status = 'approved'${beforeP}`,
+        beforeParam([userId])
+    );
+
+    const levelById = new Map(levels.map((l) => [l.id, l]));
+    const levelTotals = new Map(); // level_id -> akumulasi point (negatif)
+    let unresolved = 0;
+
     pelanggaran.forEach((row) => {
-        const jenis = row.jenis_pelanggaran?.toLowerCase();
-        if (jenis === 'ringan') {
-            points.pelanggaran_ringan += row.point_dikurangi || 0;
-        } else if (jenis === 'sedang') {
-            points.pelanggaran_sedang += row.point_dikurangi || 0;
-        } else if (jenis === 'berat') {
-            points.pelanggaran_berat += row.point_dikurangi || 0;
+        const delta = row.point_dikurangi || 0;
+        const level = row.level_id != null ? levelById.get(row.level_id) : null;
+
+        if (!level) {
+            // Detail/tingkat sudah dihapus — tetap dihitung sebagai "lainnya".
+            unresolved += delta;
+            points.pelanggaran_lainnya += delta;
+            return;
+        }
+
+        levelTotals.set(level.id, (levelTotals.get(level.id) || 0) + delta);
+
+        // Legacy buckets untuk leger per kelas (kolom Ringan/Sedang/Berat).
+        const name = level.name.toLowerCase();
+        if (name.includes('ringan')) {
+            points.pelanggaran_ringan += delta;
+        } else if (name.includes('sedang')) {
+            points.pelanggaran_sedang += delta;
+        } else if (name.includes('berat')) {
+            points.pelanggaran_berat += delta;
         } else {
-            points.pelanggaran_lainnya += row.point_dikurangi || 0;
+            // Tingkat custom (mis. "anjay") -> hanya masuk "lainnya" di leger,
+            // tapi tetap punya baris sendiri di cetakan individual.
+            points.pelanggaran_lainnya += delta;
         }
     });
 
+    // Baris cetak: SEMUA tingkat (aktif atau punya record siswa), diurutkan
+    // dari point terkecil ke terbesar yang dipotong (-1, -5, -25, -125, ...).
+    const pelanggaranLevels = levels
+        .filter((l) => l.is_active || (levelTotals.get(l.id) || 0) !== 0)
+        .map((l) => ({
+            id: l.id,
+            name: l.name,
+            point_value: l.point_value,
+            total: levelTotals.get(l.id) || 0
+        }))
+        .sort((a, b) => (b.point_value - a.point_value) || String(a.name).localeCompare(String(b.name)));
+
+    if (unresolved !== 0) {
+        pelanggaranLevels.push({ id: null, name: 'Lainnya', point_value: null, total: unresolved });
+    }
+    points.pelanggaran_levels = pelanggaranLevels;
+
+    // Perilaku memakai penilaian TERAKHIR; dengan cutoff berarti
+    // penilaian terakhir SEBELUM tanggal cutoff (kondisi saat itu).
     const [perilaku] = await db.query(
         `SELECT karakter_siswa, point FROM perilaku
-         WHERE user_id = ? AND status = 'approved'
+         WHERE user_id = ? AND status = 'approved'${before}
          ORDER BY created_at DESC LIMIT 1`,
-        [userId]
+        beforeParam([userId])
     );
     if (perilaku.length > 0) {
         await addPerilakuPoints(points, perilaku[0].karakter_siswa);

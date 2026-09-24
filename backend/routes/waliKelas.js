@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { auth, superAdminOnly, teacherOnly } = require('../middleware/auth');
 const db = require('../config/database');
-const { validateTahunPelajaran, getCurrentAcademicYear } = require('../utils/academicYear');
+const { validateTahunPelajaran, getCurrentAcademicYear, calculateCurrentClass } = require('../utils/academicYear');
 const { buildIpcCardBreakdown } = require('../utils/ipcCardBreakdown');
 
 function getRequestedAcademicYear(req) {
@@ -83,8 +83,7 @@ router.get('/class-statistics', auth, superAdminOnly, async (req, res) => {
 
                 // Filter students who should be in this class for the selected academic year
                 const students = allStudents.filter(student => {
-                    const { calculateCurrentClass } = require('../utils/academicYear');
-                    const expectedClass = calculateCurrentClass(student.tahun_pelajaran);
+                    const expectedClass = calculateCurrentClass(student.tahun_pelajaran, tahunAjaran);
                     if (!expectedClass) return false; // Graduated students
                     
                     // Build full class name (e.g., "X TKJ 1")
@@ -263,10 +262,9 @@ router.get('/my-class', auth, teacherOnly, async (req, res) => {
                     ORDER BY u.nama ASC
                 `);
 
-                // Filter students who should be in this class for the current academic year
+                // Filter students who should be in this class for the assignment's academic year
                 const students = allStudents.filter(student => {
-                    const { calculateCurrentClass } = require('../utils/academicYear');
-                    const expectedClass = calculateCurrentClass(student.tahun_pelajaran);
+                    const expectedClass = calculateCurrentClass(student.tahun_pelajaran, tahunAjaran);
                     if (!expectedClass) return false; // Graduated students
                     
                     // Build full class name (e.g., "X TKJ 1")
@@ -367,10 +365,9 @@ router.get('/my-class', auth, teacherOnly, async (req, res) => {
             ORDER BY u.nama ASC
         `);
 
-        // Filter students who should be in this class for the current academic year
+        // Filter students who should be in this class for the assignment's academic year
         const students = allStudents.filter(student => {
-            const { calculateCurrentClass } = require('../utils/academicYear');
-            const expectedClass = calculateCurrentClass(student.tahun_pelajaran);
+            const expectedClass = calculateCurrentClass(student.tahun_pelajaran, assignment[0].tahun_ajaran);
             if (!expectedClass) return false; // Graduated students
             
             // Build full class name (e.g., "X TKJ 1")
@@ -499,11 +496,11 @@ router.post('/', auth, superAdminOnly, async (req, res) => {
         // Log activity
         await db.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Assign Wali Kelas', `Assigned teacher ${guruNama} as wali kelas for ${kelas}`]
+            [req.user.id, 'ASSIGN_WALI_KELAS', `Assigned teacher ${guruNama} as wali kelas for ${kelas}`]
         );
 
         // Notify all pembina (gurus)
-        const [pembinas] = await db.query('SELECT id FROM users WHERE role = "guru"');
+        const [pembinas] = await db.query("SELECT id FROM users WHERE role = 'guru'");
         for (const pembina of pembinas) {
             await db.query(
                 `INSERT INTO notifications (user_id, type, title, message, related_id, related_type) 
@@ -604,7 +601,7 @@ router.delete('/:id', auth, superAdminOnly, async (req, res) => {
         // Log activity
         await db.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Remove Wali Kelas', `Removed ${guruNama} as wali kelas for ${kelas}`]
+            [req.user.id, 'REMOVE_WALI_KELAS', `Removed ${guruNama} as wali kelas for ${kelas}`]
         );
 
         // Notify the removed teacher

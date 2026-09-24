@@ -22,8 +22,36 @@ router.get('/', auth, superAdminOnly, async (req, res) => {
 router.get('/user/:userId', auth, async (req, res) => {
     try {
         const [permissions] = await db.query(
-            'SELECT * FROM permissions WHERE user_id = ?',
+            'SELECT id, user_id, can_input_prestasi, can_input_organisasi, can_input_kepanitiaan, can_input_event, can_input_pelanggaran, can_input_perilaku FROM permissions WHERE user_id = ?',
             [req.params.userId]
+        );
+        
+        if (permissions.length === 0) {
+            return res.json({
+                can_input_prestasi: false,
+                can_input_organisasi: false,
+                can_input_kepanitiaan: false,
+                can_input_event: false,
+                can_input_pelanggaran: false,
+                can_input_perilaku: false,
+                can_view_all_data: false
+            });
+        }
+        
+        res.json(permissions[0]);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Get current user's permissions
+router.get('/my-permissions', auth, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const [permissions] = await db.query(
+            'SELECT id, user_id, can_input_prestasi, can_input_organisasi, can_input_kepanitiaan, can_input_event, can_input_pelanggaran, can_input_perilaku FROM permissions WHERE user_id = ?',
+            [userId]
         );
         
         if (permissions.length === 0) {
@@ -51,15 +79,27 @@ router.put('/user/:userId', auth, superAdminOnly, async (req, res) => {
         const userId = req.params.userId;
         const { can_input_prestasi, can_input_organisasi, can_input_kepanitiaan, can_input_event, can_input_pelanggaran, can_input_perilaku, can_view_all_data } = req.body;
 
-        await db.query(
-            'UPDATE permissions SET can_input_prestasi = ?, can_input_organisasi = ?, can_input_kepanitiaan = ?, can_input_event = ?, can_input_pelanggaran = ?, can_input_perilaku = ?, can_view_all_data = ? WHERE user_id = ?',
-            [can_input_prestasi, can_input_organisasi, can_input_kepanitiaan, can_input_event, can_input_pelanggaran, can_input_perilaku, can_view_all_data, userId]
-        );
+        // Check if permissions exist for this user
+        const [existing] = await db.query('SELECT id FROM permissions WHERE user_id = ?', [userId]);
+        
+        if (existing.length === 0) {
+            // Create new permissions record
+            await db.query(
+                'INSERT INTO permissions (user_id, can_input_prestasi, can_input_organisasi, can_input_kepanitiaan, can_input_event, can_input_pelanggaran, can_input_perilaku, can_view_all_data) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                [userId, can_input_prestasi, can_input_organisasi, can_input_kepanitiaan, can_input_event, can_input_pelanggaran, can_input_perilaku, can_view_all_data]
+            );
+        } else {
+            // Update existing permissions
+            await db.query(
+                'UPDATE permissions SET can_input_prestasi = ?, can_input_organisasi = ?, can_input_kepanitiaan = ?, can_input_event = ?, can_input_pelanggaran = ?, can_input_perilaku = ?, can_view_all_data = ? WHERE user_id = ?',
+                [can_input_prestasi, can_input_organisasi, can_input_kepanitiaan, can_input_event, can_input_pelanggaran, can_input_perilaku, can_view_all_data, userId]
+            );
+        }
 
         // Log activity
         await db.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Update Permissions', `Updated permissions for user ID ${userId}`]
+            [req.user.id, 'UPDATE_PERMISSIONS', `Updated permissions for user ID ${userId}`]
         );
 
         res.json({ message: 'Permissions updated successfully' });
@@ -72,25 +112,27 @@ router.put('/user/:userId', auth, superAdminOnly, async (req, res) => {
 // Set permissions for all students (bulk)
 router.post('/bulk-students', auth, superAdminOnly, async (req, res) => {
     try {
-        const { can_input_prestasi, can_input_organisasi, can_input_kepanitiaan, can_input_event, can_input_pelanggaran, can_input_perilaku } = req.body;
+        const { can_input_prestasi, can_input_organisasi, can_input_kepanitiaan, can_input_event } = req.body;
 
+        // This endpoint only targets students (u.role = 'siswa'), and pelanggaran/perilaku
+        // are guru-only input types — always force them off regardless of the request body.
         await db.query(
             `UPDATE permissions p 
              JOIN users u ON p.user_id = u.id 
              SET p.can_input_prestasi = ?, 
                  p.can_input_organisasi = ?, 
-                 p.can_input_kepanitiaan = ?, 
+                 p.can_input_kepanitiaan = ?,
                  p.can_input_event = ?,
-                 p.can_input_pelanggaran = ?,
-                 p.can_input_perilaku = ? 
+                 p.can_input_pelanggaran = false,
+                 p.can_input_perilaku = false 
              WHERE u.role = 'siswa'`,
-            [can_input_prestasi, can_input_organisasi, can_input_kepanitiaan, can_input_event, can_input_pelanggaran, can_input_perilaku]
+            [can_input_prestasi, can_input_organisasi, can_input_kepanitiaan, can_input_event]
         );
 
         // Log activity
         await db.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Bulk Update Permissions', 'Updated permissions for all students']
+            [req.user.id, 'BULK_UPDATE_PERMISSIONS', 'Updated permissions for all students']
         );
 
         res.json({ message: 'Bulk permissions updated successfully' });

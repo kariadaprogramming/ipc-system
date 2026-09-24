@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
+import { formatDisplayText } from '../utils/formatDisplayText';
 import Select from 'react-select';
 import EditModal from './EditModal';
 import useEditModal from '../hooks/useEditModal';
@@ -44,29 +45,27 @@ function InputEvent() {
     'internasional'
   ];
 
-  const formatDisplayText = (text) => {
-    return text
-      .replace(/_/g, ' ')
-      .replace(/\b\w+\b/g, word => {
-        // Check if word is Roman numeral (I, II, III, etc.)
-        if (/^[ivx]+$/.test(word.toLowerCase())) {
-          return word.toUpperCase();
-        }
-        return word.charAt(0).toUpperCase() + word.slice(1);
-      });
-  };
-
   useEffect(() => {
-    fetchUserSubmissions();
-    checkAccess();
-    fetchIpcConfig();
-    // Get user role from localStorage
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     setUserRole(user.role || '');
+
+    // Auto-fill biodata for siswa
+    if (user.role === 'siswa') {
+      setFormData(prev => ({
+        ...prev,
+        nama: user.nama || '',
+        nis: user.nis || '',
+        kelas: user.kelas || '',
+        grha: user.grha || ''
+      }));
+    } else {
+      // Only fetch students for guru/superadmin
+      fetchStudents();
+    }
+
     fetchUserSubmissions();
-    fetchIpcConfig();
-    fetchStudents();
     checkAccess();
+    fetchIpcConfig();
     if (user.role === 'superadmin') {
       fetchAllEvent();
     }
@@ -75,10 +74,7 @@ function InputEvent() {
   const fetchAllEvent = async () => {
     try {
       setLoadingIndex(true);
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/event/all', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/event/all');
       setAllEvent(response.data);
     } catch (error) {
       console.error('Error fetching all event:', error);
@@ -89,7 +85,6 @@ function InputEvent() {
 
   const checkAccess = async () => {
     try {
-      const token = localStorage.getItem('token');
       const user = JSON.parse(localStorage.getItem('user') || '{}');
       
       // Superadmin always has access
@@ -99,9 +94,7 @@ function InputEvent() {
         return;
       }
       
-      const response = await axios.get('/input-access/status/my-access', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/input-access/status/my-access');
       
       const canInputEvent = response.data.event;
       setHasAccess(canInputEvent);
@@ -119,10 +112,7 @@ function InputEvent() {
 
   const fetchUserSubmissions = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/approvals-v2/user-submissions', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/approvals-v2/user-submissions');
       setSubmissions(response.data.event || []);
     } catch (error) {
       console.error('Error fetching submissions:', error);
@@ -131,10 +121,7 @@ function InputEvent() {
 
   const fetchIpcConfig = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/ipc-config/active', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/ipc-config/active');
       setIpcConfig(response.data);
       const firstTingkat = response.data.event?.[0]?.field1;
       if (firstTingkat) {
@@ -151,11 +138,8 @@ function InputEvent() {
 
   const fetchStudents = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/users', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const studentList = response.data.filter(user => user.role === 'siswa');
+      const response = await api.get('/users?role=siswa&limit=500');
+      const studentList = response.data.users?.filter(user => user.role === 'siswa') || [];
       setStudents(studentList);
     } catch (error) {
       console.error('Error fetching students:', error);
@@ -220,10 +204,7 @@ function InputEvent() {
 
   const fetchStudentData = async (nis) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`/users/nis/${nis}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get(`/users/nis/${nis}`);
       
       if (response.data) {
         setFormData(prev => ({
@@ -242,10 +223,7 @@ function InputEvent() {
 
   const fetchStudentDataByName = async (nama) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`/users/nama/${nama}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get(`/users/nama/${nama}`);
       
       if (response.data) {
         setFormData(prev => ({
@@ -272,7 +250,6 @@ function InputEvent() {
     setLoading(true);
 
     try {
-      const token = localStorage.getItem('token');
       const data = new FormData();
       Object.keys(formData).forEach(key => {
         data.append(key, formData[key]);
@@ -285,12 +262,7 @@ function InputEvent() {
         data.append('foto', fileToUpload);
       }
 
-      await axios.post('/approvals-v2/event/submit', data, {
-        headers: { 
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data'
-        }
-      });
+      await api.post('/approvals-v2/event/submit', data);
 
       setMessage(userRole === 'superadmin' ? 'Event berhasil ditambahkan!' : 'Event berhasil diajukan untuk persetujuan!');
       if (userRole === 'superadmin') {
@@ -325,10 +297,7 @@ function InputEvent() {
     }
 
     try {
-      const token = localStorage.getItem('token');
-      await axios.delete(`/event/${id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.delete(`/event/${id}`);
       setMessage('Event berhasil dihapus!');
       fetchAllEvent();
     } catch (error) {
@@ -343,7 +312,6 @@ function InputEvent() {
   const handleUpdate = async () => {
     editModal.setIsLoading(true);
     try {
-      const token = localStorage.getItem('token');
       const data = new FormData();
       Object.keys(editModal.editFormData).forEach(key => {
         if (key !== 'id' && key !== 'created_at' && key !== 'status' && key !== 'user_id') {
@@ -357,12 +325,7 @@ function InputEvent() {
         data.append('foto', fileToUpload);
       }
 
-      await axios.put(`/event/${editModal.editingItem.id}`, data, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data'
-        }
-      });
+      await api.put(`/event/${editModal.editingItem.id}`, data);
 
       setMessage('Event berhasil diperbarui!');
       fetchAllEvent();
@@ -495,37 +458,69 @@ function InputEvent() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <div className="form-group">
             <label>Nama <span className="required">*</span></label>
-            <Select
-              value={students.find(s => s.nama === formData.nama && s.nis === formData.nis) ? { value: formData.nama, label: formData.nama, nama: formData.nama, nis: formData.nis, kelas: formData.kelas, grha: formData.grha } : null}
-              onChange={(selected) => handleStudentSelect(selected)}
-              options={students.map(student => ({ value: student.nama, label: `${student.nama} (${student.nis})`, nama: student.nama, nis: student.nis, kelas: student.kelas, grha: student.grha }))}
-              placeholder="Cari nama siswa..."
-              isSearchable
-              isClearable
-              styles={{
-                control: (provided) => ({
-                  ...provided,
-                  minHeight: '40px'
-                })
-              }}
-            />
+            {userRole === 'siswa' ? (
+              <input
+                type="text"
+                value={formData.nama}
+                disabled
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #d0d0d0',
+                  borderRadius: '4px',
+                  backgroundColor: '#f5f5f5',
+                  color: '#666'
+                }}
+              />
+            ) : (
+              <Select
+                value={students.find(s => s.nama === formData.nama && s.nis === formData.nis) ? { value: formData.nama, label: formData.nama, nama: formData.nama, nis: formData.nis, kelas: formData.kelas, grha: formData.grha } : null}
+                onChange={(selected) => handleStudentSelect(selected)}
+                options={students.map(student => ({ value: student.nama, label: `${student.nama} (${student.nis})`, nama: student.nama, nis: student.nis, kelas: student.kelas, grha: student.grha }))}
+                placeholder="Cari nama siswa..."
+                isSearchable
+                isClearable
+                styles={{
+                  control: (provided) => ({
+                    ...provided,
+                    minHeight: '40px'
+                  })
+                }}
+              />
+            )}
           </div>
           <div className="form-group">
             <label>NIS <span className="required">*</span></label>
-            <Select
-              value={students.find(s => s.nis === formData.nis) ? { value: formData.nis, label: formData.nis, nama: formData.nama, nis: formData.nis, kelas: formData.kelas, grha: formData.grha } : null}
-              onChange={(selected) => handleStudentSelect(selected)}
-              options={students.map(student => ({ value: student.nis, label: `${student.nis} - ${student.nama}`, nama: student.nama, nis: student.nis, kelas: student.kelas, grha: student.grha }))}
-              placeholder="Cari NIS siswa..."
-              isSearchable
-              isClearable
-              styles={{
-                control: (provided) => ({
-                  ...provided,
-                  minHeight: '40px'
-                })
-              }}
-            />
+            {userRole === 'siswa' ? (
+              <input
+                type="text"
+                value={formData.nis}
+                disabled
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #d0d0d0',
+                  borderRadius: '4px',
+                  backgroundColor: '#f5f5f5',
+                  color: '#666'
+                }}
+              />
+            ) : (
+              <Select
+                value={students.find(s => s.nis === formData.nis) ? { value: formData.nis, label: formData.nis, nama: formData.nama, nis: formData.nis, kelas: formData.kelas, grha: formData.grha } : null}
+                onChange={(selected) => handleStudentSelect(selected)}
+                options={students.map(student => ({ value: student.nis, label: `${student.nis} - ${student.nama}`, nama: student.nama, nis: student.nis, kelas: student.kelas, grha: student.grha }))}
+                placeholder="Cari NIS siswa..."
+                isSearchable
+                isClearable
+                styles={{
+                  control: (provided) => ({
+                    ...provided,
+                    minHeight: '40px'
+                  })
+                }}
+              />
+            )}
           </div>
         </div>
 

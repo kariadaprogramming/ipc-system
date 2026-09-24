@@ -1,11 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const VALID_TEACHER_JABATAN = ['Guru', 'Pegawai', 'Staff'];
+const VALID_TEACHER_JABATAN = ['Guru', 'Pegawai'];
 const bcrypt = require('bcryptjs');
 const { auth, superAdminOnly, teacherOrSuperAdmin } = require('../middleware/auth');
 const db = require('../config/database');
 const { getStudentRecords } = require('../utils/studentRecords');
 const { validateTahunPelajaran, calculateCurrentClass, shouldGraduate, getClassInfo, calculateFullClass } = require('../utils/academicYear');
+const { logActivity } = require('../utils/logger');
+const { syncBiodataChange } = require('../utils/biodataSync');
 
 async function applyIpcAwalUpdate(userId, newIpcAwal, adminId) {
     const parsedAwal = parseInt(newIpcAwal, 10);
@@ -54,7 +56,7 @@ async function applyIpcAwalUpdate(userId, newIpcAwal, adminId) {
 
         await db.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [adminId, 'Update IPC Awal', `Updated IPC awal for user ID ${userId} to ${parsedAwal}`]
+            [adminId, 'UPDATE_IPC_AWAL', `Updated IPC awal for user ID ${userId} to ${parsedAwal}`]
         );
     }
 
@@ -143,38 +145,112 @@ router.get('/nama/:nama', auth, async (req, res) => {
     }
 });
 
-// Get all users (Superadmin and Teacher)
+// Get all users (Superadmin and Teacher) - with pagination
 router.get('/', auth, teacherOrSuperAdmin, async (req, res) => {
     try {
+        const { page = 1, limit = 50, search = '', role: roleFilter } = req.query;
+        const offset = (page - 1) * limit;
+
         // If guru, only return students (excluding graduated)
         if (req.user.role === 'guru') {
-            const [users] = await db.query('SELECT id, nama, nis, nip, role, kelas, grha, wali_kelas, ipc_total, ipc_awal, created_at, tahun_pelajaran, is_graduated, jurusan FROM users WHERE role = ? AND (is_graduated = 0 OR is_graduated IS NULL)', ['siswa']);
-            
+            let query = 'SELECT id, nama, nis, nip, role, kelas, grha, wali_kelas, ipc_total, ipc_awal, created_at, tahun_pelajaran, is_graduated, jurusan, detail, alamat, no_hp FROM users WHERE role = ? AND (is_graduated = 0 OR is_graduated IS NULL)';
+            let params = ['siswa'];
+
+            if (search) {
+                query += ' AND (nama LIKE ? OR nis LIKE ?)';
+                params.push(`%${search}%`, `%${search}%`);
+            }
+
+            query += ' ORDER BY nama ASC LIMIT ? OFFSET ?';
+            params.push(parseInt(limit), parseInt(offset));
+
+            const [users] = await db.query(query, params);
+
+            // Get total count for pagination
+            let countQuery = 'SELECT COUNT(*) as total FROM users WHERE role = ? AND (is_graduated = 0 OR is_graduated IS NULL)';
+            let countParams = ['siswa'];
+            if (search) {
+                countQuery += ' AND (nama LIKE ? OR nis LIKE ?)';
+                countParams.push(`%${search}%`, `%${search}%`);
+            }
+            const [countResult] = await db.query(countQuery, countParams);
+
             // Calculate and update class for each student
             const usersWithCalculatedClass = users.map(user => {
                 const calculatedClass = calculateFullClass(user.tahun_pelajaran, user.jurusan);
                 return {
                     ...user,
-                    kelas: calculatedClass || user.kelas // Use calculated class, fallback to stored
+                    kelas: calculatedClass || user.kelas
                 };
             });
-            return res.json(usersWithCalculatedClass);
+
+            return res.json({
+                users: usersWithCalculatedClass,
+                pagination: {
+                    page: parseInt(page),
+                    limit: parseInt(limit),
+                    total: countResult[0].total,
+                    totalPages: Math.ceil(countResult[0].total / limit)
+                }
+            });
         }
+
         // If superadmin, return all users (including graduated)
-        const [users] = await db.query('SELECT id, nama, nis, nip, role, kelas, grha, wali_kelas, ipc_total, ipc_awal, created_at, tahun_pelajaran, is_graduated, jurusan FROM users');
-        
+        let query = 'SELECT id, nama, nis, nip, role, kelas, grha, wali_kelas, ipc_total, ipc_awal, created_at, tahun_pelajaran, is_graduated, jurusan, detail, alamat, no_hp FROM users WHERE 1=1';
+        let params = [];
+
+        if (roleFilter) {
+            query += ' AND role = ?';
+            params.push(roleFilter);
+        }
+
+        if (search) {
+            query += ' AND (nama LIKE ? OR nis LIKE ? OR nip LIKE ?)';
+            params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+        }
+
+        query += ' ORDER BY nama ASC LIMIT ? OFFSET ?';
+        params.push(parseInt(limit), parseInt(offset));
+
+        const [users] = await db.query(query, params);
+
+        // Get total count for pagination
+        let countQuery = 'SELECT COUNT(*) as total FROM users WHERE 1=1';
+        let countParams = [];
+
+        if (roleFilter) {
+            countQuery += ' AND role = ?';
+            countParams.push(roleFilter);
+        }
+
+        if (search) {
+            countQuery += ' AND (nama LIKE ? OR nis LIKE ? OR nip LIKE ?)';
+            countParams.push(`%${search}%`, `%${search}%`, `%${search}%`);
+        }
+
+        const [countResult] = await db.query(countQuery, countParams);
+
         // Calculate and update class for each student
         const usersWithCalculatedClass = users.map(user => {
             if (user.role === 'siswa') {
                 const calculatedClass = calculateFullClass(user.tahun_pelajaran, user.jurusan);
                 return {
                     ...user,
-                    kelas: calculatedClass || user.kelas // Use calculated class, fallback to stored
+                    kelas: calculatedClass || user.kelas
                 };
             }
             return user;
         });
-        res.json(usersWithCalculatedClass);
+
+        res.json({
+            users: usersWithCalculatedClass,
+            pagination: {
+                page: parseInt(page),
+                limit: parseInt(limit),
+                total: countResult[0].total,
+                totalPages: Math.ceil(countResult[0].total / limit)
+            }
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error' });
@@ -276,7 +352,7 @@ router.get('/:id/ipc-history', auth, teacherOrSuperAdmin, async (req, res) => {
         }
 
         const [history] = await db.query(
-            'SELECT * FROM ipc_history WHERE user_id = ? ORDER BY created_at DESC',
+            'SELECT id, user_id, jenis_perubahan, point_change, ipc_sebelum, ipc_sesudah, keterangan, created_at FROM ipc_history WHERE user_id = ? ORDER BY created_at DESC',
             [userId]
         );
         res.json(history);
@@ -286,12 +362,24 @@ router.get('/:id/ipc-history', auth, teacherOrSuperAdmin, async (req, res) => {
     }
 });
 
-// Get user by ID
+// Get user by ID - IDOR protection: users can only access their own data unless they are admin/teacher
 router.get('/:id', auth, async (req, res) => {
     try {
+        const requestedUserId = parseInt(req.params.id);
+        const currentUserId = req.user.id;
+        const currentUserRole = req.user.role;
+
+        // IDOR protection: Only allow access if:
+        // 1. User is requesting their own data, OR
+        // 2. User is a superadmin, OR
+        // 3. User is a teacher
+        if (requestedUserId !== currentUserId && currentUserRole !== 'superadmin' && currentUserRole !== 'guru') {
+            return res.status(403).json({ message: 'Access denied. You can only view your own profile.' });
+        }
+
         const [users] = await db.query(
             'SELECT id, nama, nis, nip, role, kelas, grha, wali_kelas, ipc_total, alamat, no_hp, detail, detail AS jabatan, created_at FROM users WHERE id = ?',
-            [req.params.id]
+            [requestedUserId]
         );
         
         if (users.length === 0) {
@@ -306,7 +394,7 @@ router.get('/:id', auth, async (req, res) => {
                 SELECT u.nama as wali_kelas_nama, u.nip as wali_kelas_nip
                 FROM wali_kelas_assignment wka
                 JOIN users u ON wka.guru_id = u.id
-                WHERE wka.kelas = ? AND wka.tahun_ajaran = YEAR(CURDATE())
+                WHERE wka.kelas = ? AND SPLIT_PART(wka.tahun_ajaran, '-', 1)::INT = EXTRACT(YEAR FROM CURRENT_DATE)::INT
                 ORDER BY wka.id DESC
                 LIMIT 1
             `, [user.kelas]);
@@ -349,7 +437,7 @@ router.post('/create-student', auth, teacherOrSuperAdmin, async (req, res) => {
 
         // Check for duplicate in pending approvals
         const [existingApproval] = await db.query(
-            'SELECT id FROM student_creation_approvals WHERE nis = ? AND superadmin_status = "pending"',
+            "SELECT id FROM student_creation_approvals WHERE nis = ? AND superadmin_status = 'pending'",
             [nis]
         );
 
@@ -382,7 +470,7 @@ router.post('/create-student', auth, teacherOrSuperAdmin, async (req, res) => {
             // Log activity
             await db.query(
                 'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-                [req.user.id, 'Create Student', `Created student account for ${nama} (${nis})`]
+                [req.user.id, 'CREATE_STUDENT', `Created student account for ${nama} (${nis})`]
             );
 
             return res.status(201).json({ message: 'Akun siswa berhasil dibuat!' });
@@ -390,12 +478,12 @@ router.post('/create-student', auth, teacherOrSuperAdmin, async (req, res) => {
 
         // If Guru, create approval request
         const [result] = await db.query(
-            'INSERT INTO student_creation_approvals (nama, nis, kelas, grha, jurusan, password, tahun_pelajaran, requested_by, superadmin_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, "pending")',
+            "INSERT INTO student_creation_approvals (nama, nis, kelas, grha, jurusan, password, tahun_pelajaran, requested_by, superadmin_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')",
             [nama, nis, calculatedClass, grha, jurusan, hashedPassword, tahun_pelajaran, req.user.id]
         );
 
         // Notify superadmin
-        const [superadmins] = await db.query('SELECT id FROM users WHERE role = "superadmin"');
+        const [superadmins] = await db.query("SELECT id FROM users WHERE role = 'superadmin'");
         for (const admin of superadmins) {
             await db.query(
                 `INSERT INTO notifications (user_id, type, title, message, related_id, related_type) 
@@ -446,7 +534,7 @@ router.post('/create-teacher', auth, superAdminOnly, async (req, res) => {
         // Log activity
         await db.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Create Teacher', `Created teacher account for ${nama} (${nip})`]
+            [req.user.id, 'CREATE_TEACHER', `Created teacher account for ${nama} (${nip})`]
         );
 
         res.status(201).json({ message: 'Teacher account created successfully' });
@@ -476,21 +564,32 @@ router.put('/:id', auth, async (req, res) => {
         }
 
         const { nama, alamat, no_hp, jabatan, detail } = req.body;
-        const teacherJabatan = jabatan || detail;
-        if (teacherJabatan && !VALID_TEACHER_JABATAN.includes(teacherJabatan)) {
+
+        // Get current user data for logging (dan untuk validasi jabatan)
+        const [targetUserData] = await db.query('SELECT nama, role, detail FROM users WHERE id = ?', [userId]);
+        const storedJabatan = targetUserData[0]?.detail || null;
+        const oldUserName = targetUserData[0]?.nama || null;
+
+        let teacherJabatan = jabatan || detail;
+        if (!teacherJabatan) {
+            // Tidak dikirim / kosong -> pertahankan nilai yang sudah ada
+            teacherJabatan = storedJabatan;
+        } else if (teacherJabatan !== storedJabatan && !VALID_TEACHER_JABATAN.includes(teacherJabatan)) {
+            // Hanya nilai BARU yang divalidasi; nilai lama (legacy) yang tidak
+            // diubah tetap diterima agar edit biodata lain tidak terkunci
             return res.status(400).json({ message: `Jabatan tidak valid. Gunakan: ${VALID_TEACHER_JABATAN.join(', ')}` });
         }
-        
+
         await db.query(
             'UPDATE users SET nama = ?, alamat = ?, no_hp = ?, detail = ? WHERE id = ?',
             [nama, alamat, no_hp, teacherJabatan, userId]
         );
 
+        // Propagate renamed biodata into record snapshots, pembina names, logs.
+        await syncBiodataChange(userId, { nama: oldUserName });
+
         // Log activity
-        await db.query(
-            'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [currentUser.id, 'Update User', `Updated user ID ${userId}`]
-        );
+        await logActivity(currentUser.id, 'UPDATE_BIODATA', `User ${currentUser.nama} (${currentUser.role}) updated biodata for ${targetUserData[0]?.nama || userId} (${targetUserData[0]?.role})`, req.ip);
 
         res.json({ message: 'User updated successfully' });
     } catch (error) {
@@ -507,7 +606,7 @@ async function deleteUserAndDependencies(conn, userId) {
         } catch (e) {
             // Some installations/older schemas may not have certain columns (e.g. pembina_id).
             // In that case we retry with a simpler query instead of failing deletion.
-            if (e && e.code === 'ER_BAD_FIELD_ERROR') {
+            if (e && (e.code === 'ER_BAD_FIELD_ERROR' || e.code === '42703')) {
                 return false;
             }
             throw e;
@@ -571,7 +670,7 @@ router.post('/bulk-delete', auth, superAdminOnly, async (req, res) => {
 
         await conn.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Bulk Delete User', `Deleted ${parsed.length} users: ${parsed.join(',')}`]
+            [req.user.id, 'BULK_DELETE_USER', `Deleted ${parsed.length} users: ${parsed.join(',')}`]
         );
 
         await conn.commit();
@@ -604,7 +703,7 @@ router.delete('/:id', auth, superAdminOnly, async (req, res) => {
             await deleteUserAndDependencies(conn, userId);
             await conn.query(
                 'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-                [req.user.id, 'Delete User', `Deleted user ID ${userId}`]
+                [req.user.id, 'DELETE_USER', `Deleted user ID ${userId}`]
             );
             await conn.commit();
         } catch (e) {
@@ -681,7 +780,7 @@ router.post('/:id/biodata-request', auth, async (req, res) => {
         );
         
         // Notify superadmin
-        const [superadmins] = await db.query('SELECT id FROM users WHERE role = "superadmin"');
+        const [superadmins] = await db.query("SELECT id FROM users WHERE role = 'superadmin'");
         for (const admin of superadmins) {
             await db.query(
                 `INSERT INTO notifications (user_id, type, title, message, related_id, related_type) 
@@ -702,39 +801,55 @@ router.put('/biodata-approvals/:id', auth, superAdminOnly, async (req, res) => {
     try {
         const approvalId = parseInt(req.params.id);
         const { status, notes } = req.body;
-        
+
         // Get approval data
         const [approval] = await db.query(
-            'SELECT * FROM biodata_update_approvals WHERE id = ?',
+            'SELECT id, user_id, nama_baru, nis_baru, kelas_baru, jurusan_baru, tahun_pelajaran_baru, grha_baru, nama_lama, nis_lama, kelas_lama, jurusan_lama, tahun_pelajaran_lama, grha_lama, requested_by, superadmin_status, created_at FROM biodata_update_approvals WHERE id = ?',
             [approvalId]
         );
-        
+
         if (approval.length === 0) {
             return res.status(404).json({ message: 'Approval request not found' });
         }
-        
+
         const data = approval[0];
-        
+
         if (status === 'approved') {
+            // Capture pre-update identity so copies can be synced afterwards.
+            const [currentUserRows] = await db.query(
+                'SELECT nama, nis FROM users WHERE id = ?',
+                [data.user_id]
+            );
+            const oldBiodata = {
+                nama: currentUserRows[0]?.nama || data.nama_lama || null,
+                nis: currentUserRows[0]?.nis || data.nis_lama || null,
+            };
+
             // Update student data with new biodata
             await db.query(
                 'UPDATE users SET nama = ?, nis = ?, kelas = ?, jurusan = ?, tahun_pelajaran = ?, grha = ? WHERE id = ?',
                 [data.nama_baru, data.nis_baru, data.kelas_baru, data.jurusan_baru, data.tahun_pelajaran_baru, data.grha_baru, data.user_id]
             );
-            
+
+            // Propagate the approved biodata into record snapshots, logs, notifications.
+            await syncBiodataChange(data.user_id, oldBiodata);
+
             // Update approval status
             await db.query(
                 'UPDATE biodata_update_approvals SET superadmin_status = ?, superadmin_notes = ?, superadmin_approved_at = NOW() WHERE id = ?',
                 ['approved', notes || 'Disetujui oleh SuperAdmin', approvalId]
             );
-            
+
+            // Log activity
+            await logActivity(req.user.id, 'APPROVE_BIODATA_UPDATE', `SuperAdmin ${req.user.nama} approved biodata update for student ${data.nama_lama} (${data.nis_lama})`, req.ip);
+
             // Notify student
             await db.query(
-                `INSERT INTO notifications (user_id, type, title, message, related_id, related_type) 
+                `INSERT INTO notifications (user_id, type, title, message, related_id, related_type)
                  VALUES (?, 'approved', 'Biodata Diperbarui', ?, ?, 'biodata')`,
                 [data.user_id, 'Biodata Anda telah berhasil diperbarui oleh SuperAdmin.', approvalId]
             );
-            
+
             res.json({ message: 'Biodata siswa berhasil diupdate' });
         } else {
             // Reject
@@ -742,14 +857,17 @@ router.put('/biodata-approvals/:id', auth, superAdminOnly, async (req, res) => {
                 'UPDATE biodata_update_approvals SET superadmin_status = ?, superadmin_notes = ? WHERE id = ?',
                 ['rejected', notes || 'Ditolak oleh SuperAdmin', approvalId]
             );
-            
+
+            // Log activity
+            await logActivity(req.user.id, 'REJECT_BIODATA_UPDATE', `SuperAdmin ${req.user.nama} rejected biodata update for student ${data.nama_lama} (${data.nis_lama})`, req.ip);
+
             // Notify student
             await db.query(
-                `INSERT INTO notifications (user_id, type, title, message, related_id, related_type) 
+                `INSERT INTO notifications (user_id, type, title, message, related_id, related_type)
                  VALUES (?, 'rejected', 'Pengajuan Update Biodata Ditolak', ?, ?, 'biodata')`,
                 [data.user_id, `Pengajuan update biodata ditolak: ${notes || 'Tidak ada alasan'}`, approvalId]
             );
-            
+
             res.json({ message: 'Pengajuan update biodata ditolak' });
         }
     } catch (error) {
@@ -766,13 +884,16 @@ router.put('/:id/biodata', auth, superAdminOnly, async (req, res) => {
         const teacherJabatan = jabatan || detail;
 
         // Get user current data
-        const [user] = await db.query('SELECT role FROM users WHERE id = ?', [userId]);
+        const [user] = await db.query('SELECT nama, role, detail, nis, nip, alamat, no_hp FROM users WHERE id = ?', [userId]);
         if (user.length === 0) {
             return res.status(404).json({ message: 'User not found' });
         }
-        
+
         const role = user[0].role;
-        
+        const oldName = user[0].nama;
+        const oldNis = user[0].nis || null;
+        const oldNip = user[0].nip || null;
+
         if (role === 'siswa') {
             // Validate tahun_pelajaran format if provided
             if (tahun_pelajaran && !validateTahunPelajaran(tahun_pelajaran)) {
@@ -781,29 +902,40 @@ router.put('/:id/biodata', auth, superAdminOnly, async (req, res) => {
 
             // Calculate new class based on updated jurusan and tahun_pelajaran
             const calculatedClass = calculateFullClass(tahun_pelajaran, jurusan);
-            
+
             // Update siswa biodata
             await db.query(
                 'UPDATE users SET nama = ?, nis = ?, jurusan = ?, grha = ?, tahun_pelajaran = ?, kelas = ? WHERE id = ?',
                 [nama, nis, jurusan, grha, tahun_pelajaran, calculatedClass, userId]
             );
+
+            // Propagate the edited biodata into record snapshots, logs, notifications.
+            await syncBiodataChange(userId, { nama: oldName, nis: oldNis });
+
+            // Log activity
+            await logActivity(req.user.id, 'UPDATE_BIODATA_DIRECT', `SuperAdmin ${req.user.nama} directly updated biodata for student ${oldName} (${nis}) to ${nama}`, req.ip);
         } else if (role === 'guru') {
-            if (!VALID_TEACHER_JABATAN.includes(teacherJabatan)) {
+            const storedDetail = user[0].detail || null;
+            const newJabatan = teacherJabatan || storedDetail;
+            // Nilai BARU harus valid; nilai lama (legacy) yang tidak diubah tetap diterima
+            if (newJabatan && newJabatan !== storedDetail && !VALID_TEACHER_JABATAN.includes(newJabatan)) {
                 return res.status(400).json({ message: `Jabatan tidak valid. Gunakan: ${VALID_TEACHER_JABATAN.join(', ')}` });
             }
-            // Update guru biodata
+            // Update guru biodata (preserve alamat/no_hp when the form does not send them)
+            const newAlamat = alamat !== undefined ? alamat : user[0].alamat;
+            const newNoHp = no_hp !== undefined ? no_hp : user[0].no_hp;
             await db.query(
                 'UPDATE users SET nama = ?, nip = ?, detail = ?, alamat = ?, no_hp = ? WHERE id = ?',
-                [nama, nip, teacherJabatan, alamat, no_hp, userId]
+                [nama, nip, newJabatan, newAlamat, newNoHp, userId]
             );
+
+            // Propagate the renamed teacher into pembina names, logs, notifications.
+            await syncBiodataChange(userId, { nama: oldName, nip: oldNip });
+
+            // Log activity
+            await logActivity(req.user.id, 'UPDATE_BIODATA_DIRECT', `SuperAdmin ${req.user.nama} directly updated biodata for teacher ${oldName} (${nip}) to ${nama}`, req.ip);
         }
-        
-        // Log activity
-        await db.query(
-            'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Update Biodata', `Updated biodata for ${role} ID ${userId}`]
-        );
-        
+
         res.json({ message: 'Biodata updated successfully' });
     } catch (error) {
         console.error(error);
@@ -819,7 +951,7 @@ router.put('/student-creation-approvals/:id', auth, superAdminOnly, async (req, 
         
         // Get approval data
         const [approval] = await db.query(
-            'SELECT * FROM student_creation_approvals WHERE id = ?',
+            'SELECT id, nama, nis, kelas, grha, jurusan, password, tahun_pelajaran, requested_by, superadmin_status, created_at FROM student_creation_approvals WHERE id = ?',
             [approvalId]
         );
         

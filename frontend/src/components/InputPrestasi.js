@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
+import { formatDisplayText } from '../utils/formatDisplayText';
 import EditModal from './EditModal';
 import useEditModal from '../hooks/useEditModal';
 import API_BASE_URL from '../config';
@@ -51,18 +52,6 @@ function InputPrestasi() {
     'juara_i'
   ];
 
-  const formatDisplayText = (text) => {
-    return text
-      .replace(/_/g, ' ')
-      .replace(/\b\w+\b/g, word => {
-        // Check if word is Roman numeral (I, II, III, etc.)
-        if (/^[ivx]+$/.test(word.toLowerCase())) {
-          return word.toUpperCase();
-        }
-        return word.charAt(0).toUpperCase() + word.slice(1);
-      });
-  };
-
   const tingkatLombaOptions = FIXED_TINGKAT_OPTIONS;
   const juaraLombaOptions = FIXED_JUARA_LOMBA_OPTIONS;
   const [students, setStudents] = useState([]);
@@ -74,10 +63,24 @@ function InputPrestasi() {
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     setUserRole(user.role || '');
+
+    // Auto-fill biodata for siswa
+    if (user.role === 'siswa') {
+      setFormData(prev => ({
+        ...prev,
+        nama: user.nama || '',
+        nis: user.nis || '',
+        kelas: user.kelas || '',
+        grha: user.grha || ''
+      }));
+    } else {
+      // Only fetch students for guru/superadmin
+      fetchStudents();
+    }
+
     fetchTeachers();
     fetchUserSubmissions();
     fetchIpcConfig();
-    fetchStudents();
     checkAccess();
     if (user.role === 'superadmin') {
       fetchAllPrestasi();
@@ -88,10 +91,7 @@ function InputPrestasi() {
   const fetchAllPrestasi = async () => {
     try {
       setLoadingIndex(true);
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/prestasi/all', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/prestasi/all');
       setAllPrestasi(response.data);
     } catch (error) {
       console.error('Error fetching all prestasi:', error);
@@ -110,10 +110,7 @@ function InputPrestasi() {
     }
 
     try {
-      const token = localStorage.getItem('token');
-      await axios.delete(`/prestasi/${id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await api.delete(`/prestasi/${id}`);
       setMessage('Prestasi berhasil dihapus!');
       fetchAllPrestasi();
     } catch (error) {
@@ -124,7 +121,6 @@ function InputPrestasi() {
   const handleUpdate = async () => {
     editModal.setIsLoading(true);
     try {
-      const token = localStorage.getItem('token');
       const updateData = {};
       Object.keys(editModal.editFormData).forEach(key => {
         if (key !== 'id' && key !== 'created_at' && key !== 'status' && key !== 'user_id') {
@@ -132,11 +128,7 @@ function InputPrestasi() {
         }
       });
       
-      await axios.put(`/prestasi/${editModal.editingItem.id}`, updateData, {
-        headers: { 
-          Authorization: `Bearer ${token}`
-        }
-      });
+      await api.put(`/prestasi/${editModal.editingItem.id}`, updateData);
       setMessage('Prestasi berhasil diperbarui!');
       fetchAllPrestasi();
       editModal.closeEditModal();
@@ -149,7 +141,6 @@ function InputPrestasi() {
 
   const checkAccess = async () => {
     try {
-      const token = localStorage.getItem('token');
       const user = JSON.parse(localStorage.getItem('user') || '{}');
       
       // Superadmin always has access
@@ -159,9 +150,7 @@ function InputPrestasi() {
         return;
       }
       
-      const response = await axios.get('/input-access/status/my-access', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/input-access/status/my-access');
       
       const canInputPrestasi = response.data.prestasi;
       setHasAccess(canInputPrestasi);
@@ -187,8 +176,7 @@ function InputPrestasi() {
   //   }
 
   //   try {
-  //     const token = localStorage.getItem('token');
-  //     const response = await axios.get('/permissions/' + user.id, {
+  //     //     const response = await api.get('/permissions/' + user.id, {
   //       headers: { Authorization: `Bearer ${token}` }
   //     });
   //     setHasPermission(response.data.can_input_prestasi === true);
@@ -202,10 +190,7 @@ function InputPrestasi() {
 
   const fetchUserSubmissions = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/approvals-v2/user-submissions', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/approvals-v2/user-submissions');
       setSubmissions(response.data.prestasi || []);
     } catch (error) {
       console.error('Error fetching submissions:', error);
@@ -214,10 +199,7 @@ function InputPrestasi() {
 
   const fetchTeachers = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/prestasi/teachers', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/prestasi/teachers');
       setTeachers(response.data);
     } catch (error) {
       console.error('Error fetching teachers:', error);
@@ -226,10 +208,7 @@ function InputPrestasi() {
 
   const fetchIpcConfig = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/ipc-config/active', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/ipc-config/active');
       setIpcConfig(response.data);
       const firstTingkat = response.data.prestasi?.[0]?.field1 || 'sekolah';
       const firstJuara = response.data.prestasi?.[0]?.field2 || 'juara_i';
@@ -242,12 +221,9 @@ function InputPrestasi() {
 
   const fetchStudents = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/users', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      // Filter only students
-      const studentList = response.data.filter(user => user.role === 'siswa');
+      const response = await api.get('/users?role=siswa&limit=500');
+      // Use the new pagination format
+      const studentList = response.data.users || [];
       setStudents(studentList);
     } catch (error) {
       console.error('Error fetching students:', error);
@@ -322,10 +298,7 @@ function InputPrestasi() {
 
   const fetchStudentData = async (nis) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`/users/nis/${nis}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get(`/users/nis/${nis}`);
       
       if (response.data) {
         setFormData(prev => ({
@@ -343,10 +316,7 @@ function InputPrestasi() {
 
   const fetchStudentDataByName = async (nama) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`/users/nama/${nama}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get(`/users/nama/${nama}`);
       
       if (response.data) {
         setFormData(prev => ({
@@ -372,7 +342,6 @@ function InputPrestasi() {
     setLoading(true);
 
     try {
-      const token = localStorage.getItem('token');
       const data = new FormData();
       Object.keys(formData).forEach(key => {
         data.append(key, formData[key]);
@@ -385,12 +354,7 @@ function InputPrestasi() {
         data.append('foto', fileToUpload);
       }
 
-      const response = await axios.post('/approvals-v2/prestasi/submit', data, {
-        headers: { 
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data'
-        }
-      });
+      const response = await api.post('/approvals-v2/prestasi/submit', data);
 
       // Use message from backend response (different for superadmin vs regular user)
       setMessage(response.data?.message || 'Data prestasi berhasil dikirim!');
@@ -513,37 +477,69 @@ function InputPrestasi() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <div className="form-group">
             <label>Nama <span className="required">*</span></label>
-            <Select
-              value={students.find(s => s.nama === formData.nama && s.nis === formData.nis) ? { value: formData.nama, label: formData.nama, nama: formData.nama, nis: formData.nis, kelas: formData.kelas, grha: formData.grha } : null}
-              onChange={(selected) => handleStudentSelect(selected)}
-              options={students.map(student => ({ value: student.nama, label: `${student.nama} (${student.nis})`, nama: student.nama, nis: student.nis, kelas: student.kelas, grha: student.grha }))}
-              placeholder="Cari nama siswa..."
-              isSearchable
-              isClearable
-              styles={{
-                control: (provided) => ({
-                  ...provided,
-                  minHeight: '40px'
-                })
-              }}
-            />
+            {userRole === 'siswa' ? (
+              <input
+                type="text"
+                value={formData.nama}
+                disabled
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #d0d0d0',
+                  borderRadius: '4px',
+                  backgroundColor: '#f5f5f5',
+                  color: '#666'
+                }}
+              />
+            ) : (
+              <Select
+                value={students.find(s => s.nama === formData.nama && s.nis === formData.nis) ? { value: formData.nama, label: formData.nama, nama: formData.nama, nis: formData.nis, kelas: formData.kelas, grha: formData.grha } : null}
+                onChange={(selected) => handleStudentSelect(selected)}
+                options={students.map(student => ({ value: student.nama, label: `${student.nama} (${student.nis})`, nama: student.nama, nis: student.nis, kelas: student.kelas, grha: student.grha }))}
+                placeholder="Cari nama siswa..."
+                isSearchable
+                isClearable
+                styles={{
+                  control: (provided) => ({
+                    ...provided,
+                    minHeight: '40px'
+                  })
+                }}
+              />
+            )}
           </div>
           <div className="form-group">
             <label>NIS <span className="required">*</span></label>
-            <Select
-              value={students.find(s => s.nis === formData.nis) ? { value: formData.nis, label: formData.nis, nama: formData.nama, nis: formData.nis, kelas: formData.kelas, grha: formData.grha } : null}
-              onChange={(selected) => handleStudentSelect(selected)}
-              options={students.map(student => ({ value: student.nis, label: `${student.nis} - ${student.nama}`, nama: student.nama, nis: student.nis, kelas: student.kelas, grha: student.grha }))}
-              placeholder="Cari NIS siswa..."
-              isSearchable
-              isClearable
-              styles={{
-                control: (provided) => ({
-                  ...provided,
-                  minHeight: '40px'
-                })
-              }}
-            />
+            {userRole === 'siswa' ? (
+              <input
+                type="text"
+                value={formData.nis}
+                disabled
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #d0d0d0',
+                  borderRadius: '4px',
+                  backgroundColor: '#f5f5f5',
+                  color: '#666'
+                }}
+              />
+            ) : (
+              <Select
+                value={students.find(s => s.nis === formData.nis) ? { value: formData.nis, label: formData.nis, nama: formData.nama, nis: formData.nis, kelas: formData.kelas, grha: formData.grha } : null}
+                onChange={(selected) => handleStudentSelect(selected)}
+                options={students.map(student => ({ value: student.nis, label: `${student.nis} - ${student.nama}`, nama: student.nama, nis: student.nis, kelas: student.kelas, grha: student.grha }))}
+                placeholder="Cari NIS siswa..."
+                isSearchable
+                isClearable
+                styles={{
+                  control: (provided) => ({
+                    ...provided,
+                    minHeight: '40px'
+                  })
+                }}
+              />
+            )}
           </div>
         </div>
         
@@ -748,32 +744,40 @@ function InputPrestasi() {
       {/* Submission History - Hidden for Superadmin */}
       {JSON.parse(localStorage.getItem('user') || '{}').role !== 'superadmin' && (
         <div style={{ marginTop: '30px' }}>
-          <h3>Riwayat Pengajuan</h3>
+          <h3 style={{ marginBottom: '15px', fontSize: '18px' }}>📋 Riwayat Pengajuan Prestasi</h3>
           {submissions.length === 0 ? (
             <p className="text-muted">Belum ada pengajuan</p>
           ) : (
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Tanggal</th>
-                  <th>Lomba</th>
-                  <th>Juara</th>
-                  <th>Pembina</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {submissions.slice(0, 5).map(item => (
-                  <tr key={item.id}>
-                    <td>{new Date(item.created_at).toLocaleDateString('id-ID')}</td>
-                    <td>{item.nama_lomba}</td>
-                    <td>{formatDisplayText(item.juara)}</td>
-                    <td>{item.pembina || '-'}</td>
-                    <td>{getStatusBadge(item)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div style={{ display: 'grid', gap: '10px' }}>
+              {submissions.map((sub, index) => (
+                <div key={sub.id || index} style={{
+                  padding: '15px',
+                  backgroundColor: '#f8f9fa',
+                  borderRadius: '8px',
+                  border: '1px solid #e0e0e0',
+                  display: 'grid',
+                  gridTemplateColumns: '1fr auto',
+                  gap: '10px',
+                  alignItems: 'center'
+                }}>
+                  <div>
+                    <strong style={{ fontSize: '14px' }}>{sub.nama_lomba}</strong>
+                    <p style={{ margin: '4px 0', fontSize: '13px', color: '#666' }}>
+                      {sub.nama} ({sub.nis}) - {formatDisplayText(sub.juara)}
+                    </p>
+                    <p style={{ margin: '4px 0', fontSize: '13px', color: '#666' }}>
+                      Pembina: {sub.pembina || '-'}
+                    </p>
+                    <p style={{ margin: 0, fontSize: '12px', color: '#999' }}>
+                      Diajukan: {new Date(sub.created_at).toLocaleDateString('id-ID')}
+                    </p>
+                  </div>
+                  <div>
+                    {getStatusBadge(sub)}
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       )}

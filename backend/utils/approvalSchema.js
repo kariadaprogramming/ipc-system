@@ -7,8 +7,10 @@ async function getApprovalStatusColumn() {
         return statusColumn;
     }
 
+    // Postgres equivalent of SHOW COLUMNS ... LIKE (schema is fixed, but keep the probe PG-safe)
     const [columns] = await db.query(
-        "SHOW COLUMNS FROM prestasi_approvals LIKE 'superadmin_status'"
+        `SELECT column_name FROM information_schema.columns
+         WHERE table_name = 'prestasi_approvals' AND column_name = 'superadmin_status'`
     );
     statusColumn = columns.length > 0 ? 'superadmin_status' : 'status';
     return statusColumn;
@@ -20,10 +22,18 @@ function getRowApprovalStatus(row) {
 
 async function fetchPendingApprovals(table, alias) {
     const col = await getApprovalStatusColumn();
+    // "Diajukan Oleh" = the account that actually submitted (submitted_by),
+    // NOT the target student (user_id). Fall back to the target student for
+    // legacy rows where submitted_by is NULL. submitted_by_* extras are
+    // additive metadata for the frontend; user_name keeps its shape.
     const [rows] = await db.query(`
-        SELECT ${alias}.*, u.nama as user_name
+        SELECT ${alias}.*,
+               COALESCE(submitter.nama, target_user.nama) as user_name,
+               submitter.nama as submitted_by_name,
+               submitter.role as submitted_by_role
         FROM ${table} ${alias}
-        JOIN users u ON ${alias}.user_id = u.id
+        JOIN users target_user ON ${alias}.user_id = target_user.id
+        LEFT JOIN users submitter ON ${alias}.submitted_by = submitter.id
         WHERE ${alias}.${col} = 'pending'
     `);
     return rows;

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
+import { useMinIpc, isBelowMinIpc } from '../utils/minIpc';
 import './IpcReport.css';
 
 function formatTahunPelajaran(date = new Date()) {
@@ -17,6 +18,7 @@ function formatPrintDate(date = new Date()) {
 }
 
 function IpcReport({ studentId, onClose }) {
+  const minIpc = useMinIpc();
   const [studentData, setStudentData] = useState(null);
   const [ipcData, setIpcData] = useState(null);
   const [schoolConfig, setSchoolConfig] = useState(null);
@@ -29,17 +31,11 @@ function IpcReport({ studentId, onClose }) {
 
   const fetchReportData = async () => {
     try {
-      const token = localStorage.getItem('token');
-
       // Fetch student data
-      const studentResponse = await axios.get(`/users/${studentId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const studentResponse = await api.get(`/users/${studentId}`);
 
       // Fetch IPC card data (includes breakdown)
-      const ipcResponse = await axios.get(`/reports/ipc-card/${studentId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const ipcResponse = await api.get(`/reports/ipc-card/${studentId}`);
 
       // Extract wali kelas data from IPC card response
       const waliKelasData = ipcResponse.data.wali || { nama: null, nip: null };
@@ -58,7 +54,7 @@ function IpcReport({ studentId, onClose }) {
     } finally {
       setLoading(false);
     }
-  }, [studentId]);
+  };
 
   useEffect(() => {
     fetchReportData();
@@ -66,10 +62,7 @@ function IpcReport({ studentId, onClose }) {
 
   const fetchSchoolConfig = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/school-config', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.get('/school-config');
       setSchoolConfig(response.data);
     } catch (error) {
       console.error('Error fetching school config:', error);
@@ -287,7 +280,7 @@ function IpcReport({ studentId, onClose }) {
 
               <tr className="total-row">
                 <td><strong>TOTAL POINT IPC</strong></td>
-                <td className={`point-value total ${total < 0 ? 'total-minus' : ''}`}><strong>{formatTotal(total)}</strong></td>
+                <td className={`point-value total ${total < 0 || isBelowMinIpc(total, minIpc) ? 'total-minus' : ''}`}><strong>{formatTotal(total)}</strong></td>
               </tr>
             </tbody>
           </table>
