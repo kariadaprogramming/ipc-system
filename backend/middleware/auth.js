@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 const db = require('../config/database');
 
-const auth = (req, res, next) => {
+const auth = async (req, res, next) => {
     try {
         // First try to get token from HTTP-only cookie
         let token = req.cookies.token;
@@ -16,6 +16,17 @@ const auth = (req, res, next) => {
         }
 
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+        // Tokens issued before 'nama' was added to the JWT payload don't have it;
+        // fetch it once from the DB so req.user.nama is never undefined.
+        // (New tokens include nama, so this query only runs for old tokens.)
+        if (decoded.nama === undefined) {
+            const [rows] = await db.query('SELECT nama FROM users WHERE id = ?', [decoded.id]);
+            if (rows.length > 0) {
+                decoded.nama = rows[0].nama;
+            }
+        }
+
         req.user = decoded;
         next();
     } catch (error) {

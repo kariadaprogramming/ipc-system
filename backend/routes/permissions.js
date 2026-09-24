@@ -99,7 +99,7 @@ router.put('/user/:userId', auth, superAdminOnly, async (req, res) => {
         // Log activity
         await db.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Update Permissions', `Updated permissions for user ID ${userId}`]
+            [req.user.id, 'UPDATE_PERMISSIONS', `Updated permissions for user ID ${userId}`]
         );
 
         res.json({ message: 'Permissions updated successfully' });
@@ -130,7 +130,7 @@ router.post('/bulk-students', auth, superAdminOnly, async (req, res) => {
         // Log activity
         await db.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Bulk Update Permissions', 'Updated permissions for all students']
+            [req.user.id, 'BULK_UPDATE_PERMISSIONS', 'Updated permissions for all students']
         );
 
         res.json({ message: 'Bulk permissions updated successfully' });

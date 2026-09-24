@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import api from '../utils/api';
 import API_BASE_URL from '../config';
 import { useMinIpc, isBelowMinIpc } from '../utils/minIpc';
+import { formatDisplayText } from '../utils/formatDisplayText';
 
 function getCurrentAcademicYear() {
   const now = new Date();
@@ -29,18 +30,6 @@ function getIpcDetailRows(points = {}) {
       .reduce((sum, key) => sum + (Number(points[key]) || 0), 0))]
   ];
 }
-
-function formatDisplayText(text) {
-  return text
-    .replace(/_/g, ' ')
-    .replace(/\b\w+\b/g, word => {
-      if (/^[ivx]+$/.test(word.toLowerCase())) {
-        return word.toUpperCase();
-      }
-      return word.charAt(0).toUpperCase() + word.slice(1);
-    });
-}
-
 
 function WaliKelas() {
   const minIpc = useMinIpc();

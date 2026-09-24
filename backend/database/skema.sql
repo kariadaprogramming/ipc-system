@@ -272,6 +272,8 @@ CREATE TABLE perilaku (
 -- ==================== LOGGING & HISTORY TABLES ====================
 
 -- Activity Logs Table
+-- The `action` column uses SCREAMING_SNAKE_CASE naming convention
+-- (e.g. LOGIN, SUBMIT_PRESTASI, APPROVE_PRESTASI, CREATE_TEACHER).
 DROP TABLE IF EXISTS activity_logs CASCADE;
 CREATE TABLE activity_logs (
     id SERIAL PRIMARY KEY,

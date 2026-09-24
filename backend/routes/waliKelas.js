@@ -499,7 +499,7 @@ router.post('/', auth, superAdminOnly, async (req, res) => {
         // Log activity
         await db.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Assign Wali Kelas', `Assigned teacher ${guruNama} as wali kelas for ${kelas}`]
+            [req.user.id, 'ASSIGN_WALI_KELAS', `Assigned teacher ${guruNama} as wali kelas for ${kelas}`]
         );
 
         // Notify all pembina (gurus)
@@ -604,7 +604,7 @@ router.delete('/:id', auth, superAdminOnly, async (req, res) => {
         // Log activity
         await db.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Remove Wali Kelas', `Removed ${guruNama} as wali kelas for ${kelas}`]
+            [req.user.id, 'REMOVE_WALI_KELAS', `Removed ${guruNama} as wali kelas for ${kelas}`]
         );
 
         // Notify the removed teacher

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
 import API_BASE_URL from '../config';
+import { formatDisplayText } from '../utils/formatDisplayText';
 
 const PAGE_BG = "#f8fafc";
 const INK = "#0f172a";
@@ -561,7 +562,7 @@ function Leaderboard() {
                             {s.detail_prestasi.map((d, i) => (
                               <div key={i} className="detail-box">
                                 <div className="detail-title">🏅 {d.nama_lomba}</div>
-                                <div className="detail-sub">{d.juara}</div>
+                                <div className="detail-sub">{formatDisplayText(d.juara)}</div>
                               </div>
                             ))}
                           </div>
@@ -615,7 +616,7 @@ function Leaderboard() {
                       {s.detail_prestasi.map((d, i) => (
                         <div key={i} className="detail-box">
                           <div className="detail-title">🏅 {d.nama_lomba}</div>
-                          <div className="detail-sub">{d.juara}</div>
+                          <div className="detail-sub">{formatDisplayText(d.juara)}</div>
                         </div>
                       ))}
                     </div>

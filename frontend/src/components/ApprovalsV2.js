@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
 import API_BASE_URL from '../config';
 import { toTitleCase } from '../utils/perilaku';
+import { formatDisplayText } from '../utils/formatDisplayText';
 
 function ApprovalsV2() {
   const PAGE_BG = '#f3f5f9';
@@ -216,12 +217,12 @@ function ApprovalsV2() {
     const getFieldValue = (item, col, type) => {
       if (type === 'prestasi') {
         if (col === 'Lomba') return item.nama_lomba;
-        if (col === 'Juara') return item.juara;
-        if (col === 'Kategori') return item.kategori;
+        if (col === 'Juara') return formatDisplayText(item.juara);
+        if (col === 'Kategori') return formatDisplayText(item.kategori);
       }
       if (type === 'event') {
         if (col === 'Event') return item.nama_event;
-        if (col === 'Tingkat') return item.tingkat;
+        if (col === 'Tingkat') return formatDisplayText(item.tingkat);
       }
       if (type === 'organisasi') {
         if (col === 'Organisasi') return item.kategori_organisasi;
@@ -517,13 +518,13 @@ function ApprovalsV2() {
                       borderBottom: `1px solid ${BORDER}`,
                       verticalAlign: "middle",
                       color: TEXT
-                    }}>{item.juara}</td>
+                    }}>{formatDisplayText(item.juara)}</td>
                     <td style={{
                       padding: "16px 18px",
                       borderBottom: `1px solid ${BORDER}`,
                       verticalAlign: "middle",
                       color: TEXT
-                    }}>{item.kategori}</td>
+                    }}>{formatDisplayText(item.kategori)}</td>
                   </>
                 )}
                 {type === 'event' && (
@@ -539,7 +540,7 @@ function ApprovalsV2() {
                       borderBottom: `1px solid ${BORDER}`,
                       verticalAlign: "middle",
                       color: TEXT
-                    }}>{item.tingkat}</td>
+                    }}>{formatDisplayText(item.tingkat)}</td>
                   </>
                 )}
                 {type === 'organisasi' && (

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
 import API_BASE_URL from '../config';
 import { useMinIpc, isBelowMinIpc } from '../utils/minIpc';
+import { formatDisplayText } from '../utils/formatDisplayText';
 import StudentRecordsHistory from './StudentRecordsHistory';
 
 const JABATAN_OPTIONS = ['Guru', 'Pegawai'];
@@ -372,13 +373,13 @@ function Profile() {
                 <tbody>
                   {ipcHistory.map(history => (
                     <tr key={history.id}>
-                      <td>{history.jenis_perubahan}</td>
+                      <td>{formatDisplayText(history.jenis_perubahan)}</td>
                       <td style={{ color: history.point_change >= 0 ? 'green' : 'red' }}>
                         {history.point_change >= 0 ? '+' : ''}{history.point_change}
                       </td>
                       <td>{history.ipc_sebelum}</td>
                       <td>{history.ipc_sesudah}</td>
-                      <td>{history.keterangan}</td>
+                      <td>{formatDisplayText(history.keterangan)}</td>
                       <td>{new Date(history.created_at).toLocaleDateString('id-ID')}</td>
                     </tr>
                   ))}

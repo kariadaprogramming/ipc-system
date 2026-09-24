@@ -55,7 +55,7 @@ async function applyIpcAwalUpdate(userId, newIpcAwal, adminId) {
 
         await db.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [adminId, 'Update IPC Awal', `Updated IPC awal for user ID ${userId} to ${parsedAwal}`]
+            [adminId, 'UPDATE_IPC_AWAL', `Updated IPC awal for user ID ${userId} to ${parsedAwal}`]
         );
     }
 
@@ -469,7 +469,7 @@ router.post('/create-student', auth, teacherOrSuperAdmin, async (req, res) => {
             // Log activity
             await db.query(
                 'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-                [req.user.id, 'Create Student', `Created student account for ${nama} (${nis})`]
+                [req.user.id, 'CREATE_STUDENT', `Created student account for ${nama} (${nis})`]
             );
 
             return res.status(201).json({ message: 'Akun siswa berhasil dibuat!' });
@@ -533,7 +533,7 @@ router.post('/create-teacher', auth, superAdminOnly, async (req, res) => {
         // Log activity
         await db.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Create Teacher', `Created teacher account for ${nama} (${nip})`]
+            [req.user.id, 'CREATE_TEACHER', `Created teacher account for ${nama} (${nip})`]
         );
 
         res.status(201).json({ message: 'Teacher account created successfully' });
@@ -665,7 +665,7 @@ router.post('/bulk-delete', auth, superAdminOnly, async (req, res) => {
 
         await conn.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Bulk Delete User', `Deleted ${parsed.length} users: ${parsed.join(',')}`]
+            [req.user.id, 'BULK_DELETE_USER', `Deleted ${parsed.length} users: ${parsed.join(',')}`]
         );
 
         await conn.commit();
@@ -698,7 +698,7 @@ router.delete('/:id', auth, superAdminOnly, async (req, res) => {
             await deleteUserAndDependencies(conn, userId);
             await conn.query(
                 'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-                [req.user.id, 'Delete User', `Deleted user ID ${userId}`]
+                [req.user.id, 'DELETE_USER', `Deleted user ID ${userId}`]
             );
             await conn.commit();
         } catch (e) {

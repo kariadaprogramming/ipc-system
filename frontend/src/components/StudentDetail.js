@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
 import API_BASE_URL from '../config';
 import { useMinIpc, isBelowMinIpc } from '../utils/minIpc';
+import { formatDisplayText } from '../utils/formatDisplayText';
 import StudentRecordsHistory from './StudentRecordsHistory';
 
 function StudentDetail({ student, onClose }) {
@@ -188,12 +189,12 @@ function StudentDetail({ student, onClose }) {
                                     <tbody>
                                         {ipcHistory.map((row) => (
                                             <tr key={row.id}>
-                                                <td>{row.jenis_perubahan}</td>
+                                                <td>{formatDisplayText(row.jenis_perubahan)}</td>
                                                 <td style={{ color: row.point_change >= 0 ? 'green' : 'red' }}>
                                                     {row.point_change >= 0 ? '+' : ''}{row.point_change}
                                                 </td>
                                                 <td>{row.ipc_sebelum} → {row.ipc_sesudah}</td>
-                                                {!isMobile && <td>{row.keterangan}</td>}
+                                                {!isMobile && <td>{formatDisplayText(row.keterangan)}</td>}
                                                 {!isMobile && <td>{new Date(row.created_at).toLocaleDateString('id-ID')}</td>}
                                             </tr>
                                         ))}

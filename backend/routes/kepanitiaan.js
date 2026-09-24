@@ -78,7 +78,7 @@ router.post('/', auth, upload.single('foto'), async (req, res) => {
         // Log activity
         await db.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Submit Kepanitiaan', `Submitted kepanitiaan: ${jabatan_kepanitiaan}`]
+            [req.user.id, 'SUBMIT_KEPANITIAAN', `Submitted kepanitiaan: ${jabatan_kepanitiaan}`]
         );
 
         res.status(201).json({ message: 'Kepanitiaan submitted for approval', id: result.insertId });
@@ -126,7 +126,7 @@ router.put('/:id/approve', auth, async (req, res) => {
 
         await db.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Approve Kepanitiaan', `Approved kepanitiaan ID ${kepanitiaanId}`]
+            [req.user.id, 'APPROVE_KEPANITIAAN', `Approved kepanitiaan ID ${kepanitiaanId}`]
         );
 
         res.json({ message: 'Kepanitiaan approved successfully' });
@@ -146,7 +146,7 @@ router.put('/:id/reject', auth, async (req, res) => {
 
         await db.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Reject Kepanitiaan', `Rejected kepanitiaan ID ${kepanitiaanId}`]
+            [req.user.id, 'REJECT_KEPANITIAAN', `Rejected kepanitiaan ID ${kepanitiaanId}`]
         );
 
         res.json({ message: 'Kepanitiaan rejected' });
@@ -215,7 +215,7 @@ router.put('/:id', auth, upload.single('foto'), async (req, res) => {
         // Log activity
         await db.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Update Kepanitiaan', `Updated kepanitiaan ID ${kepanitiaanId}`]
+            [req.user.id, 'UPDATE_KEPANITIAAN', `Updated kepanitiaan ID ${kepanitiaanId}`]
         );
 
         res.json({ message: 'Kepanitiaan updated successfully' });
@@ -266,7 +266,7 @@ router.delete('/:id', auth, superAdminOnly, async (req, res) => {
         // Log activity
         await db.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Delete Kepanitiaan', `Deleted kepanitiaan ID ${kepanitiaanId}`]
+            [req.user.id, 'DELETE_KEPANITIAAN', `Deleted kepanitiaan ID ${kepanitiaanId}`]
         );
 
         res.json({ message: 'Kepanitiaan deleted successfully' });

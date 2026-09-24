@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
+import { formatDisplayText } from '../utils/formatDisplayText';
 import Select from 'react-select';
 import EditModal from './EditModal';
 import useEditModal from '../hooks/useEditModal';
@@ -43,18 +44,6 @@ function InputEvent() {
     'nasional',
     'internasional'
   ];
-
-  const formatDisplayText = (text) => {
-    return text
-      .replace(/_/g, ' ')
-      .replace(/\b\w+\b/g, word => {
-        // Check if word is Roman numeral (I, II, III, etc.)
-        if (/^[ivx]+$/.test(word.toLowerCase())) {
-          return word.toUpperCase();
-        }
-        return word.charAt(0).toUpperCase() + word.slice(1);
-      });
-  };
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('user') || '{}');

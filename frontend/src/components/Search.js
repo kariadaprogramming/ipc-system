@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../utils/api';
 import { useMinIpc, isBelowMinIpc } from '../utils/minIpc';
+import { formatDisplayText } from '../utils/formatDisplayText';
 
 function Search() {
   const minIpc = useMinIpc();
@@ -132,8 +133,8 @@ function Search() {
                 {selectedStudent.prestasi.filter(p => p.jenis === 'akademik').map(p => (
                   <tr key={p.id}>
                     <td>{p.nama_lomba}</td>
-                    <td>{p.juara}</td>
-                    <td>{p.kategori}</td>
+                    <td>{formatDisplayText(p.juara)}</td>
+                    <td>{formatDisplayText(p.kategori)}</td>
                     <td>{p.point}</td>
                   </tr>
                 ))}
@@ -158,8 +159,8 @@ function Search() {
                 {selectedStudent.prestasi.filter(p => p.jenis === 'nonakademik').map(p => (
                   <tr key={p.id}>
                     <td>{p.nama_lomba}</td>
-                    <td>{p.juara}</td>
-                    <td>{p.kategori}</td>
+                    <td>{formatDisplayText(p.juara)}</td>
+                    <td>{formatDisplayText(p.kategori)}</td>
                     <td>{p.point}</td>
                   </tr>
                 ))}

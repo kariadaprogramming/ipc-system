@@ -111,7 +111,7 @@ router.post('/student/:id/graduate', auth, superAdminOnly, async (req, res) => {
         // Log activity
         await db.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Mark Student Graduated', `Marked student ${student.nama} (ID: ${student.id}) as graduated`]
+            [req.user.id, 'MARK_STUDENT_GRADUATED', `Marked student ${student.nama} (ID: ${student.id}) as graduated`]
         );
 
         res.json({ message: 'Student marked as graduated successfully' });
@@ -151,7 +151,7 @@ router.post('/student/:id/reactivate', auth, superAdminOnly, async (req, res) =>
         // Log activity
         await db.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Reactivate Student', `Reactivated graduated student ${student.nama} (ID: ${student.id})`]
+            [req.user.id, 'REACTIVATE_STUDENT', `Reactivated graduated student ${student.nama} (ID: ${student.id})`]
         );
 
         res.json({ message: 'Student reactivated successfully' });
@@ -232,7 +232,7 @@ router.get('/validate-classes', auth, superAdminOnly, async (req, res) => {
         // Log validation results
         await db.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Class Validation', `Validated ${students.length} students. Found ${discrepancies.length} discrepancies.`]
+            [req.user.id, 'CLASS_VALIDATION', `Validated ${students.length} students. Found ${discrepancies.length} discrepancies.`]
         );
 
         res.json({
@@ -326,7 +326,7 @@ router.post('/fix-discrepancies', auth, superAdminOnly, async (req, res) => {
         if (!dryRun) {
             await db.query(
                 'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-                [req.user.id, 'Fix Class Discrepancies', `Fixed ${fixedCount} students with class discrepancies.`]
+                [req.user.id, 'FIX_CLASS_DISCREPANCIES', `Fixed ${fixedCount} students with class discrepancies.`]
             );
         }
 

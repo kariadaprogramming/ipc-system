@@ -77,7 +77,7 @@ router.post('/', auth, upload.single('foto'), async (req, res) => {
 
         await db.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Submit Event', `Submitted event: ${nama_event}`]
+            [req.user.id, 'SUBMIT_EVENT', `Submitted event: ${nama_event}`]
         );
 
         res.status(201).json({ message: 'Event submitted for approval', id: result.insertId });
@@ -125,7 +125,7 @@ router.put('/:id/approve', auth, superAdminOnly, async (req, res) => {
 
         await db.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Approve Event', `Approved event ID ${eventId}`]
+            [req.user.id, 'APPROVE_EVENT', `Approved event ID ${eventId}`]
         );
 
         res.json({ message: 'Event approved successfully' });
@@ -145,7 +145,7 @@ router.put('/:id/reject', auth, superAdminOnly, async (req, res) => {
 
         await db.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Reject Event', `Rejected event ID ${eventId}`]
+            [req.user.id, 'REJECT_EVENT', `Rejected event ID ${eventId}`]
         );
 
         res.json({ message: 'Event rejected' });
@@ -214,7 +214,7 @@ router.put('/:id', auth, upload.single('foto'), async (req, res) => {
         // Log activity
         await db.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Update Event', `Updated event ID ${eventId}`]
+            [req.user.id, 'UPDATE_EVENT', `Updated event ID ${eventId}`]
         );
 
         res.json({ message: 'Event updated successfully' });
@@ -265,7 +265,7 @@ router.delete('/:id', auth, superAdminOnly, async (req, res) => {
         // Log activity
         await db.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Delete Event', `Deleted event ID ${eventId}`]
+            [req.user.id, 'DELETE_EVENT', `Deleted event ID ${eventId}`]
         );
 
         res.json({ message: 'Event deleted successfully' });

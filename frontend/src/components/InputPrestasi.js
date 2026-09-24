@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../utils/api';
+import { formatDisplayText } from '../utils/formatDisplayText';
 import EditModal from './EditModal';
 import useEditModal from '../hooks/useEditModal';
 import API_BASE_URL from '../config';
@@ -50,18 +51,6 @@ function InputPrestasi() {
     'juara_ii',
     'juara_i'
   ];
-
-  const formatDisplayText = (text) => {
-    return text
-      .replace(/_/g, ' ')
-      .replace(/\b\w+\b/g, word => {
-        // Check if word is Roman numeral (I, II, III, etc.)
-        if (/^[ivx]+$/.test(word.toLowerCase())) {
-          return word.toUpperCase();
-        }
-        return word.charAt(0).toUpperCase() + word.slice(1);
-      });
-  };
 
   const tingkatLombaOptions = FIXED_TINGKAT_OPTIONS;
   const juaraLombaOptions = FIXED_JUARA_LOMBA_OPTIONS;

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
 import { toTitleCase } from '../utils/perilaku';
+import { formatDisplayText } from '../utils/formatDisplayText';
 
 function Approvals() {
   const [approvals, setApprovals] = useState([]);
@@ -115,9 +116,9 @@ function Approvals() {
         return (
           <>
             <p><strong>Nama Lomba:</strong> {item.nama_lomba}</p>
-            <p><strong>Jenis:</strong> {item.jenis}</p>
-            <p><strong>Juara:</strong> {item.juara}</p>
-            <p><strong>Kategori:</strong> {item.kategori}</p>
+            <p><strong>Jenis:</strong> {formatDisplayText(item.jenis)}</p>
+            <p><strong>Juara:</strong> {formatDisplayText(item.juara)}</p>
+            <p><strong>Kategori:</strong> {formatDisplayText(item.kategori)}</p>
             <p><strong>Point:</strong> {item.point}</p>
           </>
         );

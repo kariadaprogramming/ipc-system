@@ -53,7 +53,7 @@ const user = users[0];
         }
 
         const token = jwt.sign(
-            { id: user.id, role: user.role, nis: user.nis },
+            { id: user.id, nama: user.nama, role: user.role, nis: user.nis },
             process.env.JWT_SECRET,
             { expiresIn: '24h' }
         );
@@ -65,7 +65,7 @@ const user = users[0];
         try {
             await db.query(
                 'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-                [user.id, 'Login', 'User logged in']
+                [user.id, 'LOGIN', 'User logged in']
             );
         } catch (logError) {
             console.log('Activity log failed (table might not exist):', logError.message);

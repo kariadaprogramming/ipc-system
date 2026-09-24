@@ -78,7 +78,7 @@ router.post('/', auth, upload.single('foto'), async (req, res) => {
         // Log activity
         await db.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Submit Organisasi', `Submitted organisasi: ${jabatan_organisasi}`]
+            [req.user.id, 'SUBMIT_ORGANISASI', `Submitted organisasi: ${jabatan_organisasi}`]
         );
 
         res.status(201).json({ message: 'Organisasi submitted for approval', id: result.insertId });
@@ -126,7 +126,7 @@ router.put('/:id/approve', auth, superAdminOnly, async (req, res) => {
 
         await db.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Approve Organisasi', `Approved organisasi ID ${organisasiId}`]
+            [req.user.id, 'APPROVE_ORGANISASI', `Approved organisasi ID ${organisasiId}`]
         );
 
         res.json({ message: 'Organisasi approved successfully' });
@@ -146,7 +146,7 @@ router.put('/:id/reject', auth, superAdminOnly, async (req, res) => {
 
         await db.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Reject Organisasi', `Rejected organisasi ID ${organisasiId}`]
+            [req.user.id, 'REJECT_ORGANISASI', `Rejected organisasi ID ${organisasiId}`]
         );
 
         res.json({ message: 'Organisasi rejected' });
@@ -215,7 +215,7 @@ router.put('/:id', auth, upload.single('foto'), async (req, res) => {
         // Log activity
         await db.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Update Organisasi', `Updated organisasi ID ${organisasiId}`]
+            [req.user.id, 'UPDATE_ORGANISASI', `Updated organisasi ID ${organisasiId}`]
         );
 
         res.json({ message: 'Organisasi updated successfully' });
@@ -266,7 +266,7 @@ router.delete('/:id', auth, superAdminOnly, async (req, res) => {
         // Log activity
         await db.query(
             'INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)',
-            [req.user.id, 'Delete Organisasi', `Deleted organisasi ID ${organisasiId}`]
+            [req.user.id, 'DELETE_ORGANISASI', `Deleted organisasi ID ${organisasiId}`]
         );
 
         res.json({ message: 'Organisasi deleted successfully' });

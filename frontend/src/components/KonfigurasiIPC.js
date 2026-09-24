@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
+import { formatDisplayText } from '../utils/formatDisplayText';
 import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
 import { getRowField } from '../utils/excelImport';
@@ -443,18 +444,6 @@ function KonfigurasiIPC() {
     'juara_ii',
     'juara_i'
   ];
-
-  const formatDisplayText = (text) => {
-    return text
-      .replace(/_/g, ' ')
-      .replace(/\b\w+\b/g, word => {
-        // Check if word is Roman numeral (I, II, III, etc.)
-        if (/^[ivx]+$/.test(word.toLowerCase())) {
-          return word.toUpperCase();
-        }
-        return word.charAt(0).toUpperCase() + word.slice(1);
-      });
-  };
 
   const showAddField2 = ['prestasi', 'organisasi'].includes(activeCategory) ||
     (activeCategory === 'pelanggaran' && pelanggaranAddType === 'detail');
