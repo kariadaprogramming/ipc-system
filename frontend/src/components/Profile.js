@@ -200,7 +200,7 @@ function Profile() {
             <p><strong>NIS:</strong> {profile?.nis || '-'}</p>
             <p><strong>Kelas:</strong> {profile?.kelas || '-'}</p>
             <p><strong>Grha:</strong> {profile?.grha || '-'}</p>
-            <p><strong>Wali Kelas:</strong> {profile?.wali_kelas || '-'}</p>
+            <p><strong>Wali Kelas:</strong> {profile?.wali_kelas_nama || profile?.wali_kelas || '-'}</p>
           </>
         )}
         {user.role === 'guru' && (

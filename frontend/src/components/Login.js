@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 
 // Default support link shown on the login page when school config has none set.
-const DEFAULT_SUPPORT_LINK = 'google.com';
+const DEFAULT_SUPPORT_LINK = 'https://google.com';
 
 function Login() {
   const [formData, setFormData] = useState({
