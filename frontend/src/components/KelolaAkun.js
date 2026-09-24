@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import api from '../utils/api';
 import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
@@ -70,9 +70,9 @@ function KelolaAkun() {
     const user = JSON.parse(localStorage.getItem('user'));
     setUserRole(user?.role);
     fetchUsers();
-  }, []);
+  }, [fetchUsers]);
 
-  const fetchUsers = async (page = 1) => {
+  const fetchUsers = useCallback(async (page = 1) => {
     try {
       setLoading(true);
       const params = new URLSearchParams({
@@ -97,7 +97,7 @@ function KelolaAkun() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [pagination.limit, searchQuery, filters.role]);
 
   // Debounced search effect
   useEffect(() => {
@@ -106,7 +106,7 @@ function KelolaAkun() {
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [searchQuery, filters.role]);
+  }, [searchQuery, filters.role, fetchUsers]);
 
   const handleCreateStudent = async (e) => {
     e.preventDefault();

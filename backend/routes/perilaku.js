@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { auth, checkInputAccess, superAdminOnly } = require('../middleware/auth');
+const { auth, checkInputAccess, superAdminOnly, checkPermission } = require('../middleware/auth');
 const db = require('../config/database');
 const { logActivity } = require('../utils/logger');
 const {
@@ -42,7 +42,7 @@ router.get('/user/:userId', auth, async (req, res) => {
 });
 
 // Create perilaku
-router.post('/', auth, checkInputAccess('perilaku'), async (req, res) => {
+router.post('/', auth, checkPermission('perilaku'), async (req, res) => {
     try {
         const userRole = req.user.role;
         const {

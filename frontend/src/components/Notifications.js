@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import api from '../utils/api';
 
 function Notifications() {
@@ -11,16 +11,17 @@ function Notifications() {
     fetchNotifications();
     fetchUnreadCount();
     markAllAsRead();
-  }, []);
+  }, [markAllAsRead, fetchUnreadCount]);
 
-  const markAllAsRead = async () => {
+  const markAllAsRead = useCallback(async () => {
     try {
       await api.put('/approvals-v2/notifications/read-all', {});
-      fetchUnreadCount();
+      const response = await api.get('/approvals-v2/notifications/count');
+      setUnreadCount(response.data.count || 0);
     } catch (error) {
       console.error('Error marking all as read:', error);
     }
-  };
+  }, []);
 
   const fetchNotifications = async () => {
     try {
@@ -34,14 +35,14 @@ function Notifications() {
     }
   };
 
-  const fetchUnreadCount = async () => {
+  const fetchUnreadCount = useCallback(async () => {
     try {
       const response = await api.get('/approvals-v2/notifications/count');
       setUnreadCount(response.data.count || 0);
     } catch (error) {
       console.error('Error fetching unread count:', error);
     }
-  };
+  }, []);
 
   const markAsRead = async (id) => {
     try {
