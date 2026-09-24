@@ -24,6 +24,9 @@ function IzinAkun() {
     { key: 'perilaku', label: 'Perilaku', icon: '✅' }
   ];
 
+  // Pelanggaran & Perilaku are guru-only (students never receive these permissions)
+  const GURU_ONLY_KEYS = ['pelanggaran', 'perilaku'];
+
   const kelasOptions = [
     'X TKJ 1', 'X TKJ 2', 'X TO 1', 'X TO 2',
     'X DPIB 1', 'X DPIB 2',
@@ -193,6 +196,12 @@ function IzinAkun() {
     setSelectedUserIds(new Set());
   };
 
+  // Derived: which users are currently selected (used for guru-only bulk button gating)
+  // Guru-only permissions require a guru-ONLY selection: if even one siswa is
+  // selected, the "Aktifkan Pelanggaran/Perilaku" buttons stay disabled.
+  const selectedUsers = users.filter(u => selectedUserIds.has(u.id));
+  const onlyGuruSelected = selectedUsers.length > 0 && selectedUsers.every(u => u.role === 'guru');
+
   // Bulk update ONE permission type, but only for the explicitly selected users
   const handleBulkSelectedUpdate = async (jenis, enable) => {
     if (bulkUpdating) return; // Prevent multiple simultaneous updates
@@ -200,6 +209,15 @@ function IzinAkun() {
     if (selectedUserIds.size === 0) {
       setMessage('❌ Pilih minimal satu user lewat checkbox terlebih dahulu');
       setTimeout(() => setMessage(''), 3000);
+      return;
+    }
+
+    // Guru-only permissions can never be granted to students, so a mixed
+    // selection (guru + siswa) cannot use the enable buttons at all —
+    // deselect the siswa first. The backend enforces the same rule.
+    if (enable && GURU_ONLY_KEYS.includes(jenis) && !onlyGuruSelected) {
+      setMessage('⚠️ Pelanggaran & Perilaku hanya dapat diaktifkan untuk guru saja — hapus siswa dari pilihan Anda terlebih dahulu');
+      setTimeout(() => setMessage(''), 4000);
       return;
     }
 
@@ -213,7 +231,9 @@ function IzinAkun() {
         enable
       });
 
-      setMessage(`✅ ${jenisLabel} ${enable ? 'diaktifkan' : 'dimatikan'} untuk ${response.data.success_count} user terpilih!`);
+      const skippedSiswa = response.data.skipped_siswa_count || 0;
+      const skipNote = skippedSiswa > 0 ? ` (${skippedSiswa} siswa dilewati — khusus guru)` : '';
+      setMessage(`✅ ${jenisLabel} ${enable ? 'diaktifkan' : 'dimatikan'} untuk ${response.data.success_count} user terpilih!${skipNote}`);
       await fetchUsers(); // Refresh user list (also clears selection)
       setTimeout(() => setMessage(''), 3000);
     } catch (error) {
@@ -572,18 +592,34 @@ function IzinAkun() {
               <div className="bulk-panel unified">
                 <div className="bulk-panel-title">📦 Bulk Update ({selectedUserIds.size} user dipilih)</div>
                 <div className="chip-flow">
-                  {jenisInputs.map(({ key, label }) => (
-                    <React.Fragment key={key}>
-                      <button className="chip-btn on" onClick={() => handleBulkSelectedUpdate(key, true)} disabled={bulkUpdating || selectedUserIds.size === 0} style={{ opacity: (bulkUpdating || selectedUserIds.size === 0) ? 0.6 : 1, cursor: (bulkUpdating || selectedUserIds.size === 0) ? 'not-allowed' : 'pointer' }}>
-                        <span className="ic">✓</span>
-                        <span>Aktifkan {label}</span>
-                      </button>
-                      <button className="chip-btn off" onClick={() => handleBulkSelectedUpdate(key, false)} disabled={bulkUpdating || selectedUserIds.size === 0} style={{ opacity: (bulkUpdating || selectedUserIds.size === 0) ? 0.6 : 1, cursor: (bulkUpdating || selectedUserIds.size === 0) ? 'not-allowed' : 'pointer' }}>
-                        <span className="ic">✕</span>
-                        <span>Matikan {label}</span>
-                      </button>
-                    </React.Fragment>
-                  ))}
+                  {jenisInputs.map(({ key, label }) => {
+                    const baseDisabled = bulkUpdating || selectedUserIds.size === 0;
+                    const enableBlocked = enable => enable && GURU_ONLY_KEYS.includes(key) && !onlyGuruSelected;
+                    const enableDisabled = baseDisabled || enableBlocked(true);
+                    return (
+                      <React.Fragment key={key}>
+                        <button
+                          className="chip-btn on"
+                          onClick={() => handleBulkSelectedUpdate(key, true)}
+                          disabled={enableDisabled}
+                          title={enableBlocked(true) ? 'Hanya untuk pilihan berisi guru saja — hapus siswa dari pilihan' : undefined}
+                          style={{ opacity: enableDisabled ? 0.6 : 1, cursor: enableDisabled ? 'not-allowed' : 'pointer' }}
+                        >
+                          <span className="ic">✓</span>
+                          <span>Aktifkan {label}</span>
+                        </button>
+                        <button
+                          className="chip-btn off"
+                          onClick={() => handleBulkSelectedUpdate(key, false)}
+                          disabled={baseDisabled}
+                          style={{ opacity: baseDisabled ? 0.6 : 1, cursor: baseDisabled ? 'not-allowed' : 'pointer' }}
+                        >
+                          <span className="ic">✕</span>
+                          <span>Matikan {label}</span>
+                        </button>
+                      </React.Fragment>
+                    );
+                  })}
                 </div>
               </div>
             </div>

@@ -745,17 +745,27 @@ router.get('/all', auth, superAdminOnly, async (req, res) => {
             fetchPendingApprovals('kepanitiaan_approvals', 'k')
         ]);
 
+        // "Diajukan Oleh" = actual submitter (submitted_by), not the target
+        // student (user_id). COALESCE covers legacy rows with submitted_by NULL.
         const [pelanggaran] = await db.query(`
-            SELECT p.*, u.nama as user_name
+            SELECT p.*,
+                   COALESCE(s.nama, u.nama) as user_name,
+                   s.nama as submitted_by_name,
+                   s.role as submitted_by_role
             FROM pelanggaran p
             JOIN users u ON p.user_id = u.id
+            LEFT JOIN users s ON p.submitted_by = s.id
             WHERE p.status = 'pending'
         `);
 
         const [perilaku] = await db.query(`
-            SELECT p.*, u.nama as user_name
+            SELECT p.*,
+                   COALESCE(s.nama, u.nama) as user_name,
+                   s.nama as submitted_by_name,
+                   s.role as submitted_by_role
             FROM perilaku p
             JOIN users u ON p.user_id = u.id
+            LEFT JOIN users s ON p.submitted_by = s.id
             WHERE p.status = 'pending'
         `);
 

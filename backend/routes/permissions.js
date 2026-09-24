@@ -112,19 +112,21 @@ router.put('/user/:userId', auth, superAdminOnly, async (req, res) => {
 // Set permissions for all students (bulk)
 router.post('/bulk-students', auth, superAdminOnly, async (req, res) => {
     try {
-        const { can_input_prestasi, can_input_organisasi, can_input_kepanitiaan, can_input_event, can_input_pelanggaran, can_input_perilaku } = req.body;
+        const { can_input_prestasi, can_input_organisasi, can_input_kepanitiaan, can_input_event } = req.body;
 
+        // This endpoint only targets students (u.role = 'siswa'), and pelanggaran/perilaku
+        // are guru-only input types — always force them off regardless of the request body.
         await db.query(
             `UPDATE permissions p 
              JOIN users u ON p.user_id = u.id 
              SET p.can_input_prestasi = ?, 
                  p.can_input_organisasi = ?, 
-                 p.can_input_kepanitiaan = ?, 
+                 p.can_input_kepanitiaan = ?,
                  p.can_input_event = ?,
-                 p.can_input_pelanggaran = ?,
-                 p.can_input_perilaku = ? 
+                 p.can_input_pelanggaran = false,
+                 p.can_input_perilaku = false 
              WHERE u.role = 'siswa'`,
-            [can_input_prestasi, can_input_organisasi, can_input_kepanitiaan, can_input_event, can_input_pelanggaran, can_input_perilaku]
+            [can_input_prestasi, can_input_organisasi, can_input_kepanitiaan, can_input_event]
         );
 
         // Log activity

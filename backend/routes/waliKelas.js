@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { auth, superAdminOnly, teacherOnly } = require('../middleware/auth');
 const db = require('../config/database');
-const { validateTahunPelajaran, getCurrentAcademicYear } = require('../utils/academicYear');
+const { validateTahunPelajaran, getCurrentAcademicYear, calculateCurrentClass } = require('../utils/academicYear');
 const { buildIpcCardBreakdown } = require('../utils/ipcCardBreakdown');
 
 function getRequestedAcademicYear(req) {
@@ -83,8 +83,7 @@ router.get('/class-statistics', auth, superAdminOnly, async (req, res) => {
 
                 // Filter students who should be in this class for the selected academic year
                 const students = allStudents.filter(student => {
-                    const { calculateCurrentClass } = require('../utils/academicYear');
-                    const expectedClass = calculateCurrentClass(student.tahun_pelajaran);
+                    const expectedClass = calculateCurrentClass(student.tahun_pelajaran, tahunAjaran);
                     if (!expectedClass) return false; // Graduated students
                     
                     // Build full class name (e.g., "X TKJ 1")
@@ -263,10 +262,9 @@ router.get('/my-class', auth, teacherOnly, async (req, res) => {
                     ORDER BY u.nama ASC
                 `);
 
-                // Filter students who should be in this class for the current academic year
+                // Filter students who should be in this class for the assignment's academic year
                 const students = allStudents.filter(student => {
-                    const { calculateCurrentClass } = require('../utils/academicYear');
-                    const expectedClass = calculateCurrentClass(student.tahun_pelajaran);
+                    const expectedClass = calculateCurrentClass(student.tahun_pelajaran, tahunAjaran);
                     if (!expectedClass) return false; // Graduated students
                     
                     // Build full class name (e.g., "X TKJ 1")
@@ -367,10 +365,9 @@ router.get('/my-class', auth, teacherOnly, async (req, res) => {
             ORDER BY u.nama ASC
         `);
 
-        // Filter students who should be in this class for the current academic year
+        // Filter students who should be in this class for the assignment's academic year
         const students = allStudents.filter(student => {
-            const { calculateCurrentClass } = require('../utils/academicYear');
-            const expectedClass = calculateCurrentClass(student.tahun_pelajaran);
+            const expectedClass = calculateCurrentClass(student.tahun_pelajaran, assignment[0].tahun_ajaran);
             if (!expectedClass) return false; // Graduated students
             
             // Build full class name (e.g., "X TKJ 1")

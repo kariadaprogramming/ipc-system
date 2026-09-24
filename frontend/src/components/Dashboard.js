@@ -35,7 +35,6 @@ function Dashboard() {
   const [user, setUser] = useState(null);
   const [showLabels, setShowLabels] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [noteExpanded, setNoteExpanded] = useState(false);
   const [schoolConfig, setSchoolConfig] = useState(null);
   
   // Chart colors
@@ -725,59 +724,6 @@ function Dashboard() {
             filter: showLabels ? 'none' : 'blur(7px)',
             transition: 'filter 0.3s ease'
           }}>{stats?.ipc_stats?.terendah || 0}</div>
-        </div>
-      </div>
-
-      {/* PRINCIPAL NOTE */}
-      <div style={{
-        background: CARD,
-        border: `1px solid ${BORDER}`,
-        borderRadius: RADIUS,
-        boxShadow: SHADOW,
-        padding: '20px 22px',
-        marginBottom: '22px',
-        display: 'flex',
-        gap: '16px',
-        alignItems: 'flex-start'
-      }}>
-        <div style={{
-          fontSize: '34px',
-          lineHeight: '1',
-          color: BLUE,
-          fontWeight: '800',
-          flexShrink: 0,
-          marginTop: '-4px'
-        }}>&ldquo;</div>
-        <div>
-          <button 
-            onClick={() => setNoteExpanded(!noteExpanded)}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: BLUE,
-              fontWeight: '700',
-              fontSize: '13px',
-              cursor: 'pointer',
-              padding: '8px 0 0',
-              fontFamily: 'inherit'
-            }}
-          >
-            {noteExpanded ? 'Tutup' : 'Baca selengkapnya'}
-          </button>
-          <div style={{
-            marginTop: '10px',
-            fontSize: '12.5px',
-            color: TEXT,
-            fontWeight: '700'
-          }}>
-            {schoolConfig?.principal_name || 'Nama Kepala Sekolah'}
-            <span style={{
-              display: 'block',
-              fontWeight: '500',
-              color: MUTED,
-              fontSize: '11.5px'
-            }}>{schoolConfig?.principal_nip ? `NIP: ${schoolConfig.principal_nip}` : 'Kepala SMK Negeri Bali Mandara'}</span>
-          </div>
         </div>
       </div>
 

@@ -7,6 +7,7 @@ const db = require('../config/database');
 const { getStudentRecords } = require('../utils/studentRecords');
 const { validateTahunPelajaran, calculateCurrentClass, shouldGraduate, getClassInfo, calculateFullClass } = require('../utils/academicYear');
 const { logActivity } = require('../utils/logger');
+const { syncBiodataChange } = require('../utils/biodataSync');
 
 async function applyIpcAwalUpdate(userId, newIpcAwal, adminId) {
     const parsedAwal = parseInt(newIpcAwal, 10);
@@ -152,7 +153,7 @@ router.get('/', auth, teacherOrSuperAdmin, async (req, res) => {
 
         // If guru, only return students (excluding graduated)
         if (req.user.role === 'guru') {
-            let query = 'SELECT id, nama, nis, nip, role, kelas, grha, wali_kelas, ipc_total, ipc_awal, created_at, tahun_pelajaran, is_graduated, jurusan FROM users WHERE role = ? AND (is_graduated = 0 OR is_graduated IS NULL)';
+            let query = 'SELECT id, nama, nis, nip, role, kelas, grha, wali_kelas, ipc_total, ipc_awal, created_at, tahun_pelajaran, is_graduated, jurusan, detail, alamat, no_hp FROM users WHERE role = ? AND (is_graduated = 0 OR is_graduated IS NULL)';
             let params = ['siswa'];
 
             if (search) {
@@ -195,7 +196,7 @@ router.get('/', auth, teacherOrSuperAdmin, async (req, res) => {
         }
 
         // If superadmin, return all users (including graduated)
-        let query = 'SELECT id, nama, nis, nip, role, kelas, grha, wali_kelas, ipc_total, ipc_awal, created_at, tahun_pelajaran, is_graduated, jurusan FROM users WHERE 1=1';
+        let query = 'SELECT id, nama, nis, nip, role, kelas, grha, wali_kelas, ipc_total, ipc_awal, created_at, tahun_pelajaran, is_graduated, jurusan, detail, alamat, no_hp FROM users WHERE 1=1';
         let params = [];
 
         if (roleFilter) {
@@ -567,6 +568,7 @@ router.put('/:id', auth, async (req, res) => {
         // Get current user data for logging (dan untuk validasi jabatan)
         const [targetUserData] = await db.query('SELECT nama, role, detail FROM users WHERE id = ?', [userId]);
         const storedJabatan = targetUserData[0]?.detail || null;
+        const oldUserName = targetUserData[0]?.nama || null;
 
         let teacherJabatan = jabatan || detail;
         if (!teacherJabatan) {
@@ -582,6 +584,9 @@ router.put('/:id', auth, async (req, res) => {
             'UPDATE users SET nama = ?, alamat = ?, no_hp = ?, detail = ? WHERE id = ?',
             [nama, alamat, no_hp, teacherJabatan, userId]
         );
+
+        // Propagate renamed biodata into record snapshots, pembina names, logs.
+        await syncBiodataChange(userId, { nama: oldUserName });
 
         // Log activity
         await logActivity(currentUser.id, 'UPDATE_BIODATA', `User ${currentUser.nama} (${currentUser.role}) updated biodata for ${targetUserData[0]?.nama || userId} (${targetUserData[0]?.role})`, req.ip);
@@ -810,11 +815,24 @@ router.put('/biodata-approvals/:id', auth, superAdminOnly, async (req, res) => {
         const data = approval[0];
 
         if (status === 'approved') {
+            // Capture pre-update identity so copies can be synced afterwards.
+            const [currentUserRows] = await db.query(
+                'SELECT nama, nis FROM users WHERE id = ?',
+                [data.user_id]
+            );
+            const oldBiodata = {
+                nama: currentUserRows[0]?.nama || data.nama_lama || null,
+                nis: currentUserRows[0]?.nis || data.nis_lama || null,
+            };
+
             // Update student data with new biodata
             await db.query(
                 'UPDATE users SET nama = ?, nis = ?, kelas = ?, jurusan = ?, tahun_pelajaran = ?, grha = ? WHERE id = ?',
                 [data.nama_baru, data.nis_baru, data.kelas_baru, data.jurusan_baru, data.tahun_pelajaran_baru, data.grha_baru, data.user_id]
             );
+
+            // Propagate the approved biodata into record snapshots, logs, notifications.
+            await syncBiodataChange(data.user_id, oldBiodata);
 
             // Update approval status
             await db.query(
@@ -866,13 +884,15 @@ router.put('/:id/biodata', auth, superAdminOnly, async (req, res) => {
         const teacherJabatan = jabatan || detail;
 
         // Get user current data
-        const [user] = await db.query('SELECT nama, role, detail FROM users WHERE id = ?', [userId]);
+        const [user] = await db.query('SELECT nama, role, detail, nis, nip, alamat, no_hp FROM users WHERE id = ?', [userId]);
         if (user.length === 0) {
             return res.status(404).json({ message: 'User not found' });
         }
 
         const role = user[0].role;
         const oldName = user[0].nama;
+        const oldNis = user[0].nis || null;
+        const oldNip = user[0].nip || null;
 
         if (role === 'siswa') {
             // Validate tahun_pelajaran format if provided
@@ -889,6 +909,9 @@ router.put('/:id/biodata', auth, superAdminOnly, async (req, res) => {
                 [nama, nis, jurusan, grha, tahun_pelajaran, calculatedClass, userId]
             );
 
+            // Propagate the edited biodata into record snapshots, logs, notifications.
+            await syncBiodataChange(userId, { nama: oldName, nis: oldNis });
+
             // Log activity
             await logActivity(req.user.id, 'UPDATE_BIODATA_DIRECT', `SuperAdmin ${req.user.nama} directly updated biodata for student ${oldName} (${nis}) to ${nama}`, req.ip);
         } else if (role === 'guru') {
@@ -898,11 +921,16 @@ router.put('/:id/biodata', auth, superAdminOnly, async (req, res) => {
             if (newJabatan && newJabatan !== storedDetail && !VALID_TEACHER_JABATAN.includes(newJabatan)) {
                 return res.status(400).json({ message: `Jabatan tidak valid. Gunakan: ${VALID_TEACHER_JABATAN.join(', ')}` });
             }
-            // Update guru biodata
+            // Update guru biodata (preserve alamat/no_hp when the form does not send them)
+            const newAlamat = alamat !== undefined ? alamat : user[0].alamat;
+            const newNoHp = no_hp !== undefined ? no_hp : user[0].no_hp;
             await db.query(
                 'UPDATE users SET nama = ?, nip = ?, detail = ?, alamat = ?, no_hp = ? WHERE id = ?',
-                [nama, nip, newJabatan, alamat, no_hp, userId]
+                [nama, nip, newJabatan, newAlamat, newNoHp, userId]
             );
+
+            // Propagate the renamed teacher into pembina names, logs, notifications.
+            await syncBiodataChange(userId, { nama: oldName, nip: oldNip });
 
             // Log activity
             await logActivity(req.user.id, 'UPDATE_BIODATA_DIRECT', `SuperAdmin ${req.user.nama} directly updated biodata for teacher ${oldName} (${nip}) to ${nama}`, req.ip);

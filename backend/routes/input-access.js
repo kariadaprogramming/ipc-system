@@ -270,6 +270,14 @@ router.post('/admin/individual', auth, superAdminOnly, async (req, res) => {
         if (userInfo.length === 0) {
             return res.status(404).json({ message: 'User tidak ditemukan' });
         }
+
+        // Pelanggaran & Perilaku are guru-only: force them off for non-guru users
+        // so students can never hold these flags (also heals previously mis-granted rows).
+        const sanitizedPermissions = { ...permissions };
+        if (userInfo[0].role !== 'guru') {
+            sanitizedPermissions.can_input_pelanggaran = false;
+            sanitizedPermissions.can_input_perilaku = false;
+        }
         
         // Check if permission record exists
         const [existingPerm] = await db.query('SELECT id FROM permissions WHERE user_id = ?', [user_id]);
@@ -286,12 +294,12 @@ router.post('/admin/individual', auth, superAdminOnly, async (req, res) => {
                     can_input_perilaku = ?
                  WHERE user_id = ?`,
                 [
-                    permissions.can_input_prestasi,
-                    permissions.can_input_organisasi,
-                    permissions.can_input_kepanitiaan,
-                    permissions.can_input_event,
-                    permissions.can_input_pelanggaran,
-                    permissions.can_input_perilaku,
+                    sanitizedPermissions.can_input_prestasi,
+                    sanitizedPermissions.can_input_organisasi,
+                    sanitizedPermissions.can_input_kepanitiaan,
+                    sanitizedPermissions.can_input_event,
+                    sanitizedPermissions.can_input_pelanggaran,
+                    sanitizedPermissions.can_input_perilaku,
                     user_id
                 ]
             );
@@ -302,12 +310,12 @@ router.post('/admin/individual', auth, superAdminOnly, async (req, res) => {
                  VALUES (?, ?, ?, ?, ?, ?, ?)`,
                 [
                     user_id,
-                    permissions.can_input_prestasi,
-                    permissions.can_input_organisasi,
-                    permissions.can_input_kepanitiaan,
-                    permissions.can_input_event,
-                    permissions.can_input_pelanggaran,
-                    permissions.can_input_perilaku
+                    sanitizedPermissions.can_input_prestasi,
+                    sanitizedPermissions.can_input_organisasi,
+                    sanitizedPermissions.can_input_kepanitiaan,
+                    sanitizedPermissions.can_input_event,
+                    sanitizedPermissions.can_input_pelanggaran,
+                    sanitizedPermissions.can_input_perilaku
                 ]
             );
         }
@@ -324,7 +332,7 @@ router.post('/admin/individual', auth, superAdminOnly, async (req, res) => {
             'can_input_perilaku': 'perilaku'
         };
         
-        for (const [key, value] of Object.entries(permissions)) {
+        for (const [key, value] of Object.entries(sanitizedPermissions)) {
             if (permMap[key]) {
                 await db.query(
                     `INSERT INTO input_access_logs (control_type, target_user_id, jenis_input, action, performed_by)
@@ -390,12 +398,29 @@ router.post('/admin/bulk', auth, superAdminOnly, async (req, res) => {
         const enableBool = enable === true || enable === 1 || enable === 'true' || enable === '1';
         const permCols = validJenis.map(j => `can_input_${j}`);
 
+        // Pelanggaran & Perilaku are guru-only input types. They must never be
+        // granted to students (matching the "(GURU ONLY)" rule in the UI and the
+        // siswa block in checkPermission/checkInputAccess). Disabling is always
+        // allowed so admins can clean up previously mis-granted rows.
+        const isGuruOnly = jenis === 'pelanggaran' || jenis === 'perilaku';
+
         let successCount = 0;
         const skippedIds = [];
+        let skippedSiswaCount = 0;
         for (const user_id of user_ids) {
             const [userInfo] = await db.query('SELECT id, nama, role FROM users WHERE id = ?', [user_id]);
             if (userInfo.length === 0) {
                 skippedIds.push(user_id);
+                continue;
+            }
+
+            const targetRole = userInfo[0].role;
+            const isGuruOnlyTarget = targetRole !== 'guru';
+
+            if (isGuruOnly && enableBool && isGuruOnlyTarget) {
+                // Skip students for guru-only "enable" actions
+                skippedIds.push(user_id);
+                skippedSiswaCount++;
                 continue;
             }
 
@@ -412,9 +437,13 @@ router.post('/admin/bulk', auth, superAdminOnly, async (req, res) => {
                 );
             } else {
                 // New row: selected jenis as given, everything else defaults to true
+                // — except guru-only types for students, which default to false
                 const values = {};
                 for (const j of validJenis) {
-                    values[`can_input_${j}`] = (j === jenis) ? enableBool : true;
+                    const otherIsGuruOnly = j === 'pelanggaran' || j === 'perilaku';
+                    values[`can_input_${j}`] = (j === jenis)
+                        ? enableBool
+                        : (otherIsGuruOnly && isGuruOnlyTarget ? false : true);
                 }
                 await db.query(
                     `INSERT INTO permissions (user_id, ${permCols.join(', ')})
@@ -447,7 +476,8 @@ router.post('/admin/bulk', auth, superAdminOnly, async (req, res) => {
         res.json({
             message: `Berhasil ${enableBool ? 'mengaktifkan' : 'mematikan'} ${jenis} untuk ${successCount} user`,
             success_count: successCount,
-            skipped_ids: skippedIds
+            skipped_ids: skippedIds,
+            skipped_siswa_count: skippedSiswaCount
         });
     } catch (error) {
         console.error('Error updating bulk access:', error);

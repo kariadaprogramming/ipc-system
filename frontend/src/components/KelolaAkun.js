@@ -44,9 +44,6 @@ function KelolaAkun() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [importModalType, setImportModalType] = useState('');
   const [showEditBiodataModal, setShowEditBiodataModal] = useState(false);
-  const [showClassValidationModal, setShowClassValidationModal] = useState(false);
-  const [validationResults, setValidationResults] = useState(null);
-  const [validatingClasses, setValidatingClasses] = useState(false);
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 50,
@@ -525,39 +522,6 @@ function KelolaAkun() {
     }
   };
 
-  const handleValidateClasses = async () => {
-    setValidatingClasses(true);
-    try {
-      const response = await api.get('/academic-year/validate-classes');
-      setValidationResults(response.data);
-      setShowClassValidationModal(true);
-    } catch (error) {
-      console.error('Error validating classes:', error);
-      alert('Gagal memvalidasi kelas');
-    } finally {
-      setValidatingClasses(false);
-    }
-  };
-
-  const handleFixDiscrepancies = async (dryRun = false) => {
-    try {
-      const response = await api.post('/academic-year/fix-discrepancies', 
-        { dryRun }
-      );
-      
-      if (dryRun) {
-        alert(`Preview: ${response.data.discrepanciesFound} discrepancies found. Run again without dryRun to fix.`);
-      } else {
-        alert(`Berhasil memperbaiki ${response.data.fixedCount} siswa`);
-        // Re-validate to show updated results
-        await handleValidateClasses();
-      }
-    } catch (error) {
-      console.error('Error fixing discrepancies:', error);
-      alert('Gagal memperbaiki discrepancies');
-    }
-  };
-
   if (loading) {
     return <div className="loading"><div className="spinner"></div></div>;
   }
@@ -615,19 +579,6 @@ function KelolaAkun() {
 
           {userRole === 'superadmin' && (
             <>
-              <button 
-                onClick={handleValidateClasses} 
-                disabled={validatingClasses}
-                style={{ 
-                  padding: '10px 16px', border: 'none', borderRadius: '4px', fontSize: '14px', fontWeight: '500', cursor: validatingClasses ? 'not-allowed' : 'pointer',
-                  background: '#ffa726', color: 'white', display: 'inline-flex', alignItems: 'center', gap: '6px',
-                  transition: 'all 0.3s ease', opacity: validatingClasses ? 0.6 : 1
-                }}
-                onMouseOver={(e) => { if (!validatingClasses) { e.target.style.background = '#fb8c00'; e.target.style.transform = 'translateY(-2px)'; e.target.style.boxShadow = '0 4px 8px rgba(255, 167, 38, 0.3)'; } }}
-                onMouseOut={(e) => { e.target.style.background = '#ffa726'; e.target.style.transform = 'translateY(0)'; e.target.style.boxShadow = 'none'; }}
-              >
-                {validatingClasses ? 'Memvalidasi...' : 'Validasi Kelas'}
-              </button>
               <button 
                 onClick={() => { setShowImportModal(true); setImportModalType('siswa'); setExcelFile(null); setImportResults([]); }}
                 style={{ 
@@ -1342,97 +1293,6 @@ function KelolaAkun() {
                     ))}
                   </tbody>
                 </table>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Class Validation Modal */}
-      {showClassValidationModal && validationResults && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000
-        }}>
-          <div className="card" style={{ width: 800, maxWidth: '90%', maxHeight: '90vh', overflowY: 'auto' }}>
-            <h3>Validasi Kelas</h3>
-            <button className="btn btn-danger" onClick={() => { setShowClassValidationModal(false); setValidationResults(null); }} style={{ marginBottom: '10px' }}>Tutup</button>
-
-            <div style={{ marginBottom: '20px' }}>
-              <div style={{ display: 'flex', gap: '20px', marginBottom: '15px' }}>
-                <div style={{ flex: 1, padding: '10px', backgroundColor: '#d4edda', borderRadius: '4px' }}>
-                  <strong>Total Siswa:</strong> {validationResults.totalStudents}
-                </div>
-                <div style={{ flex: 1, padding: '10px', backgroundColor: '#d4edda', borderRadius: '4px' }}>
-                  <strong>Valid:</strong> {validationResults.validCount}
-                </div>
-                <div style={{ flex: 1, padding: '10px', backgroundColor: validationResults.discrepancyCount > 0 ? '#f8d7da' : '#d4edda', borderRadius: '4px' }}>
-                  <strong>Discrepancies:</strong> {validationResults.discrepancyCount}
-                </div>
-              </div>
-
-              {validationResults.discrepancyCount > 0 && (
-                <div style={{ marginBottom: '15px' }}>
-                  <button 
-                    className="btn btn-info" 
-                    onClick={() => handleFixDiscrepancies(true)}
-                    style={{ marginRight: '10px' }}
-                  >
-                    Preview Perbaikan
-                  </button>
-                  <button 
-                    className="btn btn-success" 
-                    onClick={() => handleFixDiscrepancies(false)}
-                  >
-                    Perbaiki Sekarang
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {validationResults.discrepancies.length > 0 ? (
-              <div>
-                <h4>Discrepancies ({validationResults.discrepancies.length})</h4>
-                <div style={{ maxHeight: '400px', overflowY: 'auto', border: '1px solid #ddd', borderRadius: '4px' }}>
-                  <table className="table" style={{ fontSize: '12px' }}>
-                    <thead>
-                      <tr>
-                        <th>Nama</th>
-                        <th>NIS</th>
-                        <th>Tipe</th>
-                        <th>Expected</th>
-                        <th>Actual</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {validationResults.discrepancies.map((discrepancy, index) => (
-                        <tr key={index}>
-                          <td>{discrepancy.nama}</td>
-                          <td>{discrepancy.nis}</td>
-                          <td>
-                            <span className={`badge badge-${discrepancy.discrepancyType === 'graduation_status' ? 'danger' : 'warning'}`}>
-                              {discrepancy.discrepancyType === 'graduation_status' ? 'Graduation' : 'Class'}
-                            </span>
-                          </td>
-                          <td>{discrepancy.expectedValue}</td>
-                          <td>{discrepancy.actualValue}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            ) : (
-              <div style={{ padding: '20px', backgroundColor: '#d4edda', borderRadius: '4px', textAlign: 'center' }}>
-                <strong>✅ Semua kelas valid!</strong>
               </div>
             )}
           </div>

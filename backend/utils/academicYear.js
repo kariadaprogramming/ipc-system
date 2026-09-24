@@ -54,16 +54,29 @@ function getCurrentAcademicYear() {
 }
 
 /**
- * Calculate current class based on enrollment academic year
- * @param {string} enrollmentYear - Academic year when student enrolled (YYYY-YYYY)
- * @returns {string|null} - Current class (X, XI, XII) or null if graduated
+ * Resolve the academic year to calculate against.
+ * @param {string|null} referenceYear - Requested academic year (YYYY-YYYY)
+ * @returns {string} - referenceYear when valid, otherwise the current academic year
  */
-function calculateCurrentClass(enrollmentYear) {
+function resolveAcademicYear(referenceYear) {
+    return referenceYear && validateTahunPelajaran(referenceYear)
+        ? referenceYear
+        : getCurrentAcademicYear();
+}
+
+/**
+ * Calculate class based on enrollment academic year
+ * @param {string} enrollmentYear - Academic year when student enrolled (YYYY-YYYY)
+ * @param {string|null} referenceYear - Academic year to calculate against (YYYY-YYYY),
+ *                                      defaults to the current academic year
+ * @returns {string|null} - Class in the reference year (X, XI, XII) or null if graduated
+ */
+function calculateCurrentClass(enrollmentYear, referenceYear = null) {
     if (!enrollmentYear || !validateTahunPelajaran(enrollmentYear)) {
         return null;
     }
     
-    const currentYear = getCurrentAcademicYear();
+    const currentYear = resolveAcademicYear(referenceYear);
     const [enrollStart] = enrollmentYear.split('-').map(Number);
     const [currentStart] = currentYear.split('-').map(Number);
     
@@ -90,27 +103,29 @@ function calculateCurrentClass(enrollmentYear) {
 /**
  * Check if student should be marked as graduated
  * @param {string} enrollmentYear - Academic year when student enrolled (YYYY-YYYY)
+ * @param {string|null} referenceYear - Academic year to calculate against (YYYY-YYYY)
  * @returns {boolean} - True if student should be graduated
  */
-function shouldGraduate(enrollmentYear) {
-    const currentClass = calculateCurrentClass(enrollmentYear);
+function shouldGraduate(enrollmentYear, referenceYear = null) {
+    const currentClass = calculateCurrentClass(enrollmentYear, referenceYear);
     return currentClass === null;
 }
 
 /**
- * Get class from academic year and current date
+ * Get class from academic year and reference date
  * @param {string} enrollmentYear - Academic year when student enrolled (YYYY-YYYY)
+ * @param {string|null} referenceYear - Academic year to calculate against (YYYY-YYYY)
  * @returns {object} - Object with class info and graduation status
  */
-function getClassInfo(enrollmentYear) {
-    const currentClass = calculateCurrentClass(enrollmentYear);
-    const isGraduated = shouldGraduate(enrollmentYear);
+function getClassInfo(enrollmentYear, referenceYear = null) {
+    const currentClass = calculateCurrentClass(enrollmentYear, referenceYear);
+    const isGraduated = shouldGraduate(enrollmentYear, referenceYear);
     
     return {
         currentClass,
         isGraduated,
         enrollmentYear,
-        currentAcademicYear: getCurrentAcademicYear()
+        currentAcademicYear: resolveAcademicYear(referenceYear)
     };
 }
 
@@ -118,10 +133,12 @@ function getClassInfo(enrollmentYear) {
  * Calculate full class name (X/XI/XII + jurusan)
  * @param {string} enrollmentYear - Academic year when student enrolled (YYYY-YYYY)
  * @param {string} jurusan - Student program/stream (e.g., "TKJ 1", "DPIB 2", "TKR 1")
+ * @param {string|null} referenceYear - Academic year to calculate against (YYYY-YYYY),
+ *                                      defaults to the current academic year
  * @returns {string|null} - Full class name (e.g., "X TKJ 1") or null if graduated
  */
-function calculateFullClass(enrollmentYear, jurusan) {
-    const currentClass = calculateCurrentClass(enrollmentYear);
+function calculateFullClass(enrollmentYear, jurusan, referenceYear = null) {
+    const currentClass = calculateCurrentClass(enrollmentYear, referenceYear);
     
     if (!currentClass) {
         return null; // Graduated
@@ -158,5 +175,6 @@ module.exports = {
     shouldGraduate,
     getClassInfo,
     getAcademicYearOptions,
-    calculateFullClass
+    calculateFullClass,
+    resolveAcademicYear
 };

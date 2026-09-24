@@ -178,16 +178,25 @@ function ApprovalsV2() {
         cleanPath = path.split('\\').pop();
         cleanPath = `/uploads/${uploadFolder}/${cleanPath}`;
       } else if (!cleanPath.startsWith('/')) {
-        cleanPath = `/uploads/${uploadFolder}/${cleanPath}`;
+        // Paths saved by the backend are already relative to the uploads root
+        // (e.g. "uploads/event/filename.jpg") — just root them, don't nest
+        // them under the fallback folder again.
+        cleanPath = cleanPath.startsWith('uploads/')
+          ? `/${cleanPath}`
+          : `/uploads/${uploadFolder}/${cleanPath}`;
       }
       return `${API_BASE_URL.replace('/api', '')}${cleanPath}`;
     };
 
     const getItemPhoto = (item, itemType) => {
+      // `foto` is the actual column name returned by the approvals API
+      // (`foto_path` kept as fallback for legacy rows).
+      const foto = item.foto || item.foto_path;
+      if (!foto) return null;
       if (itemType === 'pelanggaran') {
-        return item.foto ? getPhotoUrl(item.foto, 'pelanggaran') : null;
+        return getPhotoUrl(foto, 'pelanggaran');
       }
-      return item.foto_path ? getPhotoUrl(item.foto_path) : null;
+      return getPhotoUrl(foto);
     };
 
     const usesApprovalStatus = !['biodata', 'student_creation'].includes(type);
@@ -726,6 +735,31 @@ function ApprovalsV2() {
                     </td>
                   </>
                 )}
+                {usesApprovalStatus && type !== 'perilaku' && (
+                  <td style={{
+                    padding: "16px 18px",
+                    borderBottom: `1px solid ${BORDER}`,
+                    verticalAlign: "middle"
+                  }}>
+                    {getItemPhoto(item, type) ? (
+                      <div>
+                        <img
+                          src={getItemPhoto(item, type)}
+                          alt="Foto Bukti"
+                          style={{ width: '60px', height: '60px', objectFit: 'cover', borderRadius: '5px', cursor: 'pointer' }}
+                          onClick={() => window.open(getItemPhoto(item, type), '_blank')}
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            e.currentTarget.insertAdjacentHTML('afterend', '<span style="color:#6b7280;font-size:12.5px">Foto tidak ditemukan</span>');
+                          }}
+                          title="Klik untuk memperbesar"
+                        />
+                      </div>
+                    ) : (
+                      <span style={{ color: MUTED }}>-</span>
+                    )}
+                  </td>
+                )}
                 {usesApprovalStatus && (
                   <td style={{
                     padding: "16px 18px",
@@ -780,27 +814,6 @@ function ApprovalsV2() {
                         background: '#fdeaea',
                         color: RED_DARK
                       }}>❌ DITOLAK</span>
-                    )}
-                  </td>
-                )}
-                {usesApprovalStatus && type !== 'perilaku' && (
-                  <td style={{
-                    padding: "16px 18px",
-                    borderBottom: `1px solid ${BORDER}`,
-                    verticalAlign: "middle"
-                  }}>
-                    {getItemPhoto(item, type) ? (
-                      <div>
-                        <img
-                          src={getItemPhoto(item, type)}
-                          alt="Foto Bukti"
-                          style={{ width: '60px', height: '60px', objectFit: 'cover', borderRadius: '5px', cursor: 'pointer' }}
-                          onClick={() => window.open(getItemPhoto(item, type), '_blank')}
-                          title="Klik untuk memperbesar"
-                        />
-                      </div>
-                    ) : (
-                      <span style={{ color: MUTED }}>-</span>
                     )}
                   </td>
                 )}

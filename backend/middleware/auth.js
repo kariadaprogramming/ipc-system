@@ -108,6 +108,14 @@ const checkInputAccess = (jenisInput) => {
         return next();
       }
       
+      // Students never get access to pelanggaran/perilaku (guru-only input),
+      // mirroring checkPermission above — regardless of any stored permission flags.
+      if (userRole === 'siswa' && (jenisInput === 'pelanggaran' || jenisInput === 'perilaku')) {
+        return res.status(403).json({ 
+          message: `Anda tidak memiliki izin untuk input data ${jenisInput}. Silakan hubungi SuperAdmin.` 
+        });
+      }
+      
       // Check global access status
       const [globalControl] = await db.query(
         'SELECT is_enabled FROM input_access_control WHERE control_type = ? AND jenis_input = ?',
