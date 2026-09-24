@@ -228,6 +228,66 @@ router.delete('/perilaku-ratings/:id', auth, superAdminOnly, async (req, res) =>
     }
 });
 
+// ---- Batas minimum Total IPC (bukan poin — hanya pengaturan tampilan) ----
+const MIN_IPC_CATEGORY = 'pengaturan';
+const MIN_IPC_FIELD1 = 'min_ipc';
+
+// Dibaca semua role yang login — dipakai untuk menandai total IPC di bawah batas (merah).
+router.get('/min-ipc', auth, async (req, res) => {
+    try {
+        const [rows] = await db.query(
+            `SELECT point_value FROM ipc_config
+             WHERE category = ? AND field1 = ?
+             ORDER BY id LIMIT 1`,
+            [MIN_IPC_CATEGORY, MIN_IPC_FIELD1]
+        );
+        const value = rows.length ? parseInt(rows[0].point_value, 10) : 0;
+        res.json({ min_ipc: Number.isFinite(value) && value > 0 ? value : 0 });
+    } catch (error) {
+        console.error('Error fetching min IPC config:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Hanya superadmin yang boleh mengubah batas. 0 = fitur nonaktif.
+router.put('/min-ipc', auth, superAdminOnly, async (req, res) => {
+    try {
+        const raw = req.body?.min_ipc;
+        const value = Number(raw);
+        if (raw === '' || raw === null || raw === undefined ||
+            !Number.isInteger(value) || value < 0 || value > 100000) {
+            return res.status(400).json({ message: 'Batas minimum harus bilangan bulat 0 - 100000' });
+        }
+
+        const userId = req.user.id;
+        const [existing] = await db.query(
+            'SELECT id FROM ipc_config WHERE category = ? AND field1 = ? ORDER BY id LIMIT 1',
+            [MIN_IPC_CATEGORY, MIN_IPC_FIELD1]
+        );
+
+        if (existing.length) {
+            await db.query(
+                'UPDATE ipc_config SET point_value = ?, is_active = TRUE, updated_by = ? WHERE id = ?',
+                [value, userId, existing[0].id]
+            );
+        } else {
+            await db.query(
+                `INSERT INTO ipc_config (category, field1, field2, field3, point_value, description, is_active, updated_by)
+                 VALUES (?, ?, NULL, NULL, ?, ?, TRUE, ?)`,
+                [MIN_IPC_CATEGORY, MIN_IPC_FIELD1, value,
+                 'Batas minimum Total IPC - total di bawah nilai ini ditampilkan merah (0 = nonaktif)',
+                 userId]
+            );
+        }
+
+        clearConfigCache();
+        res.json({ min_ipc: value });
+    } catch (error) {
+        console.error('Error updating min IPC config:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
 // Get single configuration
 router.get('/:id', auth, superAdminOnly, async (req, res) => {
     try {
@@ -273,18 +333,28 @@ router.post('/', auth, superAdminOnly, async (req, res) => {
         const userId = req.user.id;
         if (category === 'pelanggaran') {
             if (field2) {
+                if (!field1 || !String(field1).trim()) {
+                    return res.status(400).json({ message: 'Detail pelanggaran wajib diisi' });
+                }
                 const [level] = await db.query('SELECT id FROM ipc_pelanggaran_level WHERE name = ?', [field2]);
                 if (!level.length) return res.status(400).json({ message: 'Violation level not found' });
                 const [result] = await db.query(
                     'INSERT INTO ipc_pelanggaran_detail (name, level_id, is_active) VALUES (?, ?, ?)',
-                    [field1, level[0].id, is_active !== undefined ? is_active : true]
+                    [String(field1).trim(), level[0].id, is_active !== undefined ? is_active : true]
                 );
                 clearConfigCache();
                 return res.status(201).json((await getPelanggaranConfigs()).find(item => item.id === `detail-${result.insertId}`));
             }
+            if (!field1 || !String(field1).trim()) {
+                return res.status(400).json({ message: 'Tingkat pelanggaran wajib diisi' });
+            }
+            const levelPoint = Number(point_value);
+            if (!Number.isFinite(levelPoint) || levelPoint >= 0) {
+                return res.status(400).json({ message: 'Point pelanggaran harus negatif (< 0)' });
+            }
             const [result] = await db.query(
                 'INSERT INTO ipc_pelanggaran_level (name, point_value, description, is_active) VALUES (?, ?, ?, ?)',
-                [field1, point_value, description || null, is_active !== undefined ? is_active : true]
+                [String(field1).trim(), levelPoint, description || null, is_active !== undefined ? is_active : true]
             );
             clearConfigCache();
             return res.status(201).json((await getPelanggaranConfigs()).find(item => item.id === `level-${result.insertId}`));
@@ -305,6 +375,9 @@ router.post('/', auth, superAdminOnly, async (req, res) => {
     } catch (error) {
         console.error('Error creating IPC configuration:', error);
         if (error.code === '23505') {
+            if (req.body?.category === 'pelanggaran' && req.body?.field2) {
+                return res.status(400).json({ message: 'Detail pelanggaran sudah ada' });
+            }
             return res.status(400).json({ message: 'Configuration with this category, field1, and field2 already exists' });
         }
         res.status(500).json({ message: 'Server error' });
@@ -319,15 +392,46 @@ router.put('/:id', auth, superAdminOnly, async (req, res) => {
         const userId = req.user.id;
         const pelanggaranId = parsePelanggaranId(id);
         if (pelanggaranId) {
-            const table = pelanggaranId.type === 'level' ? 'ipc_pelanggaran_level' : 'ipc_pelanggaran_detail';
-            const fieldUpdates = pelanggaranId.type === 'level'
-                ? ['point_value = ?', 'description = ?', 'is_active = ?']
-                : ['is_active = ?'];
-            const values = pelanggaranId.type === 'level'
-                ? [point_value, description ?? null, is_active, pelanggaranId.value]
-                : [is_active, pelanggaranId.value];
-            await db.query(`UPDATE ${table} SET ${fieldUpdates.join(', ')} WHERE id = ?`, values);
-            clearConfigCache();
+            if (pelanggaranId.type === 'level') {
+                if (point_value !== undefined) {
+                    const lvlPoint = Number(point_value);
+                    if (!Number.isFinite(lvlPoint) || lvlPoint >= 0) {
+                        return res.status(400).json({ message: 'Point pelanggaran harus negatif (< 0)' });
+                    }
+                }
+                const sets = [];
+                const values = [];
+                if (point_value !== undefined) { sets.push('point_value = ?'); values.push(Number(point_value)); }
+                if (description !== undefined) { sets.push('description = ?'); values.push(description ?? null); }
+                if (is_active !== undefined) { sets.push('is_active = ?'); values.push(is_active); }
+                if (sets.length) {
+                    values.push(pelanggaranId.value);
+                    await db.query(`UPDATE ipc_pelanggaran_level SET ${sets.join(', ')} WHERE id = ?`, values);
+                    clearConfigCache();
+                }
+                return res.json((await getPelanggaranConfigs()).find(item => item.id === id));
+            }
+
+            // Detail pelanggaran: boleh pindah tingkat (field2) dan/atau toggle aktif
+            const detailSets = [];
+            const detailValues = [];
+            if (field2 !== undefined && field2 !== null && String(field2).trim() !== '') {
+                const [lvl] = await db.query('SELECT id FROM ipc_pelanggaran_level WHERE name = ?', [String(field2).trim()]);
+                if (!lvl.length) {
+                    return res.status(400).json({ message: 'Tingkat pelanggaran tidak ditemukan' });
+                }
+                detailSets.push('level_id = ?');
+                detailValues.push(lvl[0].id);
+            }
+            if (is_active !== undefined) {
+                detailSets.push('is_active = ?');
+                detailValues.push(is_active);
+            }
+            if (detailSets.length) {
+                detailValues.push(pelanggaranId.value);
+                await db.query(`UPDATE ipc_pelanggaran_detail SET ${detailSets.join(', ')} WHERE id = ?`, detailValues);
+                clearConfigCache();
+            }
             return res.json((await getPelanggaranConfigs()).find(item => item.id === id));
         }
         
@@ -335,6 +439,15 @@ router.put('/:id', auth, superAdminOnly, async (req, res) => {
         const [existing] = await db.query('SELECT id, category, field1, field2, field3, point_value, description, is_active, created_at, updated_at, updated_by FROM ipc_config WHERE id = ?', [id]);
         if (existing.length === 0) {
             return res.status(404).json({ message: 'Configuration not found' });
+        }
+
+        // Point pelanggaran (termasuk baris legacy di ipc_config) harus negatif
+        const targetCategory = category || existing[0].category;
+        if (targetCategory === 'pelanggaran' && point_value !== undefined) {
+            const pv = Number(point_value);
+            if (!Number.isFinite(pv) || pv >= 0) {
+                return res.status(400).json({ message: 'Point pelanggaran harus negatif (< 0)' });
+            }
         }
         
         await db.query(`

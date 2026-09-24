@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
 import API_BASE_URL from '../config';
+import { useMinIpc, isBelowMinIpc } from '../utils/minIpc';
 import StudentRecordsHistory from './StudentRecordsHistory';
 
 function StudentDetail({ student, onClose }) {
+    const minIpc = useMinIpc();
     const [records, setRecords] = useState(null);
     const [ipcHistory, setIpcHistory] = useState([]);
     const [ipcCard, setIpcCard] = useState(null);
@@ -123,7 +125,7 @@ function StudentDetail({ student, onClose }) {
                                         <strong>IPC:</strong>{' '}
                                         <span style={{ 
                                             fontSize: 20, 
-                                            color: (student.ipc_total ?? 0) < 0 ? '#dc2626' : '#3498db', 
+                                            color: (student.ipc_total ?? 0) < 0 || isBelowMinIpc(student.ipc_total ?? 0, minIpc) ? '#dc2626' : '#3498db', 
                                             fontWeight: 'bold' 
                                         }}>
                                             {(student.ipc_total ?? 0) < 0 ? `${student.ipc_total ?? 0} (MINUS)` : (student.ipc_total ?? 0)}

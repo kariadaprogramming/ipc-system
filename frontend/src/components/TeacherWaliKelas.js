@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
+import { useMinIpc, isBelowMinIpc } from '../utils/minIpc';
 
 function getIpcDetailRows(points = {}) {
   return [
@@ -15,6 +16,7 @@ function getIpcDetailRows(points = {}) {
 }
 
 function TeacherWaliKelas() {
+  const minIpc = useMinIpc();
   const [classData, setClassData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -300,7 +302,7 @@ function TeacherWaliKelas() {
                   </td>
                   <td style={{ padding: '12px', textAlign: 'center' }}>
                     <span style={{ 
-                      backgroundColor: getIpcColor(student.ipc_total),
+                      backgroundColor: isBelowMinIpc(student.ipc_total || 80, minIpc) ? '#dc3545' : getIpcColor(student.ipc_total),
                       color: 'white',
                       padding: '4px 8px',
                       borderRadius: '4px',
@@ -512,7 +514,7 @@ function TeacherWaliKelas() {
                   </div>
                   <div style={{ 
                     padding: '15px', 
-                    backgroundColor: getIpcColor(selectedStudent.ipc_total || 80), 
+                    backgroundColor: isBelowMinIpc(selectedStudent.ipc_total || 80, minIpc) ? '#dc3545' : getIpcColor(selectedStudent.ipc_total || 80), 
                     borderRadius: '8px',
                     textAlign: 'center',
                     color: 'white'

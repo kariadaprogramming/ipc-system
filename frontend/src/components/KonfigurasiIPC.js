@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
+import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
+import { getRowField } from '../utils/excelImport';
 
 function KonfigurasiIPC() {
   const [configs, setConfigs] = useState([]);
@@ -17,6 +20,12 @@ function KonfigurasiIPC() {
   const [organisasiName, setOrganisasiName] = useState('');
   const [perilakuRatings, setPerilakuRatings] = useState([]);
   const [perilakuRatingName, setPerilakuRatingName] = useState('');
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [excelFile, setExcelFile] = useState(null);
+  const [importing, setImporting] = useState(false);
+  const [importResults, setImportResults] = useState([]);
+  const [minIpcInput, setMinIpcInput] = useState('0');
+  const [minIpcSaving, setMinIpcSaving] = useState(false);
 
   const categories = [
     { key: 'prestasi', label: 'Prestasi', icon: '🏆' },
@@ -33,6 +42,7 @@ function KonfigurasiIPC() {
     fetchConfigs();
     fetchOrganisasiOptions();
     fetchPerilakuRatings();
+    fetchMinIpcConfig();
   }, []);
 
   const fetchOrganisasiOptions = async () => {
@@ -107,6 +117,34 @@ function KonfigurasiIPC() {
       fetchOrganisasiOptions();
     } catch (error) {
       setMessage(error.response?.data?.message || 'Gagal menghapus organisasi');
+    }
+  };
+
+  const fetchMinIpcConfig = async () => {
+    try {
+      const response = await api.get('/ipc-config/min-ipc');
+      setMinIpcInput(String(response.data?.min_ipc ?? 0));
+    } catch (error) {
+      console.error('Error fetching min IPC config:', error);
+    }
+  };
+
+  const saveMinIpcConfig = async () => {
+    const trimmed = String(minIpcInput).trim();
+    const value = Number(trimmed);
+    if (trimmed === '' || !Number.isInteger(value) || value < 0) {
+      setMessage('Batas minimum harus bilangan bulat 0 atau lebih (0 = nonaktif)');
+      return;
+    }
+    try {
+      setMinIpcSaving(true);
+      await api.put('/ipc-config/min-ipc', { min_ipc: value });
+      setMessage('Batas minimum Total IPC berhasil disimpan!');
+      setMinIpcInput(String(value));
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Gagal menyimpan batas minimum IPC');
+    } finally {
+      setMinIpcSaving(false);
     }
   };
 
@@ -195,8 +233,161 @@ function KonfigurasiIPC() {
     setShowEditModal(true);
   };
 
+  const handleExcelFileChange = (e) => {
+    setExcelFile(e.target.files[0]);
+  };
+
+  const closeImportModal = () => {
+    setShowImportModal(false);
+    setExcelFile(null);
+    setImportResults([]);
+  };
+
+  const downloadDetailTemplate = async () => {
+    const levelNames = configuredPelanggaranLevels.map(level => level.field1);
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Template');
+    worksheet.columns = [
+      { header: 'Detail', key: 'Detail', width: 35 },
+      { header: 'TingkatPelanggaran', key: 'TingkatPelanggaran', width: 22 }
+    ];
+
+    if (levelNames.length) {
+      worksheet.dataValidations.add('B2:B1000', {
+        type: 'list',
+        allowBlank: false,
+        formulae: [`"${levelNames.join(',')}"`],
+        showErrorMessage: true,
+        errorTitle: 'Tingkat Pelanggaran tidak valid',
+        error: `Pilih salah satu: ${levelNames.join(', ')}`
+      });
+    }
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blobUrl = URL.createObjectURL(new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    }));
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = 'template_detail_pelanggaran.xlsx';
+    link.click();
+    URL.revokeObjectURL(blobUrl);
+  };
+
+  const handleDetailExcelImport = async () => {
+    if (!excelFile) {
+      setMessage('Pilih file Excel terlebih dahulu');
+      return;
+    }
+
+    const activeLevels = configuredPelanggaranLevels;
+    if (!activeLevels.length) {
+      setMessage('Gagal import: belum ada Tingkat Pelanggaran aktif. Buat dulu di tab "Tingkat Pelanggaran & Point"');
+      return;
+    }
+
+    setImporting(true);
+    setImportResults([]);
+    const results = [];
+
+    try {
+      const data = await excelFile.arrayBuffer();
+      const workbook = XLSX.read(data, { type: 'array' });
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+      const existingDetails = pelanggaranDetailConfigs.map(config => String(config.field1).toLowerCase());
+      const levelNames = activeLevels.map(level => level.field1).join(', ');
+
+      for (const row of jsonData) {
+        const detail = getRowField(row, 'Detail', 'detail', 'Detail Pelanggaran', 'DetailPelanggaran', 'Nama', 'nama', 'field1');
+        const tingkatRaw = getRowField(row, 'TingkatPelanggaran', 'tingkatpelanggaran', 'Tingkat Pelanggaran', 'Tingkat', 'tingkat', 'Level', 'level', 'field2');
+
+        // Lewati baris kosong / header
+        if (!detail && !tingkatRaw) {
+          continue;
+        }
+        if (!detail) {
+          results.push({ status: 'error', name: '(tanpa nama)', level: tingkatRaw, error: 'Detail pelanggaran kosong' });
+          continue;
+        }
+        if (!tingkatRaw) {
+          results.push({ status: 'error', name: detail, level: '-', error: 'Tingkat pelanggaran kosong' });
+          continue;
+        }
+
+        const level = activeLevels.find(l => String(l.field1).toLowerCase() === tingkatRaw.toLowerCase());
+        if (!level) {
+          results.push({
+            status: 'error',
+            name: detail,
+            level: tingkatRaw,
+            error: `Tingkat "${tingkatRaw}" tidak ditemukan. Pilih: ${levelNames}`
+          });
+          continue;
+        }
+
+        if (existingDetails.includes(detail.toLowerCase())) {
+          results.push({ status: 'error', name: detail, level: level.field1, error: 'Detail sudah ada di daftar' });
+          continue;
+        }
+
+        try {
+          await api.post('/ipc-config', {
+            category: 'pelanggaran',
+            field1: detail,
+            field2: level.field1,
+            point_value: 0,
+            description: null,
+            is_active: true
+          });
+          existingDetails.push(detail.toLowerCase());
+          results.push({ status: 'success', name: detail, level: level.field1 });
+        } catch (error) {
+          results.push({
+            status: 'error',
+            name: detail,
+            level: level.field1,
+            error: error.response?.data?.message || error.message
+          });
+        }
+      }
+
+      setImportResults(results);
+      const ok = results.filter(r => r.status === 'success').length;
+      const fail = results.filter(r => r.status === 'error').length;
+      if (!results.length) {
+        setMessage('Tidak ada baris data untuk diimport');
+      } else if (ok === 0 && fail > 0) {
+        setMessage(`Gagal import semua baris (${fail} error)`);
+      } else {
+        setMessage(`Import selesai: ${ok} berhasil, ${fail} gagal`);
+      }
+      if (ok > 0) {
+        fetchConfigs();
+      }
+    } catch (error) {
+      setMessage('Gagal membaca file Excel: ' + error.message);
+    } finally {
+      setImporting(false);
+      setExcelFile(null);
+    }
+  };
+
   const categoryConfigs = configs.filter(c => c.category === activeCategory);
   const configuredPelanggaranLevels = configs.filter(c => c.category === 'pelanggaran' && !c.field2 && c.is_active);
+  // Opsi tingkat untuk edit detail: semua tingkat aktif + tingkat saat ini (jika non-aktif/terhapus)
+  const editTingkatOptions = [...configuredPelanggaranLevels];
+  if (activeCategory === 'pelanggaran' && editingConfig?.field2 &&
+      !editTingkatOptions.some(level => level.field1 === editingConfig.field2)) {
+    const currentLevel = configs.find(c => c.category === 'pelanggaran' && !c.field2 && c.field1 === editingConfig.field2);
+    editTingkatOptions.push(currentLevel || {
+      id: `current-${editingConfig.field2}`,
+      field1: editingConfig.field2,
+      point_value: editingConfig.point_value,
+      is_active: false
+    });
+  }
   const pelanggaranSeverityConfigs = categoryConfigs.filter(c => !c.field2);
   const pelanggaranDetailConfigs = categoryConfigs.filter(c => Boolean(c.field2));
   const displayedConfigs = activeCategory === 'pelanggaran'
@@ -313,6 +504,32 @@ function KonfigurasiIPC() {
       )}
 
       <div className="card" style={{ marginBottom: 20 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+          <div style={{ flex: '1 1 320px' }}>
+            <h3 style={{ margin: '0 0 4px' }}>Batas Minimum Total IPC</h3>
+            <p style={{ margin: 0, color: '#6B7080', fontSize: 13 }}>
+              Total IPC siswa di bawah batas ini ditampilkan <strong style={{ color: '#dc2626' }}>merah</strong> pada
+              cetakan Excel (laporan individual &amp; per kelas) dan halaman laporan. Isi <strong>0</strong> untuk
+              menonaktifkan.
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              value={minIpcInput}
+              onChange={(e) => setMinIpcInput(e.target.value)}
+              style={{ width: 130, padding: '9px 10px', borderRadius: 8, border: '1px solid #D7DBE4', fontSize: 14 }}
+            />
+            <button className="btn btn-primary" onClick={saveMinIpcConfig} disabled={minIpcSaving}>
+              {minIpcSaving ? 'Menyimpan...' : 'Simpan'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 20 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <h3 style={{ margin: 0 }}>Kategori Konfigurasi</h3>
           <div style={{ display: 'flex', gap: 8 }}>
@@ -367,16 +584,27 @@ function KonfigurasiIPC() {
           <h3 style={{ margin: 0 }}>
             {categories.find(c => c.key === activeCategory)?.label} Configuration
           </h3>
-          <button
-            onClick={() => {
-              setPelanggaranAddType(activeCategory === 'pelanggaran' ? pelanggaranSection : 'severity');
-              setShowAddModal(true);
-            }}
-            className="btn btn-primary"
-            style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-          >
-            ➕ Tambah Konfigurasi
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {activeCategory === 'pelanggaran' && pelanggaranSection === 'detail' && (
+              <button
+                onClick={() => { setExcelFile(null); setImportResults([]); setShowImportModal(true); }}
+                className="btn btn-info"
+                style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+              >
+                📥 Import Excel
+              </button>
+            )}
+            <button
+              onClick={() => {
+                setPelanggaranAddType(activeCategory === 'pelanggaran' ? pelanggaranSection : 'severity');
+                setShowAddModal(true);
+              }}
+              className="btn btn-primary"
+              style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+            >
+              ➕ Tambah Konfigurasi
+            </button>
+          </div>
         </div>
 
         {activeCategory === 'pelanggaran' && (
@@ -578,12 +806,21 @@ function KonfigurasiIPC() {
             <h3 style={{ marginBottom: 20 }}>Edit Konfigurasi</h3>
             <form onSubmit={(e) => {
               e.preventDefault();
+              const isDetailRow = activeCategory === 'pelanggaran' && Boolean(editingConfig.field2);
+              // Point baris tingkat harus negatif; point baris detail diisi otomatis dari tingkat (read-only)
+              if (!isDetailRow) {
+                const pvRaw = e.target.point_value?.value;
+                if (activeCategory === 'pelanggaran' && pvRaw !== undefined && !(parseInt(pvRaw) < 0)) {
+                  setMessage('Point pelanggaran harus negatif (< 0)');
+                  return;
+                }
+              }
               handleUpdateConfig(editingConfig.id, {
                 field2: e.target.field2?.value || editingConfig.field2,
-                point_value: activeCategory === 'pelanggaran' && pelanggaranAddType === 'detail'
-                  ? 0
+                point_value: isDetailRow
+                  ? Number(e.target.point_value.value)
                   : parseInt(e.target.point_value.value),
-                description: activeCategory === 'pelanggaran' && editingConfig.field2
+                description: isDetailRow
                   ? null
                   : e.target.description.value,
                 is_active: e.target.is_active.checked
@@ -603,14 +840,36 @@ function KonfigurasiIPC() {
               {showEditField2 && (
                 <div className="form-group">
                   <label>{activeCategory === 'pelanggaran' ? 'Tingkat Pelanggaran' : getHeaderLabel2(activeCategory)}</label>
-                  <input
-                    type="text"
-                    name="field2"
-                    defaultValue={editingConfig.field2 || '-'}
-                    disabled={activeCategory !== 'pelanggaran'}
-                    className="form-control"
-                    style={{ background: '#F7F8FB', color: '#6B7080' }}
-                  />
+                  {activeCategory === 'pelanggaran' ? (
+                    <select
+                      name="field2"
+                      defaultValue={editingConfig.field2 || ''}
+                      required
+                      className="form-control"
+                      onChange={(e) => {
+                        // Auto-fill Point Value sesuai tingkat yang dipilih
+                        const level = editTingkatOptions.find(l => l.field1 === e.target.value);
+                        const pointInput = e.target.form?.elements?.point_value;
+                        if (pointInput) pointInput.value = level?.point_value != null ? String(level.point_value) : '';
+                      }}
+                    >
+                      <option value="" disabled>Pilih Tingkat Pelanggaran</option>
+                      {editTingkatOptions.map(level => (
+                        <option key={level.id} value={level.field1}>
+                          {level.field1}{level.is_active ? '' : ' (non-aktif)'}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      name="field2"
+                      defaultValue={editingConfig.field2 || '-'}
+                      disabled
+                      className="form-control"
+                      style={{ background: '#F7F8FB', color: '#6B7080' }}
+                    />
+                  )}
                 </div>
               )}
               <div className="form-group">
@@ -620,9 +879,19 @@ function KonfigurasiIPC() {
                   name="point_value"
                   defaultValue={editingConfig.point_value}
                   required
+                  disabled={activeCategory === 'pelanggaran' && Boolean(editingConfig.field2)}
+                  {...(activeCategory === 'pelanggaran' ? { max: -1 } : {})}
                   className="form-control"
                   placeholder="Masukkan nilai point"
+                  style={activeCategory === 'pelanggaran' && editingConfig.field2 ? { background: '#F7F8FB', color: '#6B7080' } : undefined}
                 />
+                {activeCategory === 'pelanggaran' && (
+                  <small style={{ color: '#666', fontSize: '12px' }}>
+                    {editingConfig.field2
+                      ? 'Point otomatis mengikuti Tingkat Pelanggaran yang dipilih'
+                      : 'Point pelanggaran harus negatif karena mengurangi IPC'}
+                  </small>
+                )}
               </div>
               {!(activeCategory === 'pelanggaran' && editingConfig.field2) && <div className="form-group">
                 <label>Deskripsi</label>
@@ -694,6 +963,12 @@ function KonfigurasiIPC() {
             </p>
             <form onSubmit={(e) => {
               e.preventDefault();
+              // Point pelanggaran harus negatif (mengurangi IPC)
+              const pvRaw = e.target.point_value?.value;
+              if (activeCategory === 'pelanggaran' && pvRaw !== undefined && !(parseInt(pvRaw) < 0)) {
+                setMessage('Point pelanggaran harus negatif (< 0)');
+                return;
+              }
               handleAddConfig({
                 category: activeCategory,
                 field1: e.target.field1.value,
@@ -825,10 +1100,14 @@ function KonfigurasiIPC() {
                   type="number"
                   name="point_value"
                   required
+                  {...(activeCategory === 'pelanggaran' ? { max: -1 } : {})}
                   className="form-control"
-                  placeholder="Masukkan nilai point"
+                  placeholder={activeCategory === 'pelanggaran' ? 'Contoh: -1, -5, -25' : 'Masukkan nilai point'}
                   style={{ fontSize: 14 }}
                 />
+                {activeCategory === 'pelanggaran' && (
+                  <small style={{ color: '#666', fontSize: '12px' }}>Point pelanggaran harus negatif karena mengurangi IPC</small>
+                )}
               </div>}
               {!(activeCategory === 'pelanggaran' && pelanggaranAddType === 'detail') && <div className="form-group" style={{ marginBottom: 20 }}>
                 <label style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 500 }}>Deskripsi</label>
@@ -854,6 +1133,86 @@ function KonfigurasiIPC() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Import Detail Pelanggaran dari Excel */}
+      {showImportModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div className="card" style={{ width: 500, maxWidth: '90%', maxHeight: '90vh', overflowY: 'auto' }}>
+            <h4>Import Detail Pelanggaran dari Excel</h4>
+            <button className="btn btn-danger" onClick={closeImportModal} style={{ marginBottom: '10px' }}>Tutup</button>
+            <div style={{ marginBottom: '15px' }}>
+              <button
+                className="btn btn-secondary"
+                onClick={downloadDetailTemplate}
+                style={{ marginBottom: '10px' }}
+              >
+                📥 Download Template Detail
+              </button>
+              <input
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={handleExcelFileChange}
+                style={{ marginBottom: '10px' }}
+              />
+              <div style={{ fontSize: '12px', color: '#666', marginBottom: '10px' }}>
+                <strong>Format:</strong> Detail, TingkatPelanggaran
+                <br />
+                <small style={{ color: '#1976d2' }}>
+                  💡 Kolom TingkatPelanggaran harus sesuai daftar tingkat yang sudah dibuat
+                  {configuredPelanggaranLevels.length > 0 && ` (contoh: ${configuredPelanggaranLevels.slice(0, 3).map(l => l.field1).join(', ')})`}.
+                  Point diambil otomatis dari tingkatnya.
+                </small>
+              </div>
+              <button
+                className="btn btn-primary"
+                onClick={handleDetailExcelImport}
+                disabled={importing || !excelFile}
+              >
+                {importing ? 'Importing...' : 'Import'}
+              </button>
+            </div>
+
+            {importResults.length > 0 && (
+              <div style={{ maxHeight: '300px', overflowY: 'auto', border: '1px solid #ddd', padding: '10px', borderRadius: '4px' }}>
+                <h5>Import Results:</h5>
+                <table className="table" style={{ fontSize: '12px' }}>
+                  <thead>
+                    <tr>
+                      <th style={{ padding: '5px' }}>Detail</th>
+                      <th style={{ padding: '5px' }}>Tingkat</th>
+                      <th style={{ padding: '5px' }}>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {importResults.map((result, index) => (
+                      <tr key={index}>
+                        <td style={{ padding: '5px' }}>
+                          {result.status === 'success' ? '✅' : '❌'} {result.name}
+                        </td>
+                        <td style={{ padding: '5px' }}>{result.level || '-'}</td>
+                        <td style={{ padding: '5px' }}>
+                          {result.status === 'error' ? result.error : 'Berhasil'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
 import API_BASE_URL from '../config';
+import { useMinIpc, isBelowMinIpc } from '../utils/minIpc';
 import {
   BarChart,
   Bar,
@@ -15,6 +16,7 @@ import {
 } from 'recharts';
 
 function Dashboard() {
+  const minIpc = useMinIpc();
   // CSS Variables
   const BG = '#eef1f7';
   const CARD = '#ffffff';
@@ -797,7 +799,7 @@ function Dashboard() {
       {user?.role === 'siswa' && (
         <div className="student-dashboard">
           <div className="student-info">
-            <h3>🎯 IPC Anda: {user?.ipc_total || 0}</h3>
+            <h3>🎯 IPC Anda: <span style={{ color: isBelowMinIpc(user?.ipc_total ?? 0, minIpc) ? RED : undefined }}>{user?.ipc_total || 0}</span></h3>
             <p>Point Invidual Point Card</p>
           </div>
           
@@ -964,7 +966,7 @@ function Dashboard() {
                       <td style={{ padding: '11px 14px', borderTop: `1px solid ${BORDER}`, verticalAlign: 'middle' }}>{student.nis || '-'}</td>
                       <td style={{ padding: '11px 14px', borderTop: `1px solid ${BORDER}`, verticalAlign: 'middle' }}>{student.kelas || '-'}</td>
                       <td style={{ padding: '11px 14px', borderTop: `1px solid ${BORDER}`, verticalAlign: 'middle' }}>{student.grha || '-'}</td>
-                      <td style={{ padding: '11px 14px', borderTop: `1px solid ${BORDER}`, verticalAlign: 'middle', fontWeight: '800', color: BLUE, fontSize: '14.5px' }}>{student.ipc_total}</td>
+                      <td style={{ padding: '11px 14px', borderTop: `1px solid ${BORDER}`, verticalAlign: 'middle', fontWeight: '800', color: isBelowMinIpc(student.ipc_total, minIpc) ? RED : BLUE, fontSize: '14.5px' }}>{student.ipc_total}</td>
                     </tr>
                   ))}
                 </tbody>

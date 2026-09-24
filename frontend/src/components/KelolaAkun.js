@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../utils/api';
+import { useMinIpc, isBelowMinIpc } from '../utils/minIpc';
 import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
 import StudentDetail from './StudentDetail';
@@ -17,6 +18,7 @@ const KELAS_OPTIONS = [
 ];
 
 function KelolaAkun() {
+  const minIpc = useMinIpc();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({});
@@ -879,8 +881,8 @@ function KelolaAkun() {
                   )}
                   <td style={{ padding: '10px 12px', borderRight: '1px solid #e0e0e0', borderBottom: '1px solid #e0e0e0' }}>
                     <span style={{ 
-                      color: (user.ipc_total ?? 0) < 0 ? '#dc2626' : 'inherit',
-                      fontWeight: (user.ipc_total ?? 0) < 0 ? 'bold' : 'normal'
+                      color: (user.ipc_total ?? 0) < 0 || isBelowMinIpc(user.ipc_total ?? 0, minIpc) ? '#dc2626' : 'inherit',
+                      fontWeight: (user.ipc_total ?? 0) < 0 || isBelowMinIpc(user.ipc_total ?? 0, minIpc) ? 'bold' : 'normal'
                     }}>
                       {(user.ipc_total ?? 0) < 0 ? `${user.ipc_total ?? 0} (MINUS)` : (user.ipc_total ?? 0)}
                     </span>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
 import ExcelJS from 'exceljs';
 import { createIndividualIpcExcelBuffer, fetchKopImage } from '../utils/ipcExcel';
+import { fetchMinIpc, isBelowMinIpc } from '../utils/minIpc';
 import '../ipcPrint.css';
 
 // ------------------------------------------------------------------
@@ -55,12 +56,14 @@ function hitungTotal(s) {
   const pelanggaranRingan = Number(s.pelanggaran_ringan) || 0;
   const pelanggaranSedang = Number(s.pelanggaran_sedang) || 0;
   const pelanggaranBerat = Number(s.pelanggaran_berat) || 0;
+  const pelanggaranLainnya = Number(s.pelanggaran_lainnya) || 0;
   
   const totalPrestasi = prestasiAkademik + prestasiNonakademik;
   const totalKarakter = tanggungJawab + disiplin + kepedulian + kemandirian + spiritual + kejujuran + kepercayaanDiri;
   const totalKeaktifan = organisasi + kepanitiaan + event;
-  const totalPelanggaran = pelanggaranRingan + pelanggaranSedang + pelanggaranBerat;
+  const totalPelanggaran = pelanggaranRingan + pelanggaranSedang + pelanggaranBerat + pelanggaranLainnya;
   
+  // Pelanggaran bernilai negatif (pengurangan) -> cukup dijumlahkan.
   const ipcTotal = ipcAwal + totalPrestasi + totalKarakter + totalKeaktifan + totalPelanggaran;
   
   return {
@@ -125,10 +128,10 @@ function buildRowValues(s) {
     nis: s.nis,
     kelas: s.kelas,
     ghra: s.ghra || "-",
-    pointAwal: t.pointAwal, // Added point awal
+    pointAwal: t.ipcAwal, // ipc_awal siswa
     prestasi_akademik: Number(s.prestasi_akademik) ?? 0,
     prestasi_nonakademik: Number(s.prestasi_nonakademik) ?? 0,
-    jumlahPrestasi: t.jumlahPrestasi,
+    jumlahPrestasi: t.totalPrestasi,
     tanggung_jawab: Number(s.tanggung_jawab) ?? 0,
     disiplin: Number(s.disiplin) ?? 0,
     kepedulian: Number(s.kepedulian) ?? 0,
@@ -136,16 +139,16 @@ function buildRowValues(s) {
     spiritual: Number(s.spiritual) ?? 0,
     kejujuran: Number(s.kejujuran) ?? 0,
     kepercayaan_diri: Number(s.kepercayaan_diri) ?? 0,
-    jumlahKarakter: t.jumlahKarakter,
+    jumlahKarakter: t.totalKarakter,
     organisasi: Number(s.organisasi) ?? 0,
     kepanitiaan: Number(s.kepanitiaan) ?? 0,
     event: Number(s.event) ?? 0,
-    jumlahKeaktifan: t.jumlahKeaktifan,
+    jumlahKeaktifan: t.totalKeaktifan,
     pelanggaran_ringan: Number(s.pelanggaran_ringan) ?? 0,
     pelanggaran_sedang: Number(s.pelanggaran_sedang) ?? 0,
     pelanggaran_berat: Number(s.pelanggaran_berat) ?? 0,
-    jumlahPelanggaran: t.jumlahPelanggaran,
-    totalIPC: t.totalIPC,
+    jumlahPelanggaran: t.totalPelanggaran,
+    totalIPC: t.ipcTotal,
   };
 }
 
@@ -277,6 +280,7 @@ function LaporanCetak({ user }) {
     } else if (reportType === 'class') {
       // For class report, generate Excel with leger format using ExcelJS
       try {
+        const minIpc = await fetchMinIpc();
         // Prepare student data in the format expected by the Excel generator
         const formattedStudents = classStudents.map((student, index) => {
           const points = student.points || {};
@@ -302,6 +306,8 @@ function LaporanCetak({ user }) {
             pelanggaran_ringan: Number(points.pelanggaran_ringan) || 0,
             pelanggaran_sedang: Number(points.pelanggaran_sedang) || 0,
             pelanggaran_berat: Number(points.pelanggaran_berat) || 0,
+            pelanggaran_lainnya: Number(points.pelanggaran_lainnya) || 0,
+            ipc_awal: Number(points.point_awal) || Number(student.ipc_awal) || 80,
           };
         });
 
@@ -414,12 +420,13 @@ function LaporanCetak({ user }) {
             cell.value = values[def.key];
 
             const isNegative = typeof values[def.key] === "number" && values[def.key] < 0;
+            const isBelowMin = def.key === "totalIPC" && isBelowMinIpc(values[def.key], minIpc);
 
             styleCell(cell, {
               fill: def.jumlahFill ? EXCEL_COLORS[def.jumlahFill] : undefined,
               bold: !!def.jumlahFill,
               align: def.align || "center",
-              color: isNegative ? "FFC00000" : undefined,
+              color: isNegative || isBelowMin ? "FFC00000" : undefined,
             });
           });
         });
@@ -459,6 +466,7 @@ function LaporanCetak({ user }) {
       const cardData = await fetchIpcCard(selectedStudentId);
       const school = await getFreshSchoolConfig();
       const kopImage = await fetchKopImage(['/header.png']);
+      const minIpc = await fetchMinIpc();
       const buffer = await createIndividualIpcExcelBuffer({
         student: cardData.student,
         wali: cardData.wali,
@@ -468,6 +476,7 @@ function LaporanCetak({ user }) {
         semester,
         tahunPelajaran,
         kopImage,
+        minIpc,
       });
       const url = URL.createObjectURL(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
       const link = document.createElement('a');
