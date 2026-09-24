@@ -6,7 +6,7 @@ on:
 
 jobs:
   deploy:
-    # NOTE: the runner OS is irrelevant — every command below runs on the
+    # NOTE: the runner OS is irrelevant — the command below runs on the
     # Windows Server over SSH (OpenSSH default shell = cmd.exe, NOT bash/PowerShell).
     runs-on: ubuntu-latest
     steps:
@@ -17,34 +17,12 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
           port: ${{ secrets.SERVER_PORT || 22 }}
-          # Full deploy (3x npm install incl. Puppeteer + CRA build) can take a
-          # while on a Windows server — well above the action's 10m default.
+          # Full deploy can exceed the action's 10m default (3x npm install incl. Puppeteer + CRA build).
           command_timeout: 30m
-          script: |
-            REM --- Go to project root ( /d also switches drive, e.g. D: ) ---
-            cd /d "${{ secrets.PROJECT_PATH }}" || exit /b 1
-            git pull || exit /b 1
-            node --version
-            call npm --version
-            if not exist logs mkdir logs
-            REM --- Install deps (mirrors root `npm run install-deps`: root + backend + frontend) ---
-            REM `npm install`, NOT `npm ci`, because package-lock.json is gitignored.
-            REM `call` is required so control returns after npm/pm2 (.cmd shims).
-            call npm install --no-audit --no-fund || exit /b 1
-            cd backend || exit /b 1
-            call npm install --no-audit --no-fund || exit /b 1
-            cd ..\frontend || exit /b 1
-            if exist build rmdir /s /q build
-            call npm install --no-audit --no-fund || exit /b 1
-            call npm run build || exit /b 1
-            if not exist build (echo ERROR: frontend build folder missing after build & exit /b 1)
-            cd .. || exit /b 1
-            REM --- Restart the consolidated backend (serves API + frontend/build) ---
-            REM Canonical PM2 name is `ipc-system` from ecosystem.config.js (repo root).
-            call pm2 restart ipc-system --update-env || call pm2 start ecosystem.config.js --env production || exit /b 1
-            call pm2 save
-            call pm2 list
-            REM --- Smoke test: backend listens on PORT (ecosystem default 5000) ---
-            timeout /t 15 /nobreak >nul
-            curl.exe -f -s -o nul http://localhost:5000/ && echo SMOKE TEST OK || (call pm2 logs ipc-system --lines 30 --nostream & exit /b 1)
-            echo Deployment completed successfully
+          # Single-line cmd.exe chain (NOT PowerShell/bash):
+          # - `&&` stops at the first failure and ssh reports its exit code.
+          # - `call` before npm/pm2 so control returns (.cmd shims).
+          # - `npm install`, NOT `npm ci` (package-lock.json is gitignored).
+          # - backend/uploads and .env are gitignored and never touched.
+          # - PM2 app name is `ipc-system` from ecosystem.config.js (repo root).
+          script: 'cd /d "${{ secrets.PROJECT_PATH }}" && git pull && node --version && call npm --version && if not exist logs mkdir logs && call npm install --no-audit --no-fund && cd backend && call npm install --no-audit --no-fund && cd ..\frontend && if exist build rmdir /s /q build && call npm install --no-audit --no-fund && call npm run build && if not exist build exit /b 1 && cd .. && (call pm2 restart ipc-system --update-env || call pm2 start ecosystem.config.js --env production) && call pm2 save && call pm2 list && timeout /t 15 /nobreak >nul && curl.exe -f -s -o nul http://localhost:5000/ && echo SMOKE TEST OK && echo Deployment completed successfully'
