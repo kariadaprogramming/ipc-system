@@ -68,12 +68,6 @@ function KelolaAkun() {
     setFilters({ role: '', kelas: '', grha: '', jurusan: '', tahun_pelajaran: '' });
   };
 
-  useEffect(() => {
-    const user = JSON.parse(localStorage.getItem('user'));
-    setUserRole(user?.role);
-    fetchUsers();
-  }, [fetchUsers]);
-
   const fetchUsers = useCallback(async (page = 1) => {
     try {
       setLoading(true);
@@ -100,6 +94,12 @@ function KelolaAkun() {
       setLoading(false);
     }
   }, [pagination.limit, searchQuery, filters.role]);
+
+  useEffect(() => {
+    const user = JSON.parse(localStorage.getItem('user'));
+    setUserRole(user?.role);
+    fetchUsers();
+  }, [fetchUsers]);
 
   // Debounced search effect
   useEffect(() => {

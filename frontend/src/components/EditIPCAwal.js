@@ -3,7 +3,6 @@ import api from '../utils/api';
 import { useMinIpc, isBelowMinIpc } from '../utils/minIpc';
 
 function EditIPCAwal() {
-  const minIpc = useMinIpc();
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
@@ -382,6 +381,7 @@ function EditIPCAwal() {
 }
 
 function GradeSection({ grade, students, selectedStudents, onSelectAll, onSelectStudent, isAllSelected, isSomeSelected }) {
+  const minIpc = useMinIpc();
   return (
     <div className="panel">
       <div className="panel-head">
