@@ -6,11 +6,12 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { movePhotoToApprovedFolder } = require('../utils/fileUtils');
+const { ensureUploadSubdir, resolveUploadPath } = require('../utils/paths');
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, 'uploads/event/');
+        cb(null, ensureUploadSubdir('event'));
     },
     filename: (req, file, cb) => {
         cb(null, Date.now() + path.extname(file.originalname));
@@ -58,10 +59,10 @@ router.post('/', auth, upload.single('foto'), async (req, res) => {
 
         // Rename file to NIS_Nama Event format
         if (req.file && foto) {
-            const oldPath = path.join('uploads/event', foto);
+            const oldPath = resolveUploadPath(path.join('uploads/event', foto));
             const ext = path.extname(req.file.originalname);
             const newFileName = `${nis}_${nama_event}${ext}`;
-            const newPath = path.join('uploads/event', newFileName);
+            const newPath = resolveUploadPath(path.join('uploads/event', newFileName));
 
             // Rename the file
             fs.renameSync(oldPath, newPath);
@@ -173,7 +174,7 @@ router.put('/:id', auth, upload.single('foto'), async (req, res) => {
         if (req.file) {
             // Delete old photo if exists
             if (foto) {
-                const oldPath = path.join('uploads/event', foto);
+                const oldPath = resolveUploadPath(path.join('uploads/event', foto));
                 if (fs.existsSync(oldPath)) {
                     fs.unlinkSync(oldPath);
                 }
@@ -182,8 +183,8 @@ router.put('/:id', auth, upload.single('foto'), async (req, res) => {
             // Rename new file
             const ext = path.extname(req.file.originalname);
             const newFileName = `${nis}_${nama_event}${ext}`;
-            const oldPath = path.join('uploads/event', req.file.filename);
-            const newPath = path.join('uploads/event', newFileName);
+            const oldPath = resolveUploadPath(path.join('uploads/event', req.file.filename));
+            const newPath = resolveUploadPath(path.join('uploads/event', newFileName));
             fs.renameSync(oldPath, newPath);
             foto = newFileName;
         }
@@ -253,7 +254,7 @@ router.delete('/:id', auth, superAdminOnly, async (req, res) => {
 
         // Delete photo file if exists
         if (eventData.foto) {
-            const photoPath = path.join('uploads', eventData.foto);
+            const photoPath = resolveUploadPath(path.join('uploads', eventData.foto));
             if (fs.existsSync(photoPath)) {
                 fs.unlinkSync(photoPath);
             }

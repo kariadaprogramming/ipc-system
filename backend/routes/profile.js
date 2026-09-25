@@ -8,15 +8,12 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const bcrypt = require('bcryptjs');
+const { ensureUploadSubdir, resolveUploadPath } = require('../utils/paths');
 
 // Configure multer for avatar uploads
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        const uploadDir = path.join(__dirname, '../uploads/avatars');
-        if (!fs.existsSync(uploadDir)) {
-            fs.mkdirSync(uploadDir, { recursive: true });
-        }
-        cb(null, uploadDir);
+        cb(null, ensureUploadSubdir('avatars'));
     },
     filename: (req, file, cb) => {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
@@ -135,7 +132,7 @@ router.post('/avatar', auth, upload.single('avatar'), async (req, res) => {
         // Delete old avatar if exists
         const [user] = await db.query('SELECT foto FROM users WHERE id = ?', [req.user.id]);
         if (user.length > 0 && user[0].foto) {
-            const oldAvatarPath = path.join(__dirname, '..', user[0].foto);
+            const oldAvatarPath = resolveUploadPath(user[0].foto);
             if (fs.existsSync(oldAvatarPath)) {
                 fs.unlinkSync(oldAvatarPath);
             }
@@ -160,7 +157,7 @@ router.delete('/avatar', auth, async (req, res) => {
         const [user] = await db.query('SELECT foto FROM users WHERE id = ?', [req.user.id]);
         
         if (user.length > 0 && user[0].foto) {
-            const oldAvatarPath = path.join(__dirname, '..', user[0].foto);
+            const oldAvatarPath = resolveUploadPath(user[0].foto);
             if (fs.existsSync(oldAvatarPath)) {
                 fs.unlinkSync(oldAvatarPath);
             }

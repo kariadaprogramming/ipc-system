@@ -35,7 +35,6 @@ function KelolaAkun() {
   const [excelFile, setExcelFile] = useState(null);
   const [importing, setImporting] = useState(false);
   const [importResults, setImportResults] = useState([]);
-  const [importType, setImportType] = useState('siswa');
   const [detailStudent, setDetailStudent] = useState(null);
   const [selectedIds, setSelectedIds] = useState([]);
   const [selectionRole, setSelectionRole] = useState(null);
@@ -262,7 +261,11 @@ function KelolaAkun() {
     setExcelFile(e.target.files[0]);
   };
 
-  const handleExcelImport = async () => {
+  // NOTE: import type is passed explicitly as an argument (not via setState)
+  // because setState is async — calling setImportType() then handleExcelImport()
+  // in the same tick reads the STALE type and runs the wrong branch
+  // (this was the bug: guru import ran the siswa validation).
+  const handleExcelImport = async (type = importModalType) => {
     if (!excelFile) {
       setMessage('Please select an Excel file');
       return;
@@ -281,7 +284,7 @@ function KelolaAkun() {
 
       for (const row of jsonData) {
         try {
-          if (importType === 'siswa') {
+          if (type === 'siswa') {
             // Skip rows without nama (might be header or empty)
             const nama = getRowField(row, 'nama', 'Nama');
             if (!nama) {
@@ -1242,7 +1245,7 @@ function KelolaAkun() {
               </div>
               <button
                 className="btn btn-primary"
-                onClick={() => { setImportType(importModalType); handleExcelImport(); }}
+                onClick={() => handleExcelImport(importModalType)}
                 disabled={importing || !excelFile}
               >
                 {importing ? 'Importing...' : 'Import'}

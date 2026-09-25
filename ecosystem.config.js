@@ -2,6 +2,9 @@ module.exports = {
   apps: [{
     name: 'ipc-system',
     script: 'backend/server.js',
+    // Run with backend/ as cwd so any relative path behaves like dev.
+    // (All upload paths are absolute via backend/utils/paths.js; this is belt-and-suspenders.)
+    cwd: require('path').join(__dirname, 'backend'),
     instances: 1,
     autorestart: true,
     watch: false,

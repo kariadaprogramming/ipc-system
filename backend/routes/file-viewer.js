@@ -3,6 +3,7 @@ const router = express.Router();
 const fs = require('fs');
 const path = require('path');
 const { auth, superAdminOnly } = require('../middleware/auth');
+const { UPLOAD_DIR } = require('../utils/paths');
 
 // Helper function to sanitize and validate file paths
 const sanitizePath = (inputPath) => {
@@ -43,7 +44,7 @@ const validatePath = (requestedPath, allowedBase) => {
 // Get all folders in uploads directory
 router.get('/folders', auth, superAdminOnly, async (req, res) => {
     try {
-        const uploadsDir = path.join(__dirname, '..', 'uploads');
+        const uploadsDir = UPLOAD_DIR;
         
         if (!fs.existsSync(uploadsDir)) {
             return res.json([]);
@@ -79,8 +80,8 @@ router.get('/files/:folderName', auth, superAdminOnly, async (req, res) => {
             return res.status(403).json({ message: 'Invalid folder name' });
         }
         
-        const folderPath = path.join(__dirname, '..', 'uploads', sanitizedFolderName);
-        const uploadsDir = path.join(__dirname, '..', 'uploads');
+        const folderPath = path.join(UPLOAD_DIR, sanitizedFolderName);
+        const uploadsDir = UPLOAD_DIR;
 
         // Validate path is within uploads directory
         if (!validatePath(folderPath, uploadsDir)) {
@@ -128,8 +129,8 @@ router.delete('/file/:folderName/:fileName', auth, superAdminOnly, async (req, r
             return res.status(403).json({ message: 'Invalid folder name' });
         }
         
-        const filePath = path.join(__dirname, '..', 'uploads', sanitizedFolderName, sanitizedFileName);
-        const uploadsDir = path.join(__dirname, '..', 'uploads');
+        const filePath = path.join(UPLOAD_DIR, sanitizedFolderName, sanitizedFileName);
+        const uploadsDir = UPLOAD_DIR;
 
         // Validate path is within uploads directory
         if (!validatePath(filePath, uploadsDir)) {

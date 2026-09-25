@@ -4,6 +4,7 @@ const dotenv = require('dotenv');
 const path = require('path');
 const fs = require('fs');
 const cookieParser = require('cookie-parser');
+const { UPLOAD_DIR } = require('./utils/paths');
 const { 
   securityHeaders, 
   apiLimiter, 
@@ -104,7 +105,7 @@ app.use('/uploads', (req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Cross-Origin-Resource-Policy', 'cross-origin');
   next();
-}, express.static(path.join(__dirname, 'uploads')));
+}, express.static(UPLOAD_DIR));
 
 // Serve React frontend static files (consolidated deployment)
 const frontendBuildPath = path.join(__dirname, '../frontend/build');
