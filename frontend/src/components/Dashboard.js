@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
 import API_BASE_URL from '../config';
-import { useMinIpc, isBelowMinIpc } from '../utils/minIpc';
+import { useMinIpcPerGrade, minIpcFor, isBelowMinIpc } from '../utils/minIpc';
 import {
   BarChart,
   Bar,
@@ -16,7 +16,7 @@ import {
 } from 'recharts';
 
 function Dashboard() {
-  const minIpc = useMinIpc();
+  const minIpc = useMinIpcPerGrade();
   // CSS Variables
   const BG = '#eef1f7';
   const CARD = '#ffffff';
@@ -482,40 +482,14 @@ function Dashboard() {
             fontWeight: '600',
             marginBottom: '4px',
             whiteSpace: 'nowrap'
-          }}>Prestasi Akademik</div>
+          }}>Prestasi</div>
           <div style={{
             fontSize: '21px',
             fontWeight: '800',
             letterSpacing: '-0.01em',
             filter: showLabels ? 'none' : 'blur(7px)',
             transition: 'filter 0.3s ease'
-          }}>{stats?.prestasi_akademik || 0}</div>
-        </div>
-        <div style={{
-          flex: '0 0 auto',
-          minWidth: '148px',
-          background: CARD,
-          border: `1px solid ${BORDER}`,
-          borderLeft: '3px solid PURPLE',
-          borderRadius: '12px',
-          padding: '12px 16px',
-          boxShadow: SHADOW,
-          transition: 'transform 0.15s ease, box-shadow 0.15s ease'
-        }}>
-          <div style={{
-            fontSize: '11.5px',
-            color: MUTED,
-            fontWeight: '600',
-            marginBottom: '4px',
-            whiteSpace: 'nowrap'
-          }}>Prestasi Non-Akademik</div>
-          <div style={{
-            fontSize: '21px',
-            fontWeight: '800',
-            letterSpacing: '-0.01em',
-            filter: showLabels ? 'none' : 'blur(7px)',
-            transition: 'filter 0.3s ease'
-          }}>{stats?.prestasi_nonakademik || 0}</div>
+          }}>{stats?.total_prestasi || 0}</div>
         </div>
         <div style={{
           flex: '0 0 auto',
@@ -745,7 +719,7 @@ function Dashboard() {
       {user?.role === 'siswa' && (
         <div className="student-dashboard">
           <div className="student-info">
-            <h3>🎯 IPC Anda: <span style={{ color: isBelowMinIpc(user?.ipc_total ?? 0, minIpc) ? RED : undefined }}>{user?.ipc_total || 0}</span></h3>
+            <h3>🎯 IPC Anda: <span style={{ color: isBelowMinIpc(user?.ipc_total ?? 0, minIpcFor(minIpc, user?.kelas)) ? RED : undefined }}>{user?.ipc_total || 0}</span></h3>
             <p>Point Invidual Point Card</p>
           </div>
           
@@ -912,7 +886,7 @@ function Dashboard() {
                       <td style={{ padding: '11px 14px', borderTop: `1px solid ${BORDER}`, verticalAlign: 'middle' }}>{student.nis || '-'}</td>
                       <td style={{ padding: '11px 14px', borderTop: `1px solid ${BORDER}`, verticalAlign: 'middle' }}>{student.kelas || '-'}</td>
                       <td style={{ padding: '11px 14px', borderTop: `1px solid ${BORDER}`, verticalAlign: 'middle' }}>{student.grha || '-'}</td>
-                      <td style={{ padding: '11px 14px', borderTop: `1px solid ${BORDER}`, verticalAlign: 'middle', fontWeight: '800', color: isBelowMinIpc(student.ipc_total, minIpc) ? RED : BLUE, fontSize: '14.5px' }}>{student.ipc_total}</td>
+                      <td style={{ padding: '11px 14px', borderTop: `1px solid ${BORDER}`, verticalAlign: 'middle', fontWeight: '800', color: isBelowMinIpc(student.ipc_total, minIpcFor(minIpc, student.kelas)) ? RED : BLUE, fontSize: '14.5px' }}>{student.ipc_total}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1099,11 +1073,11 @@ function Dashboard() {
                 margin: '0 0 10px',
                 fontWeight: '700',
                 color: TEXT
-              }}>Perbandingan Prestasi</h4>
+              }}>Total Prestasi</h4>
               <div style={{ position: 'relative', height: '200px' }}>
                 <ResponsiveContainer width="100%" height={200}>
                   <BarChart data={[
-                    { name: 'Prestasi', akademik: stats.prestasi_akademik || 0, nonakademik: stats.prestasi_nonakademik || 0 }
+                    { name: 'Prestasi', prestasi: stats.total_prestasi || 0 }
                   ]}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#eef0f6" />
                     <XAxis dataKey="name" tick={{ fontSize: 11, fill: MUTED }} />
@@ -1119,17 +1093,9 @@ function Dashboard() {
                       }}
                     />
                     <Bar 
-                      dataKey="akademik" 
+                      dataKey="prestasi" 
                       fill="#8b7fd1" 
-                      name="Akademik"
-                      radius={[6, 6, 0, 0]}
-                      maxBarThickness={60}
-                      label={showLabels ? { position: 'top', fill: '#2d3748', fontSize: 12, fontWeight: 'bold' } : false}
-                    />
-                    <Bar 
-                      dataKey="nonakademik" 
-                      fill="#16a875" 
-                      name="Non-Akademik"
+                      name="Prestasi"
                       radius={[6, 6, 0, 0]}
                       maxBarThickness={60}
                       label={showLabels ? { position: 'top', fill: '#2d3748', fontSize: 12, fontWeight: 'bold' } : false}

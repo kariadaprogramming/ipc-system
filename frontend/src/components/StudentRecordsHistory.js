@@ -68,7 +68,7 @@ function renderRecordDetails(item, type) {
                 <>
                     <strong>{item.nama_lomba}</strong>
                     <div style={{ fontSize: 13, color: 'var(--text-secondary, #666)', marginTop: 4 }}>
-                        {formatDisplayText(item.jenis)} · {formatDisplayText(item.juara)} · {formatDisplayText(item.kategori)}
+                        {formatDisplayText(item.juara)} · {formatDisplayText(item.kategori)}
                     </div>
                     <div style={{ fontSize: 13, marginTop: 4 }}>
                         <span className="badge badge-success">+{item.point} poin</span>

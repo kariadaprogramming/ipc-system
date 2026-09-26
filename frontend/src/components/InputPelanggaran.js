@@ -35,8 +35,14 @@ function InputPelanggaran() {
       const level = (ipcConfig['pelanggaran'] || []).find(
         candidate => !candidate.field2 && candidate.field1 === config.field2
       );
-      return { value: config.field1, label: config.field1, point: level?.point_value || 0 };
+      return { value: config.field1, label: config.field1, level: config.field2, point: level?.point_value || 0 };
     });
+  // Options with level info (e.g. "mencuri (berat)") — shared by the dropdown
+  // list and the selected-value display of both add and edit forms.
+  const jenisSelectOptions = jenisOptions.map((jenis) => ({
+    value: jenis.value,
+    label: jenis.level ? `${jenis.label} (${jenis.level})` : jenis.label,
+  }));
 
   const grhaOptions = [
     'Airsanya', 'Daksina', 'Genya', 'Madhya', 'Nairiti', 'Pascima', 'Purwa', 'Uttara', 'Wayabhya'
@@ -385,7 +391,7 @@ function InputPelanggaran() {
                     <th>Tanggal</th>
                     <th>Nama</th>
                     <th>NIS</th>
-                    <th>Keterangan</th>
+                    <th>Detail</th>
                     <th>Jenis</th>
                     <th>Point</th>
                     <th>Aksi</th>
@@ -525,27 +531,12 @@ function InputPelanggaran() {
         </div>
 
         <div className="form-group">
-          <label>Keterangan Pelanggaran</label>
-          <textarea
-            name="keterangan"
-            value={formData.keterangan}
-            onChange={handleChange}
-            placeholder="Jelaskan pelanggaran yang dilakukan"
-            rows="3"
-            required
-          />
-        </div>
-
-        <div className="form-group">
-          <label>Detail Pelanggaran</label>
+          <label>Jenis Pelanggaran</label>
           <Select
-            value={jenisOptions.find(jenis => jenis.value === formData.jenis_pelanggaran) || null}
+            value={jenisSelectOptions.find(jenis => jenis.value === formData.jenis_pelanggaran) || null}
             onChange={handleJenisSelect}
-            options={jenisOptions.map(jenis => ({
-              value: jenis.value,
-              label: jenis.point > 0 ? `${jenis.label} (${jenis.point} point)` : jenis.label
-            }))}
-            placeholder="Pilih Detail Pelanggaran"
+            options={jenisSelectOptions}
+            placeholder="Pilih Jenis Pelanggaran"
             isSearchable
             isClearable
             styles={{
@@ -573,6 +564,18 @@ function InputPelanggaran() {
           }}>
             {calculatedPoint}
           </span>
+        </div>
+        
+        <div className="form-group">
+          <label>Detail Pelanggaran</label>
+          <textarea
+            name="keterangan"
+            value={formData.keterangan}
+            onChange={handleChange}
+            placeholder="Jelaskan pelanggaran yang dilakukan"
+            rows="3"
+            required
+          />
         </div>
 
         <div className="form-group">
@@ -652,15 +655,12 @@ function InputPelanggaran() {
             </select>
           </div>
           <div className="form-group">
-            <label>Detail Pelanggaran</label>
+            <label>Jenis Pelanggaran</label>
             <Select
-              value={jenisOptions.find(jenis => jenis.value === editModal.editFormData.jenis_pelanggaran) || null}
+              value={jenisSelectOptions.find(jenis => jenis.value === editModal.editFormData.jenis_pelanggaran) || null}
               onChange={handleEditJenisSelect}
-              options={jenisOptions.map(jenis => ({
-                value: jenis.value,
-                label: jenis.point > 0 ? `${jenis.label} (${jenis.point} point)` : jenis.label
-              }))}
-              placeholder="Pilih Detail Pelanggaran"
+              options={jenisSelectOptions}
+              placeholder="Pilih Jenis Pelanggaran"
               isSearchable
               isClearable
               styles={{
@@ -674,7 +674,7 @@ function InputPelanggaran() {
         </div>
 
         <div className="form-group">
-          <label>Keterangan Pelanggaran</label>
+          <label>Detail Pelanggaran</label>
           <textarea
             value={editModal.editFormData.keterangan || ''}
             onChange={(e) => editModal.setEditFormData({ ...editModal.editFormData, keterangan: e.target.value })}

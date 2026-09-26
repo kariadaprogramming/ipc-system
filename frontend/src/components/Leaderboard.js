@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
 import API_BASE_URL from '../config';
-import { formatDisplayText } from '../utils/formatDisplayText';
 
 const PAGE_BG = "#f8fafc";
 const INK = "#0f172a";
@@ -11,34 +10,48 @@ const BLUE = { bg: "#eff6ff", text: "#2563eb", border: "#c6dafc", solid: "#2563e
 
 const MEDALS = { 1: "🥇", 2: "🥈", 3: "🥉" };
 
+const CATEGORIES = [
+  { key: 'prestasi', label: 'Prestasi', icon: '🏆' },
+  { key: 'organisasi', label: 'Organisasi', icon: '👥' },
+  { key: 'kepanitiaan', label: 'Kepanitiaan', icon: '🤝' },
+  { key: 'event', label: 'Event', icon: '📅' },
+  { key: 'pelanggaran', label: 'Pelanggaran', icon: '⚠️' },
+  { key: 'perilaku', label: 'Perilaku', icon: '✅' }
+];
+
 function Leaderboard() {
-  const [activeTab, setActiveTab] = useState('akademik');
-  const [akademikData, setAkademikData] = useState([]);
-  const [nonAkademikData, setNonAkademikData] = useState([]);
+  const [activeCategory, setActiveCategory] = useState('prestasi');
+  const [dataByCategory, setDataByCategory] = useState({});
+  const [loadingMap, setLoadingMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [lastUpdated, setLastUpdated] = useState(null);
 
   useEffect(() => {
-    fetchLeaderboardData();
+    fetchCategory('prestasi');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const fetchLeaderboardData = async () => {
+  const fetchCategory = async (category) => {
+    setLoadingMap(prev => ({ ...prev, [category]: true }));
+    setError('');
     try {
-      setLoading(true);
-      const [akademikRes, nonAkademikRes] = await Promise.all([
-        api.get('/search/leaderboard/akademik'),
-        api.get('/search/leaderboard/nonakademik')
-      ]);
-
-      setAkademikData(akademikRes.data);
-      setNonAkademikData(nonAkademikRes.data);
+      const res = await api.get(`/search/leaderboard/category/${category}`);
+      setDataByCategory(prev => ({ ...prev, [category]: res.data }));
       setLastUpdated(new Date());
-    } catch (error) {
-      console.error('Error fetching leaderboard:', error);
+    } catch (err) {
+      console.error('Error fetching leaderboard:', err);
       setError('Gagal memuat data peringkat');
     } finally {
+      setLoadingMap(prev => ({ ...prev, [category]: false }));
       setLoading(false);
+    }
+  };
+
+  const handleSelectCategory = (category) => {
+    setActiveCategory(category);
+    if (!dataByCategory[category] && !loadingMap[category]) {
+      fetchCategory(category);
     }
   };
 
@@ -46,10 +59,12 @@ function Leaderboard() {
     return name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
   }
 
-  const currentData = activeTab === 'akademik' ? akademikData : nonAkademikData;
-  const title = activeTab === 'akademik' ? "Peringkat akademik" : "Peringkat non-akademik";
+  const activeLabel = CATEGORIES.find(c => c.key === activeCategory)?.label || activeCategory;
+  const currentData = dataByCategory[activeCategory] || [];
+  const categoryLoading = !!loadingMap[activeCategory];
+  const title = `Peringkat ${activeLabel}`;
   const top3 = currentData.filter((s) => s.rank <= 3).sort((a, b) => a.rank - b.rank);
-  const totalPrestasi = currentData.reduce((sum, s) => sum + (s.total_prestasi || 0), 0);
+  const totalPoints = currentData.reduce((sum, s) => sum + (s.total_point || 0), 0);
 
   if (loading) {
     return (
@@ -68,7 +83,7 @@ function Leaderboard() {
     );
   }
 
-  if (error) {
+  if (error && currentData.length === 0) {
     return (
       <div style={{
         fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
@@ -78,7 +93,7 @@ function Leaderboard() {
         color: INK,
       }}>
         <div style={{ padding: '12px 16px', background: '#fee2e2', color: '#dc2626', borderRadius: '10px', marginBottom: '16px', fontSize: '14px', fontWeight: 600 }}>{error}</div>
-        <button onClick={fetchLeaderboardData} style={{ padding: '10px 16px', background: BLUE.solid, color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13.5px', fontWeight: 600, cursor: 'pointer' }}>
+        <button onClick={() => fetchCategory(activeCategory)} style={{ padding: '10px 16px', background: BLUE.solid, color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13.5px', fontWeight: 600, cursor: 'pointer' }}>
           Coba Lagi
         </button>
       </div>
@@ -165,32 +180,35 @@ function Leaderboard() {
             margin-bottom:16px;
           }
         }
-        .tabs{
+        .cat-chips{
           display:flex;
+          flex-wrap:wrap;
           gap:8px;
-          background:var(--white);
-          padding:5px;
-          border-radius:12px;
-          box-shadow:var(--shadow);
-          width:100%;
-          max-width:clamp(280px, 100%, 340px);
-        }
-        .tab{
           flex:1;
-          border:none;
-          background:transparent;
-          padding:clamp(8px, 2vw, 9px) clamp(10px, 2vw, 12px);
-          border-radius:9px;
+          min-width:0;
+        }
+        .chip{
+          display:inline-flex;
+          align-items:center;
+          gap:8px;
+          border:1px solid var(--gray-200);
+          background:var(--white);
+          padding:clamp(8px, 2vw, 9px) clamp(12px, 2vw, 14px);
+          border-radius:999px;
           cursor:pointer;
           font-family:inherit;
-          text-align:center;
-          transition:background .15s ease, color .15s ease;
+          box-shadow:var(--shadow);
+          transition:background .15s ease, color .15s ease, border-color .15s ease;
           color:var(--gray-700);
         }
-        .tab strong{display:block;font-size:clamp(12px, 2.5vw, 13.5px);font-weight:700;}
-        .tab span{display:block;font-size:clamp(10px, 2vw, 11.5px);opacity:.85;margin-top:1px;}
-        .tab.active{
+        .chip:disabled{opacity:.6;cursor:wait;}
+        .chip-icon{font-size:clamp(14px, 3vw, 16px);line-height:1;}
+        .chip-text{display:flex;flex-direction:column;align-items:flex-start;line-height:1.25;}
+        .chip-text strong{font-size:clamp(12px, 2.5vw, 13.5px);font-weight:700;}
+        .chip-text span{font-size:clamp(10px, 2vw, 11.5px);opacity:.85;}
+        .chip.active{
           background:var(--blue);
+          border-color:var(--blue);
           color:var(--white);
         }
         .refresh-btn{
@@ -326,61 +344,17 @@ function Leaderboard() {
         }
         .pill.kelas{background:var(--green-bg);color:var(--green-text);}
         .pill.grha{background:var(--amber-bg);color:var(--amber-text);}
-        .total-badge{
-          width:clamp(22px, 4vw, 26px);
-          height:clamp(22px, 4vw, 26px);
-          border-radius:50%;
+        .points-pill{
+          display:inline-flex;
+          align-items:center;
+          gap:5px;
+          padding:4px 12px;
+          border-radius:999px;
           background:var(--blue-light);
           color:var(--blue);
-          display:flex;align-items:center;justify-content:center;
-          font-weight:700;
-          font-size:clamp(11px, 2vw, 12.5px);
-          flex-shrink:0;
-        }
-        .detail-box{
-          background:var(--amber-bg);
-          border:1px solid var(--amber-border);
-          border-left:4px solid var(--amber-text);
-          border-radius:10px;
-          padding:clamp(8px, 2vw, 10px) clamp(12px, 2vw, 14px);
-          flex-shrink:0;
-        }
-        .detail-title{
-          display:flex;align-items:center;gap:6px;
           font-weight:700;
           font-size:clamp(12px, 2.5vw, 13.5px);
-          color:var(--amber-text);
-          margin-bottom:2px;
-          line-height:1.3;
-        }
-        .detail-sub{
-          font-size:clamp(11px, 2vw, 12.5px);
-          color:var(--amber-text);
-          opacity:.85;
-          line-height:1.3;
-        }
-        .detail-scroll{
-          max-height:120px;
-          overflow-y:auto;
-          overflow-x:hidden;
-          display:flex;
-          flex-direction:column;
-          gap:6px;
-          padding-right:4px;
-        }
-        .detail-scroll::-webkit-scrollbar{
-          width:6px;
-        }
-        .detail-scroll::-webkit-scrollbar-track{
-          background:var(--gray-100);
-          border-radius:3px;
-        }
-        .detail-scroll::-webkit-scrollbar-thumb{
-          background:var(--amber-text);
-          border-radius:3px;
-        }
-        .detail-scroll::-webkit-scrollbar-thumb:hover{
-          background:var(--amber-border);
+          white-space:nowrap;
         }
         .mobile-list{display:none;}
         .m-item{
@@ -410,7 +384,7 @@ function Leaderboard() {
           gap:6px;
           font-size:clamp(11px, 2vw, 12.5px);
           color:var(--gray-500);
-          margin-bottom:10px;
+          margin-bottom:2px;
         }
         .podium-card .card-head{
           background:linear-gradient(135deg, var(--amber-bg), var(--white));
@@ -563,6 +537,16 @@ function Leaderboard() {
           font-size:clamp(13px, 2.5vw, 14px);
           margin-bottom:20px;
         }
+        .inline-loading{
+          background:var(--white);
+          border-radius:var(--radius);
+          box-shadow:var(--shadow);
+          padding:clamp(24px, 5vw, 36px);
+          text-align:center;
+          color:var(--gray-500);
+          font-size:clamp(13px, 2.5vw, 14px);
+          margin-bottom:20px;
+        }
         @media (max-width: 768px){
           .table-wrap{display:none;}
           .mobile-list{display:block;}
@@ -586,32 +570,32 @@ function Leaderboard() {
         <div className="header-icon">🏆</div>
         <div className="header-text">
           <h1>Peringkat Top 20</h1>
-          <p>Peringkat siswa berdasarkan prestasi akademik dan non-akademik</p>
+          <p>Peringkat siswa berdasarkan poin IPC per kategori</p>
         </div>
       </div>
 
       {/* Controls */}
       <div className="controls">
-        <div className="tabs">
-          <button 
-            className={`tab ${activeTab === 'akademik' ? 'active' : ''}`}
-            onClick={() => setActiveTab('akademik')}
-          >
-            <strong>Akademik</strong>
-            <span>{akademikData.length} siswa</span>
-          </button>
-          <button 
-            className={`tab ${activeTab === 'nonakademik' ? 'active' : ''}`}
-            onClick={() => setActiveTab('nonakademik')}
-          >
-            <strong>Non-akademik</strong>
-            <span>{nonAkademikData.length} siswa</span>
-          </button>
+        <div className="cat-chips">
+          {CATEGORIES.map(cat => (
+            <button
+              key={cat.key}
+              className={`chip ${activeCategory === cat.key ? 'active' : ''}`}
+              onClick={() => handleSelectCategory(cat.key)}
+              disabled={!!loadingMap[cat.key]}
+            >
+              <span className="chip-icon">{cat.icon}</span>
+              <span className="chip-text">
+                <strong>{cat.label}</strong>
+                {dataByCategory[cat.key] && <span>{dataByCategory[cat.key].length} siswa</span>}
+              </span>
+            </button>
+          ))}
         </div>
 
-        <button 
+        <button
           className="refresh-btn"
-          onClick={fetchLeaderboardData}
+          onClick={() => fetchCategory(activeCategory)}
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '15px', height: '15px' }}>
             <polyline points="23 4 23 10 17 10"></polyline>
@@ -622,101 +606,143 @@ function Leaderboard() {
         </button>
       </div>
 
-      {/* Podium top 3 */}
-      {top3.length > 0 ? (
-        <div className="card podium-card" style={{ marginBottom: '12px' }}>
-          <div className="card-head">
-            <h2>🏆 Podium Top 3</h2>
-            <p>{title} — siswa dengan prestasi terbanyak</p>
-          </div>
-          <div className="podium">
-            {[
-              { student: top3.find((s) => s.rank === 2), cls: 'second', medal: MEDALS[2] },
-              { student: top3.find((s) => s.rank === 1), cls: 'first', medal: MEDALS[1] },
-              { student: top3.find((s) => s.rank === 3), cls: 'third', medal: MEDALS[3] },
-            ].filter((slot) => slot.student).map((slot) => {
-              const s = slot.student;
-              return (
-                <div key={s.id} className={`podium-slot ${slot.cls}`}>
-                  <div className="podium-medal">{slot.medal}</div>
-                  <div className="podium-avatar">
-                    {s.foto ? (
-                      <img
-                        src={`${API_BASE_URL.replace('/api', '')}${s.foto}`}
-                        alt={s.nama}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      />
-                    ) : (
-                      <span>{initials(s.nama)}</span>
-                    )}
-                  </div>
-                  <div className="podium-name" title={s.nama}>{s.nama}</div>
-                  <div className="podium-meta">{s.kelas} · {s.grha || '-'}</div>
-                  <div className="podium-total">🏅 {s.total_prestasi} prestasi</div>
-                  <div className="podium-step">{s.rank}</div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+      {categoryLoading && currentData.length === 0 ? (
+        <div className="inline-loading">Memuat peringkat {activeLabel}...</div>
       ) : (
-        <div className="empty-podium">Belum ada data peringkat untuk ditampilkan.</div>
-      )}
+        <>
+          {/* Podium top 3 */}
+          {top3.length > 0 ? (
+            <div className="card podium-card" style={{ marginBottom: '12px' }}>
+              <div className="card-head">
+                <h2>🏆 Podium Top 3</h2>
+                <p>{title} — siswa dengan poin tertinggi</p>
+              </div>
+              <div className="podium">
+                {[
+                  { student: top3.find((s) => s.rank === 2), cls: 'second', medal: MEDALS[2] },
+                  { student: top3.find((s) => s.rank === 1), cls: 'first', medal: MEDALS[1] },
+                  { student: top3.find((s) => s.rank === 3), cls: 'third', medal: MEDALS[3] },
+                ].filter((slot) => slot.student).map((slot) => {
+                  const s = slot.student;
+                  return (
+                    <div key={s.id} className={`podium-slot ${slot.cls}`}>
+                      <div className="podium-medal">{slot.medal}</div>
+                      <div className="podium-avatar">
+                        {s.foto ? (
+                          <img
+                            src={`${API_BASE_URL.replace('/api', '')}${s.foto}`}
+                            alt={s.nama}
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          />
+                        ) : (
+                          <span>{initials(s.nama)}</span>
+                        )}
+                      </div>
+                      <div className="podium-name" title={s.nama}>{s.nama}</div>
+                      <div className="podium-meta">{s.kelas} · {s.grha || '-'}</div>
+                      <div className="podium-total">🏅 {s.total_point} poin</div>
+                      <div className="podium-step">{s.rank}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="empty-podium">Belum ada data peringkat untuk ditampilkan.</div>
+          )}
 
-      {/* Stats strip */}
-      <div className="stats-strip">
-        <div className="stat-item">
-          <div className="stat-value">👥 {currentData.length}</div>
-          <div className="stat-label">Siswa dalam peringkat</div>
-        </div>
-        <div className="stat-item">
-          <div className="stat-value">🏅 {totalPrestasi}</div>
-          <div className="stat-label">Total prestasi</div>
-        </div>
-        <div className="stat-item">
-          <div className="stat-value">🕒 {lastUpdated ? lastUpdated.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-'}</div>
-          <div className="stat-label">Terakhir diperbarui</div>
-        </div>
-      </div>
+          {/* Stats strip */}
+          <div className="stats-strip">
+            <div className="stat-item">
+              <div className="stat-value">👥 {currentData.length}</div>
+              <div className="stat-label">Siswa dalam peringkat</div>
+            </div>
+            <div className="stat-item">
+              <div className="stat-value">🏅 {totalPoints}</div>
+              <div className="stat-label">Total poin {activeLabel}</div>
+            </div>
+            <div className="stat-item">
+              <div className="stat-value">🕒 {lastUpdated ? lastUpdated.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-'}</div>
+              <div className="stat-label">Terakhir diperbarui</div>
+            </div>
+          </div>
 
-      {/* Ranking card */}
-      <div className="card">
-        <div className="card-head">
-          <h2 id="cardTitle">📋 {title}</h2>
-          <p id="cardSub">Daftar siswa dengan prestasi terbanyak yang telah disetujui</p>
-        </div>
+          {/* Ranking card */}
+          <div className="card">
+            <div className="card-head">
+              <h2 id="cardTitle">📋 {title}</h2>
+              <p id="cardSub">Top 20 siswa dengan poin {activeLabel} tertinggi yang telah disetujui</p>
+            </div>
 
-        {/* Desktop table */}
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Posisi</th>
-                <th>Nama</th>
-                <th>Kelas</th>
-                <th>Grha</th>
-                <th>Total</th>
-                <th>Detail prestasi</th>
-              </tr>
-            </thead>
-            <tbody>
+            {/* Desktop table */}
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Posisi</th>
+                    <th>Nama</th>
+                    <th>Kelas</th>
+                    <th>Grha</th>
+                    <th>Total Poin</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {currentData.length === 0 ? (
+                    <tr>
+                      <td colSpan="5" style={{ textAlign: 'center', color: SLATE, padding: '32px' }}>Belum ada data</td>
+                    </tr>
+                  ) : (
+                    currentData.map((s) => {
+                      return (
+                        <tr key={s.id}>
+                          <td><span className={`pos-badge ${s.rank <= 3 ? 'top' : ''}`}>{s.rank}</span></td>
+                          <td>
+                            <div className="student">
+                              <div className="avatar">
+                                {s.foto ? (
+                                  <img
+                                    src={`${API_BASE_URL.replace('/api', '')}${s.foto}`}
+                                    alt={s.nama}
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                  />
+                                ) : (
+                                  <span>{initials(s.nama)}</span>
+                                )}
+                              </div>
+                              <div>
+                                <div className="student-name">{s.nama}</div>
+                                <div className="student-nis">NIS {s.nis}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td><span className="pill kelas">{s.kelas}</span></td>
+                          <td><span className="pill grha">{s.grha || '-'}</span></td>
+                          <td><span className="points-pill">🏅 {s.total_point} poin</span></td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile card list */}
+            <div className="mobile-list">
               {currentData.length === 0 ? (
-                <tr>
-                  <td colSpan="6" style={{ textAlign: 'center', color: SLATE, padding: '32px' }}>Belum ada data</td>
-                </tr>
+                <div className="m-item" style={{ textAlign: 'center', color: SLATE }}>Belum ada data</div>
               ) : (
                 currentData.map((s) => {
                   return (
-                    <tr key={s.id}>
-                      <td><span className={`pos-badge ${s.rank <= 3 ? 'top' : ''}`}>{s.rank}</span></td>
-                      <td>
+                    <div key={s.id} className="m-item">
+                      <div className="m-top">
+                        <span className={`pos-badge ${s.rank <= 3 ? 'top' : ''}`}>{s.rank}</span>
                         <div className="student">
                           <div className="avatar">
                             {s.foto ? (
-                              <img 
-                                src={`${API_BASE_URL.replace('/api', '')}${s.foto}`} 
-                                alt={s.nama} 
-                                style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                              <img
+                                src={`${API_BASE_URL.replace('/api', '')}${s.foto}`}
+                                alt={s.nama}
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                               />
                             ) : (
                               <span>{initials(s.nama)}</span>
@@ -727,83 +753,20 @@ function Leaderboard() {
                             <div className="student-nis">NIS {s.nis}</div>
                           </div>
                         </div>
-                      </td>
-                      <td><span className="pill kelas">{s.kelas}</span></td>
-                      <td><span className="pill grha">{s.grha || '-'}</span></td>
-                      <td><span className="total-badge">{s.total_prestasi}</span></td>
-                      <td>
-                        {s.detail_prestasi && s.detail_prestasi.length > 0 ? (
-                          <div className="detail-scroll">
-                            {s.detail_prestasi.map((d, i) => (
-                              <div key={i} className="detail-box">
-                                <div className="detail-title">🏅 {d.nama_lomba}</div>
-                                <div className="detail-sub">{formatDisplayText(d.juara)}</div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <span style={{ opacity: 0.6, fontStyle: 'italic' }}>Tidak ada detail</span>
-                        )}
-                      </td>
-                    </tr>
+                      </div>
+                      <div className="m-tags">
+                        <span className="pill kelas">{s.kelas}</span>
+                        <span className="pill grha">{s.grha || '-'}</span>
+                      </div>
+                      <div className="m-total">📋 Total poin: <span className="points-pill">🏅 {s.total_point} poin</span></div>
+                    </div>
                   );
                 })
               )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Mobile card list */}
-        <div className="mobile-list">
-          {currentData.length === 0 ? (
-            <div className="m-item" style={{ textAlign: 'center', color: SLATE }}>Belum ada data</div>
-          ) : (
-            currentData.map((s) => {
-              return (
-                <div key={s.id} className="m-item">
-                  <div className="m-top">
-                    <span className={`pos-badge ${s.rank <= 3 ? 'top' : ''}`}>{s.rank}</span>
-                    <div className="student">
-                      <div className="avatar">
-                        {s.foto ? (
-                          <img 
-                            src={`${API_BASE_URL.replace('/api', '')}${s.foto}`} 
-                            alt={s.nama} 
-                            style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                          />
-                        ) : (
-                          <span>{initials(s.nama)}</span>
-                        )}
-                      </div>
-                      <div>
-                        <div className="student-name">{s.nama}</div>
-                        <div className="student-nis">NIS {s.nis}</div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="m-tags">
-                    <span className="pill kelas">{s.kelas}</span>
-                    <span className="pill grha">{s.grha || '-'}</span>
-                  </div>
-                  <div className="m-total">📋 Total prestasi: <span className="total-badge">{s.total_prestasi}</span></div>
-                  {s.detail_prestasi && s.detail_prestasi.length > 0 ? (
-                    <div className="detail-scroll">
-                      {s.detail_prestasi.map((d, i) => (
-                        <div key={i} className="detail-box">
-                          <div className="detail-title">🏅 {d.nama_lomba}</div>
-                          <div className="detail-sub">{formatDisplayText(d.juara)}</div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <span style={{ opacity: 0.6, fontStyle: 'italic' }}>Tidak ada detail</span>
-                  )}
-                </div>
-              );
-            })
-          )}
-        </div>
-      </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

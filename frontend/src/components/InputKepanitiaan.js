@@ -398,7 +398,7 @@ function InputKepanitiaan() {
                     <th>Tanggal</th>
                     <th>Nama</th>
                     <th>NIS</th>
-                    <th>Kategori</th>
+                    <th>Jenis</th>
                     <th>Jabatan</th>
                     <th>Point</th>
                     <th>Status</th>
@@ -540,17 +540,7 @@ function InputKepanitiaan() {
         </div>
 
         <div className="form-group">
-          <label>Jabatan Kepanitiaan</label>
-          <select name="jabatan_kepanitiaan" value={formData.jabatan_kepanitiaan} onChange={handleChange} required>
-            <option value="">Pilih Jabatan</option>
-            {jabatanOptions.map(jabatan => (
-              <option key={jabatan.value} value={jabatan.value}>{jabatan.label} {formData.jabatan_kepanitiaan === jabatan.value && calculatedPoint ? `(${calculatedPoint} point)` : ''}</option>
-            ))}
-          </select>
-        </div>
-
-        <div className="form-group">
-          <label>Kategori Kepanitiaan</label>
+          <label>Jenis Kepanitiaan</label>
           <input
             type="text"
             name="kategori_kepanitiaan"
@@ -558,6 +548,16 @@ function InputKepanitiaan() {
             onChange={handleChange}
             placeholder="Nama kepanitiaan"
           />
+        </div>
+        
+        <div className="form-group">
+          <label>Jabatan Kepanitiaan</label>
+          <select name="jabatan_kepanitiaan" value={formData.jabatan_kepanitiaan} onChange={handleChange} required>
+            <option value="">Pilih Jabatan</option>
+            {jabatanOptions.map(jabatan => (
+              <option key={jabatan.value} value={jabatan.value}>{jabatan.label} {formData.jabatan_kepanitiaan === jabatan.value && calculatedPoint ? `(${calculatedPoint} point)` : ''}</option>
+            ))}
+          </select>
         </div>
 
         <div className="form-group" style={{ 
@@ -659,7 +659,7 @@ function InputKepanitiaan() {
             </select>
           </div>
           <div className="form-group">
-            <label>Kategori Kepanitiaan</label>
+            <label>Jenis Kepanitiaan</label>
             <input
               type="text"
               value={editModal.editFormData.kategori_kepanitiaan || ''}

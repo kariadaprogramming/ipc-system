@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
 import API_BASE_URL from '../config';
-import { useMinIpc, isBelowMinIpc } from '../utils/minIpc';
+import { useMinIpcPerGrade, minIpcFor, isBelowMinIpc } from '../utils/minIpc';
 import { formatDisplayText } from '../utils/formatDisplayText';
 import StudentRecordsHistory from './StudentRecordsHistory';
 
 const JABATAN_OPTIONS = ['Guru', 'Pegawai'];
 
 function Profile() {
-  const minIpc = useMinIpc();
+  const minIpc = useMinIpcPerGrade();
   const [profile, setProfile] = useState(null);
   const [ipcHistory, setIpcHistory] = useState([]);
   const [summary, setSummary] = useState(null);
@@ -334,15 +334,14 @@ function Profile() {
         <>
           <div className="card" style={{ marginBottom: '24px' }}>
             <h3>IPC Anda</h3>
-            <p style={{ fontSize: '48px', fontWeight: 'bold', color: isBelowMinIpc(profile?.ipc_total ?? 0, minIpc) ? '#dc2626' : '#3498db' }}>{profile?.ipc_total || 0}</p>
+            <p style={{ fontSize: '48px', fontWeight: 'bold', color: isBelowMinIpc(profile?.ipc_total ?? 0, minIpcFor(minIpc, profile?.kelas)) ? '#dc2626' : '#3498db' }}>{profile?.ipc_total || 0}</p>
             <p>IPC Awal: {profile?.ipc_awal || 0}</p>
           </div>
 
           {summary && (
             <div className="card" style={{ marginBottom: '24px' }}>
               <h3>Ringkasan Prestasi</h3>
-              <p><strong>Total Prestasi Akademik:</strong> {summary.total_prestasi_akademik}</p>
-              <p><strong>Total Prestasi Non-Akademik:</strong> {summary.total_prestasi_nonakademik}</p>
+              <p><strong>Total Prestasi:</strong> {summary.total_prestasi}</p>
               <p><strong>Total Organisasi:</strong> {summary.total_organisasi}</p>
               <p><strong>Total Event:</strong> {summary.total_event}</p>
               <p><strong>Total Pelanggaran:</strong> {summary.total_pelanggaran}</p>

@@ -14,6 +14,9 @@ function IzinAkun() {
   });
   const [bulkUpdating, setBulkUpdating] = useState(false);
   const [selectedUserIds, setSelectedUserIds] = useState(new Set());
+  // Role of the current multi-select session (mirrors /kelola-akun):
+  // locked to the first selected user's role; cleared when selection empties.
+  const [selectionRole, setSelectionRole] = useState(null);
 
   const jenisInputs = [
     { key: 'prestasi', label: 'Prestasi', icon: '🏆' },
@@ -52,31 +55,6 @@ function IzinAkun() {
   useEffect(() => {
     fetchUsers();
   }, []);
-
-  // Reveal animation on scroll
-  useEffect(() => {
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('in');
-          observer.unobserve(entry.target);
-        }
-      });
-    }, { threshold: 0.1 });
-
-    const revealElements = document.querySelectorAll('.reveal');
-    revealElements.forEach(el => observer.observe(el));
-
-    // Fallback: add 'in' class after a short delay if observer doesn't trigger
-    const timeout = setTimeout(() => {
-      revealElements.forEach(el => el.classList.add('in'));
-    }, 300);
-
-    return () => {
-      observer.disconnect();
-      clearTimeout(timeout);
-    };
-  }, [filteredUsers]);
 
   useEffect(() => {
     let filtered = users;
@@ -174,26 +152,51 @@ function IzinAkun() {
     }
   };
 
-  // Toggle one user in the multi-select set
-  const handleToggleSelect = (userId) => {
-    setSelectedUserIds(prev => {
-      const next = new Set(prev);
-      if (next.has(userId)) {
-        next.delete(userId);
-      } else {
-        next.add(userId);
+  // Toggle one user in the multi-select set (mirrors /kelola-akun:
+  // superadmin can never be selected; once a role is picked, other roles grey out)
+  const handleToggleSelect = (user) => {
+    if (user.role === 'superadmin') {
+      return;
+    }
+    if (selectedUserIds.has(user.id)) {
+      const next = new Set(selectedUserIds);
+      next.delete(user.id);
+      setSelectedUserIds(next);
+      if (next.size === 0) {
+        setSelectionRole(null);
       }
-      return next;
-    });
+      return;
+    }
+    if (selectionRole && user.role !== selectionRole) {
+      return;
+    }
+    if (selectedUserIds.size === 0) {
+      setSelectionRole(user.role);
+    }
+    const next = new Set(selectedUserIds);
+    next.add(user.id);
+    setSelectedUserIds(next);
   };
 
-  // Select all users currently visible (after search/filter)
+  const isUserSelectable = (user) => user.role !== 'superadmin';
+
+  const isUserDisabled = (user) => {
+    if (!isUserSelectable(user)) return true;
+    if (!selectionRole) return false;
+    return user.role !== selectionRole;
+  };
+
+  // Select all selectable users currently visible (after search/filter).
+  // Like /kelola-akun, this allows a mixed-role selection (role lock reset).
   const handleSelectAllVisible = () => {
-    setSelectedUserIds(new Set(filteredUsers.map(u => u.id)));
+    const selectable = filteredUsers.filter(isUserSelectable);
+    setSelectedUserIds(new Set(selectable.map(u => u.id)));
+    setSelectionRole(null);
   };
 
   const handleClearSelection = () => {
     setSelectedUserIds(new Set());
+    setSelectionRole(null);
   };
 
   // Derived: which users are currently selected (used for guru-only bulk button gating)
@@ -245,90 +248,53 @@ function IzinAkun() {
   };
 
   if (loading) {
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: '#f8fafc' }}>
-        <div style={{ fontSize: '1.2rem', color: '#64748b' }}>Loading...</div>
-      </div>
-    );
+    return <div className="loading"><div className="spinner"></div></div>;
   }
 
   return (
-    <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '18px', fontFamily: 'Segoe UI, Inter, -apple-system, BlinkMacSystemFont, sans-serif', background: '#f8fafc', color: '#0f172a', minHeight: '100vh' }}>
+    <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif', background: '#f5f5f5', padding: '20px', color: '#333', minHeight: '100vh' }}>
+      <div style={{ maxWidth: '1200px', margin: '0 auto', background: 'white', borderRadius: '8px', padding: '24px', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)' }}>
       <style>{`
         :root{
-          --blue:#2563eb;
-          --blue-dark:#1d4ed8;
-          --blue-light:#eff6ff;
-          --sky-light:#e0f2fe;
-          --green:#16a34a;
-          --green-dark:#15803d;
-          --green-light:#dcfce7;
-          --orange:#f59e0b;
-          --orange-light:#fef3c7;
-          --amber-bg:#fffbeb;
-          --red:#ef4444;
-          --red-dark:#dc2626;
-          --gray-50:#f8fafc;
-          --gray-100:#f1f5f9;
-          --gray-200:#e2e8f0;
-          --gray-400:#94a3b8;
-          --gray-500:#64748b;
-          --gray-700:#334155;
-          --gray-900:#0f172a;
-          --radius:14px;
-          --radius-sm:10px;
-          --shadow:0 1px 2px rgba(15,23,42,.04), 0 1px 8px rgba(15,23,42,.05);
-          --shadow-hover:0 6px 20px rgba(15,23,42,.10);
+          --blue:#1e88e5;
+          --blue-dark:#1565c0;
+          --green:#43a047;
+          --green-dark:#388e3c;
+          --red:#e53935;
+          --red-dark:#c62828;
+          --gray-50:#f9f9f9;
+          --gray-100:#f5f5f5;
+          --gray-200:#e0e0e0;
+          --gray-400:#999;
+          --gray-500:#666;
+          --gray-700:#333;
+          --gray-900:#1a1a1a;
+          --radius:4px;
+          --radius-sm:4px;
+          --shadow:0 1px 3px rgba(0,0,0,0.08);
+          --shadow-hover:0 4px 8px rgba(0,0,0,0.12);
         }
-        .reveal{
-          opacity:0;
-          transform:translateY(14px);
-          transition:opacity .5s ease, transform .5s ease;
-        }
-        .reveal.in{
-          opacity:1;
-          transform:translateY(0);
-        }
-        .btn{
-          border:none;
-          border-radius:var(--radius-sm);
-          padding:10px 18px;
-          font-size:.85rem;
-          font-weight:600;
-          cursor:pointer;
-          display:inline-flex;
-          align-items:center;
-          gap:7px;
-          transition:filter .15s ease, transform .12s ease, box-shadow .15s ease;
-          white-space:nowrap;
-        }
-        .btn:hover{filter:brightness(1.06); box-shadow:var(--shadow-hover);}
-        .btn:active{transform:scale(.96);}
-        .btn-primary{background:var(--blue); color:#fff;}
-        .btn-red{background:var(--red); color:#fff;}
-        .btn-green{background:var(--green); color:#fff;}
-        .btn-orange{background:var(--orange); color:#fff;}
         .btn-outline{background:#fff; border:1px solid var(--gray-200); color:var(--gray-700);}
         .btn-sm{padding:7px 12px; font-size:.78rem;}
         .chip-btn{
           border:none;
-          border-radius:9px;
-          padding:10px 12px;
-          font-size:.8rem;
-          font-weight:600;
+          border-radius:var(--radius-sm);
+          padding:10px 16px;
+          font-size:14px;
+          font-weight:500;
           color:#fff;
           cursor:pointer;
           display:flex;
           align-items:center;
-          gap:7px;
+          gap:6px;
           min-height:42px;
-          transition:transform .12s ease, box-shadow .15s ease, filter .15s ease;
-          box-shadow:0 1px 2px rgba(0,0,0,.06);
+          transition:all 0.3s ease;
         }
-        .chip-btn:hover{filter:brightness(1.07); box-shadow:0 4px 10px rgba(0,0,0,.12);}
-        .chip-btn:active{transform:scale(.95);}
+        .chip-btn:hover{filter:brightness(0.92);}
+        .chip-btn:active{transform:translateY(0);}
         .chip-btn.on{background:var(--green);}
         .chip-btn.off{background:var(--red);}
+        .chip-btn:disabled{opacity:0.6; cursor:not-allowed;}
         .chip-btn .ic{
           width:16px; height:16px;
           display:inline-flex; align-items:center; justify-content:center;
@@ -338,26 +304,20 @@ function IzinAkun() {
           flex-shrink:0;
         }
         .main-card{
-          background:#fff;
-          border:1px solid var(--gray-200);
-          border-radius:var(--radius);
-          box-shadow:var(--shadow);
-          padding:22px 24px;
           display:flex;
           flex-direction:column;
-          gap:18px;
+          gap:16px;
+          margin-bottom:24px;
         }
         .main-card-title{
-          display:flex;
-          align-items:center;
-          gap:9px;
-          font-weight:700;
-          font-size:1.05rem;
+          font-weight:600;
+          font-size:18px;
+          color:var(--gray-900);
           line-height:1.3;
         }
         .main-card-sub{
           margin:8px 0 0;
-          font-size:.85rem;
+          font-size:13px;
           color:var(--gray-500);
           line-height:1.55;
         }
@@ -368,35 +328,34 @@ function IzinAkun() {
         }
         .bulk-panel{
           border-radius:var(--radius);
-          padding:18px 18px 20px;
-          border:1.5px solid;
+          padding:16px;
+          border:1px solid var(--gray-200);
+          background:var(--gray-50);
           display:flex;
           flex-direction:column;
           gap:12px;
         }
         .bulk-panel.siswa{
-          background:var(--sky-light);
-          border-color:#bfdbfe;
+          background:var(--gray-50);
+          border-color:var(--gray-200);
         }
         .bulk-panel.guru{
-          background:var(--amber-bg);
-          border-color:#fde68a;
+          background:var(--gray-50);
+          border-color:var(--gray-200);
         }
         .bulk-panel-title{
-          display:flex;
-          align-items:center;
-          gap:7px;
-          font-weight:700;
-          font-size:.92rem;
+          font-weight:600;
+          font-size:14px;
+          color:var(--gray-900);
         }
-        .bulk-panel.siswa .bulk-panel-title{color:var(--blue-dark);}
-        .bulk-panel.guru .bulk-panel-title{color:#b45309;}
+        .bulk-panel.siswa .bulk-panel-title{color:var(--gray-900);}
+        .bulk-panel.guru .bulk-panel-title{color:var(--gray-900);}
         .bulk-panel.unified{
-          background:var(--blue-light);
-          border-color:#bfdbfe;
+          background:var(--gray-50);
+          border-color:var(--gray-200);
           grid-column:span 2;
         }
-        .bulk-panel.unified .bulk-panel-title{color:var(--blue-dark);}
+        .bulk-panel.unified .bulk-panel-title{color:var(--gray-900);}
         .select-checkbox{
           width:17px;
           height:17px;
@@ -415,16 +374,16 @@ function IzinAkun() {
         }
         .chip-flow .chip-btn{justify-content:center; min-width:0;}
         .filter-card{
-          background:#fff;
+          background:var(--gray-50);
           border:1px solid var(--gray-200);
           border-radius:var(--radius);
-          box-shadow:var(--shadow);
-          padding:18px 22px;
+          padding:16px;
           display:flex;
           flex-direction:column;
           gap:14px;
+          margin-bottom:24px;
         }
-        .filter-title{font-weight:700; font-size:.95rem;}
+        .filter-title{font-weight:600; font-size:14px; color:var(--gray-900);}
         .filter-row{
           display:grid;
           grid-template-columns:1fr 1fr 1fr auto;
@@ -433,24 +392,24 @@ function IzinAkun() {
         }
         .field label{
           display:block;
-          font-size:.72rem;
+          font-size:12px;
           font-weight:600;
           color:var(--gray-500);
-          margin-bottom:5px;
+          margin-bottom:6px;
         }
         select, input{
           font-family:inherit;
-          font-size:.85rem;
-          padding:9px 12px;
+          font-size:14px;
+          padding:10px 12px;
           border-radius:var(--radius-sm);
-          border:1px solid var(--gray-200);
+          border:1px solid #ddd;
           background:#fff;
-          color:var(--gray-900);
+          color:var(--gray-700);
           outline:none;
           width:100%;
           transition:border-color .15s ease, box-shadow .15s ease;
         }
-        select:focus, input:focus{border-color:var(--blue); box-shadow:0 0 0 3px rgba(37,99,235,.12);}
+        select:focus, input:focus{border-color:var(--blue); box-shadow:0 0 0 3px rgba(30,136,229,.12);}
         .search-box{
           position:relative;
         }
@@ -464,40 +423,28 @@ function IzinAkun() {
         }
         .search-box input{padding-left:38px;}
         .table-card{
-          background:#fff;
-          border:1px solid var(--gray-200);
-          border-radius:var(--radius);
-          box-shadow:var(--shadow);
-          overflow:hidden;
+          overflow-x:auto;
         }
         .table-wrap{overflow-x:auto;}
         table{
           width:100%;
           border-collapse:collapse;
-          min-width:900px;
+          font-size:12px;
         }
+        thead{background:var(--gray-50); border-bottom:1px solid #d0d0d0;}
         thead th{
-          background:var(--gray-50);
           text-align:left;
-          font-size:.68rem;
-          font-weight:700;
+          font-size:12px;
+          font-weight:600;
           color:var(--gray-500);
-          letter-spacing:.03em;
           padding:13px 14px;
-          border-bottom:1px solid var(--gray-200);
           white-space:nowrap;
         }
         thead th .th-ic{margin-right:4px;}
-        thead th.col-prestasi{color:#a16207;}
-        thead th.col-organisasi{color:var(--blue);}
-        thead th.col-kepanitiaan{color:var(--orange);}
-        thead th.col-event{color:#0891b2;}
-        thead th.col-pelanggaran{color:var(--red);}
-        thead th.col-perilaku{color:var(--green);}
         tbody td{
           padding:13px 14px;
-          font-size:.85rem;
-          border-bottom:1px solid var(--gray-100);
+          font-size:12px;
+          border-bottom:1px solid var(--gray-200);
           color:var(--gray-700);
           text-align:center;
         }
@@ -505,21 +452,21 @@ function IzinAkun() {
         tbody tr{transition:background .12s ease;}
         tbody tr:last-child td{border-bottom:none;}
         tbody tr:hover{background:var(--gray-50);}
-        .user-name{font-weight:700; color:var(--gray-900); font-size:.88rem;}
-        .user-sub{font-size:.75rem; color:var(--gray-400); margin-top:1px;}
+        .user-name{font-weight:600; color:var(--gray-900); font-size:13px;}
+        .user-sub{font-size:12px; color:var(--gray-400); margin-top:1px;}
         .role-pill{
           display:inline-block;
-          background:var(--orange-light);
-          color:#b45309;
-          font-size:.7rem;
-          font-weight:700;
+          background:var(--gray-100);
+          color:var(--gray-500);
+          font-size:12px;
+          font-weight:600;
           padding:3px 10px;
           border-radius:999px;
         }
         .toggle-cell{
           width:34px;
           height:34px;
-          border-radius:9px;
+          border-radius:4px;
           border:none;
           display:inline-flex;
           align-items:center;
@@ -527,10 +474,10 @@ function IzinAkun() {
           font-size:.8rem;
           color:#fff;
           cursor:pointer;
-          transition:transform .12s ease, filter .15s ease;
+          transition:filter .15s ease;
         }
-        .toggle-cell:hover{filter:brightness(1.1);}
-        .toggle-cell:active{transform:scale(.88);}
+        .toggle-cell:hover{filter:brightness(0.92);}
+        .toggle-cell:active{transform:scale(.95);}
         .toggle-cell.on{background:var(--green);}
         .toggle-cell.off{background:var(--red);}
         @media (max-width: 900px){
@@ -539,12 +486,9 @@ function IzinAkun() {
           .filter-row .field:last-of-type{grid-column:span 2;}
         }
         @media (max-width: 600px){
-          body{padding:14px;}
-          .page-header{font-size:1.05rem;}
-          .main-card{padding:16px;}
           .bulk-panel{padding:14px;}
           .chip-flow{grid-template-columns:1fr 1fr; gap:8px;}
-          .chip-btn{font-size:.72rem; padding:9px 8px; min-height:40px;}
+          .chip-btn{font-size:12px; padding:9px 8px; min-height:40px;}
           .filter-row{grid-template-columns:1fr;}
           .filter-row .field:last-of-type{grid-column:span 1;}
           .filter-row .btn-outline{width:100%; justify-content:center;}
@@ -554,14 +498,14 @@ function IzinAkun() {
       `}</style>
 
       {/* Header */}
-      <div className="reveal" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.2rem', fontWeight: 700 }}>
-          <span style={{ fontSize: '1.3rem' }}>🛡️</span>
-          Izin Akses Input Data
+      <div style={{ marginBottom: '24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+        <div>
+          <h1 style={{ fontSize: '24px', fontWeight: '600', color: '#1a1a1a', margin: 0 }}>Izin Akses Input Data</h1>
+          <p style={{ fontSize: '13px', color: '#666', margin: '8px 0 0' }}>Kelola izin input data per user</p>
         </div>
         <button
           onClick={handleResetAll}
-          className="btn btn-red"
+          className="btn btn-danger"
           title="Hapus semua individual permissions dan kembali ke pengaturan default"
         >
           🔄 Reset Izin
@@ -569,14 +513,14 @@ function IzinAkun() {
       </div>
 
       {message && (
-        <div style={{ padding: '12px 16px', borderRadius: '10px', background: message.startsWith('✅') ? '#dcfce7' : '#fee2e2', color: message.startsWith('✅') ? '#16a34a' : '#ef4444', fontSize: '.85rem', fontWeight: 600 }}>
+        <div style={{ padding: '12px 16px', background: message.startsWith('✅') ? '#d4edda' : '#f8d7da', border: message.startsWith('✅') ? '1px solid #c3e6cb' : '1px solid #f5c6cb', borderRadius: '4px', color: message.startsWith('✅') ? '#155724' : '#721c24', fontSize: '13px', marginBottom: '20px' }}>
           {message}
         </div>
       )}
 
       {/* INDIVIDUAL CONTROL */}
       <>
-          <div className="main-card reveal">
+          <div className="main-card">
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <div className="main-card-title">
                 <span style={{ fontSize: '1.15rem' }}>👤</span>
@@ -626,7 +570,7 @@ function IzinAkun() {
           </div>
 
           {/* Filters */}
-          <div className="filter-card reveal">
+          <div className="filter-card">
             <div className="filter-title">Filter</div>
             <div className="filter-row">
               <div className="field">
@@ -675,8 +619,11 @@ function IzinAkun() {
           </div>
 
           {/* Selection bar */}
-          <div className="reveal" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', fontSize: '.85rem', color: '#334155' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', fontSize: '13px', color: '#666' }}>
             <strong>{selectedUserIds.size} user dipilih</strong>
+            {selectedUserIds.size > 0 && selectionRole && (
+              <span>Mode pilihan: <strong>{selectionRole === 'siswa' ? 'Siswa' : 'Guru'}</strong> — hanya role yang sama yang bisa dipilih.</span>
+            )}
             <button className="btn btn-outline btn-sm" onClick={handleSelectAllVisible}>
               Pilih semua yang tampil ({filteredUsers.length})
             </button>
@@ -688,7 +635,7 @@ function IzinAkun() {
           </div>
 
           {/* Table */}
-          <div className="table-card reveal">
+          <div className="table-card">
             <div className="table-wrap">
               <table>
                 <thead>
@@ -697,16 +644,18 @@ function IzinAkun() {
                       <input
                         type="checkbox"
                         className="select-checkbox"
-                        checked={filteredUsers.length > 0 && filteredUsers.every(u => selectedUserIds.has(u.id))}
+                        checked={filteredUsers.filter(isUserSelectable).length > 0 && filteredUsers.filter(isUserSelectable).every(u => selectedUserIds.has(u.id))}
                         ref={(el) => {
                           if (el) {
-                            const someSelected = filteredUsers.some(u => selectedUserIds.has(u.id));
-                            const allSelected = filteredUsers.length > 0 && filteredUsers.every(u => selectedUserIds.has(u.id));
+                            const selectable = filteredUsers.filter(isUserSelectable);
+                            const someSelected = selectable.some(u => selectedUserIds.has(u.id));
+                            const allSelected = selectable.length > 0 && selectable.every(u => selectedUserIds.has(u.id));
                             el.indeterminate = someSelected && !allSelected;
                           }
                         }}
                         onChange={() => {
-                          const allSelected = filteredUsers.length > 0 && filteredUsers.every(u => selectedUserIds.has(u.id));
+                          const selectable = filteredUsers.filter(isUserSelectable);
+                          const allSelected = selectable.length > 0 && selectable.every(u => selectedUserIds.has(u.id));
                           if (allSelected) {
                             handleClearSelection();
                           } else {
@@ -728,14 +677,19 @@ function IzinAkun() {
                 </thead>
                 <tbody>
                   {filteredUsers.map(user => (
-                    <tr key={user.id} className={selectedUserIds.has(user.id) ? 'row-selected' : ''}>
+                    <tr key={user.id} className={selectedUserIds.has(user.id) ? 'row-selected' : ''} style={isUserDisabled(user) && selectionRole ? { opacity: 0.45 } : undefined}>
                       <td>
-                        <input
-                          type="checkbox"
-                          className="select-checkbox"
-                          checked={selectedUserIds.has(user.id)}
-                          onChange={() => handleToggleSelect(user.id)}
-                        />
+                        {isUserSelectable(user) ? (
+                          <input
+                            type="checkbox"
+                            className="select-checkbox"
+                            checked={selectedUserIds.has(user.id)}
+                            disabled={isUserDisabled(user)}
+                            onChange={() => handleToggleSelect(user)}
+                          />
+                        ) : (
+                          <span style={{ color: '#999' }}>—</span>
+                        )}
                       </td>
                       <td className="user-cell">
                         <div className="user-name">{user.nama}</div>
@@ -812,6 +766,7 @@ function IzinAkun() {
             )}
           </div>
       </>
+      </div>
     </div>
   );
 }

@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import api from '../utils/api';
 import API_BASE_URL from '../config';
-import { useMinIpc, isBelowMinIpc } from '../utils/minIpc';
+import { buildEvidenceMap } from '../utils/historyEvidence';
+import { useMinIpcPerGrade, minIpcFor, isBelowMinIpc } from '../utils/minIpc';
 import { formatDisplayText } from '../utils/formatDisplayText';
 
 function getCurrentAcademicYear() {
@@ -20,7 +21,7 @@ function getAcademicYearOptions() {
 
 function getIpcDetailRows(points = {}) {
   return [
-    ['Prestasi', (Number(points.prestasi_akademik) || 0) + (Number(points.prestasi_nonakademik) || 0)],
+    ['Prestasi', Number(points.prestasi) || 0],
     ['Perilaku', ['tanggung_jawab', 'disiplin', 'kepedulian', 'kemandirian', 'spiritual', 'kejujuran', 'kepercayaan_diri']
       .reduce((sum, key) => sum + (Number(points[key]) || 0), 0)],
     ['Organisasi', Number(points.organisasi) || 0],
@@ -32,7 +33,7 @@ function getIpcDetailRows(points = {}) {
 }
 
 function WaliKelas() {
-  const minIpc = useMinIpc();
+  const minIpc = useMinIpcPerGrade();
   const [assignments, setAssignments] = useState([]);
   const [classStats, setClassStats] = useState([]);
   const [teachers, setTeachers] = useState([]);
@@ -48,6 +49,8 @@ function WaliKelas() {
   const [loadingMismatches, setLoadingMismatches] = useState(false);
   const [studentHistory, setStudentHistory] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [studentRecords, setStudentRecords] = useState(null);
+  const [evidenceImage, setEvidenceImage] = useState(null);
   
   const currentAcademicYear = getCurrentAcademicYear();
   const academicYearOptions = getAcademicYearOptions();
@@ -157,17 +160,29 @@ function WaliKelas() {
   const handleViewStudentDetail = async (student) => {
     setSelectedStudent(student);
     setShowStudentDetail(true);
+    setEvidenceImage(null);
+    setStudentRecords(null);
     setLoadingHistory(true);
     try {
-      const response = await api.get(`/users/${student.id}/ipc-history`);
-      setStudentHistory(response.data);
+      const historyRes = await api.get(`/users/${student.id}/ipc-history`);
+      setStudentHistory(historyRes.data);
     } catch (err) {
       console.error('Error fetching student history:', err);
       setStudentHistory([]);
+    }
+    try {
+      const recordsRes = await api.get(`/users/${student.id}/records`);
+      setStudentRecords(recordsRes.data);
+    } catch (err) {
+      console.error('Error fetching student records for evidence:', err);
+      setStudentRecords(null);
     } finally {
       setLoadingHistory(false);
     }
   };
+
+  // Evidence photo per history row, matched by exact keterangan text.
+  const evidenceMap = useMemo(() => buildEvidenceMap(studentRecords), [studentRecords]);
 
   const groupHistoryByCategory = (history = []) => {
     const grouped = {};
@@ -508,7 +523,7 @@ function WaliKelas() {
 
         {/* Class Mismatches Modal */}
         {showMismatches && mismatches && (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', zIndex: 50 }}>
+          <div className="app-modal-overlay" style={{ position: 'fixed', top: 0, right: 0, bottom: 0, background: 'rgba(15,23,42,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', zIndex: 1500 }}>
             <div style={{ background: '#fff', borderRadius: '14px', padding: '30px', maxWidth: '900px', width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
                 <h3 style={{ margin: 0 }}>🔍 Ketidaksesuaian Kelas</h3>
@@ -616,7 +631,7 @@ function WaliKelas() {
 
       {/* DETAIL KELAS MODAL */}
       {showClassDetail && selectedClass && (
-        <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', zIndex: 50 }} onClick={(e) => { if (e.target === e.currentTarget) setShowClassDetail(false) }}>
+        <div className="modal-overlay app-modal-overlay" style={{ position: 'fixed', top: 0, right: 0, bottom: 0, background: 'rgba(15,23,42,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', zIndex: 1500 }} onClick={(e) => { if (e.target === e.currentTarget) setShowClassDetail(false) }}>
           <div className="modal-content" style={{ background: '#fff', borderRadius: '14px', maxWidth: '900px', width: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 50px rgba(15,23,42,.25)' }}>
             <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', padding: '20px 22px', borderBottom: '1px solid #f1f5f9' }}>
               <div style={{ fontSize: '1.15rem', fontWeight: 700 }}>📊 Detail Kelas {selectedClass.kelas}</div>
@@ -694,7 +709,7 @@ function WaliKelas() {
                           </div>
                         </td>
                         <td style={{ padding: '13px 16px', fontSize: '.85rem', borderBottom: '1px solid #f1f5f9', color: '#334155' }}>
-                          <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '38px', height: '38px', borderRadius: '50%', background: isBelowMinIpc(student.ipc_total || 80, minIpc) ? '#dc2626' : '#0891b2', color: '#fff', fontWeight: 700, fontSize: '.85rem' }}>{student.ipc_total || 80}</span>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '38px', height: '38px', borderRadius: '50%', background: isBelowMinIpc(student.ipc_total || 80, minIpcFor(minIpc, selectedClass?.kelas)) ? '#dc2626' : '#0891b2', color: '#fff', fontWeight: 700, fontSize: '.85rem' }}>{student.ipc_total || 80}</span>
                         </td>
                         <td style={{ padding: '13px 16px', fontSize: '.85rem', borderBottom: '1px solid #f1f5f9', color: '#334155' }}>
                           <button onClick={() => handleViewStudentDetail(student)} className="btn" style={{ border: 'none', borderRadius: '10px', padding: '6px 12px', fontSize: '.75rem', fontWeight: 600, cursor: 'pointer', background: '#2563eb', color: '#fff', transition: 'all 0.2s' }}>Detail</button>
@@ -711,7 +726,7 @@ function WaliKelas() {
 
       {/* DETAIL SISWA MODAL */}
       {showStudentDetail && selectedStudent && (
-        <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', zIndex: 50 }} onClick={(e) => { if (e.target === e.currentTarget) setShowStudentDetail(false) }}>
+        <div className="modal-overlay app-modal-overlay" style={{ position: 'fixed', top: 0, right: 0, bottom: 0, background: 'rgba(15,23,42,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', zIndex: 1500 }} onClick={(e) => { if (e.target === e.currentTarget) { setShowStudentDetail(false); setEvidenceImage(null); } }}>
           <div className="modal-content" style={{ background: '#fff', borderRadius: '14px', width: '100%', maxWidth: '520px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 50px rgba(15,23,42,.25)' }}>
             <div className="modal-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '18px 20px', borderBottom: '1px solid #f1f5f9' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -724,7 +739,7 @@ function WaliKelas() {
                 </div>
                 <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700 }}>👤 Detail Siswa</h3>
               </div>
-              <button onClick={() => setShowStudentDetail(false)} className="btn" style={{ border: 'none', borderRadius: '10px', padding: '6px 12px', fontSize: '.75rem', fontWeight: 600, cursor: 'pointer', background: '#ef4444', color: '#fff', transition: 'all 0.2s', whiteSpace: 'nowrap' }}>Tutup</button>
+              <button onClick={() => { setShowStudentDetail(false); setEvidenceImage(null); }} className="btn" style={{ border: 'none', borderRadius: '10px', padding: '6px 12px', fontSize: '.75rem', fontWeight: 600, cursor: 'pointer', background: '#ef4444', color: '#fff', transition: 'all 0.2s', whiteSpace: 'nowrap' }}>Tutup</button>
             </div>
 
             <div style={{ padding: '16px 20px 22px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -792,7 +807,9 @@ function WaliKelas() {
                             <span style={{ marginLeft: 'auto', fontSize: '.68rem', color: '#64748b' }}>{group.records.length} record</span>
                           </div>
                           <div style={{ display: 'flex', flexDirection: 'column' }}>
-                            {group.records.map(record => (
+                            {group.records.map(record => {
+                              const evidenceFoto = evidenceMap[record.keterangan];
+                              return (
                               <div key={record.id} style={{ padding: '10px 12px', borderTop: '1px solid #f1f5f9', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
                                   <span style={{ color: '#334155', fontSize: '.78rem', wordBreak: 'break-word', flex: 1 }}>
@@ -802,12 +819,16 @@ function WaliKelas() {
                                     {record.point_change > 0 ? '+' : ''}{record.point_change}
                                   </span>
                                 </div>
+                                {evidenceFoto && (
+                                  <span onClick={() => setEvidenceImage(evidenceFoto)} style={{ color: '#2563eb', fontSize: '.75rem', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline', alignSelf: 'flex-start' }}>📎 Lihat Bukti</span>
+                                )}
                                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '.68rem', color: '#94a3b8' }}>
                                   <span>{new Date(record.created_at).toLocaleString('id-ID')}</span>
                                   <span>{record.ipc_sebelum} → {record.ipc_sesudah}</span>
                                 </div>
                               </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         </div>
                       );
@@ -818,10 +839,18 @@ function WaliKelas() {
 
               <div style={{ background: '#f8fafc', borderRadius: '10px', padding: '12px 16px' }}>
                 <div style={{ fontSize: '.72rem', fontWeight: 700, color: '#64748b', marginBottom: '4px' }}>Total IPC</div>
-                <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '44px', height: '44px', borderRadius: '50%', background: isBelowMinIpc(selectedStudent.ipc_total || 80, minIpc) ? '#dc2626' : '#0891b2', color: '#fff', fontWeight: 700, fontSize: '1rem' }}>{selectedStudent.ipc_total || 80}</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '44px', height: '44px', borderRadius: '50%', background: isBelowMinIpc(selectedStudent.ipc_total || 80, minIpcFor(minIpc, selectedClass?.kelas)) ? '#dc2626' : '#0891b2', color: '#fff', fontWeight: 700, fontSize: '1rem' }}>{selectedStudent.ipc_total || 80}</span>
               </div>
             </div>
           </div>
+          {evidenceImage && (
+            <div className="app-modal-overlay" style={{ position: 'fixed', top: 0, right: 0, bottom: 0, background: 'rgba(15,23,42,.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', zIndex: 1600 }} onClick={() => setEvidenceImage(null)}>
+              <div style={{ position: 'relative', maxWidth: '90%', maxHeight: '85vh' }} onClick={(e) => e.stopPropagation()}>
+                <img src={getImageUrl(evidenceImage)} alt="Bukti" style={{ maxWidth: '100%', maxHeight: '85vh', borderRadius: '12px', boxShadow: '0 20px 50px rgba(0,0,0,.4)', display: 'block' }} />
+                <button onClick={() => setEvidenceImage(null)} style={{ position: 'absolute', top: '-14px', right: '-14px', width: '32px', height: '32px', borderRadius: '50%', border: 'none', background: '#ef4444', color: '#fff', fontWeight: 700, cursor: 'pointer' }}>✕</button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

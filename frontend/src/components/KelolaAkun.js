@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../utils/api';
-import { useMinIpc, isBelowMinIpc } from '../utils/minIpc';
+import { useMinIpcPerGrade, minIpcFor, isBelowMinIpc } from '../utils/minIpc';
 import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
 import StudentDetail from './StudentDetail';
 import { GRHA_OPTIONS, getRowField, normalizeGrha } from '../utils/excelImport';
+import { styleImportTemplateSheet } from '../utils/excelTemplate';
 
 const JABATAN_OPTIONS = ['Guru', 'Pegawai'];
 
@@ -18,7 +19,7 @@ const KELAS_OPTIONS = [
 ];
 
 function KelolaAkun() {
-  const minIpc = useMinIpc();
+  const minIpc = useMinIpcPerGrade();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({});
@@ -409,24 +410,14 @@ function KelolaAkun() {
 
   const downloadTemplate = async (type) => {
     const currentYear = new Date().getFullYear();
-    const currentMonth = new Date().getMonth();
-    const currentAcademicYear = currentMonth >= 6 
-      ? `${currentYear}-${currentYear + 1}` 
-      : `${currentYear - 1}-${currentYear}`;
     
     if (type === 'siswa') {
       // Create 30 sample students with TKJ 1 and the current academic year
       const templateData = [];
-      const grhaOptions = ['Airsanya', 'Daksina', 'Genya', 'Madhya', 'Pascima', 'Uttara'];
       
       for (let i = 1; i <= 30; i++) {
         templateData.push({
-          Nama: `Siswa TKJ 1 ${i}`,
-          NIS: `2024${String(i).padStart(3, '0')}`,
-          Jurusan: 'TKJ 1',
-          Grha: grhaOptions[i % grhaOptions.length],
-          TahunPelajaran: currentAcademicYear,
-          Password: '123456'
+          No: i
         });
       }
 
@@ -434,6 +425,7 @@ function KelolaAkun() {
       const worksheet = workbook.addWorksheet('Template');
 
       worksheet.columns = [
+        { header: 'No', key: 'No', width: 6 },
         { header: 'Nama', key: 'Nama', width: 25 },
         { header: 'NIS', key: 'NIS', width: 10 },
         { header: 'Jurusan', key: 'Jurusan', width: 10 },
@@ -459,22 +451,24 @@ function KelolaAkun() {
       });
 
       for (let rowNumber = 2; rowNumber <= 1000; rowNumber += 1) {
-        worksheet.getCell(`C${rowNumber}`).dataValidation = validationFor(
+        worksheet.getCell(`D${rowNumber}`).dataValidation = validationFor(
           validJurusanOptions,
           'Jurusan tidak valid',
           `Pilih salah satu: ${validJurusanOptions.join(', ')}`
         );
-        worksheet.getCell(`D${rowNumber}`).dataValidation = validationFor(
+        worksheet.getCell(`E${rowNumber}`).dataValidation = validationFor(
           GRHA_OPTIONS,
           'Grha tidak valid',
           `Pilih salah satu: ${GRHA_OPTIONS.join(', ')}`
         );
-        worksheet.getCell(`E${rowNumber}`).dataValidation = validationFor(
+        worksheet.getCell(`F${rowNumber}`).dataValidation = validationFor(
           academicYearOptions,
           'Tahun Pelajaran tidak valid',
           'Pilih TahunPelajaran dari daftar yang tersedia'
         );
       }
+
+      await styleImportTemplateSheet(worksheet);
 
       const buffer = await workbook.xlsx.writeBuffer();
       const blobUrl = URL.createObjectURL(new Blob([buffer], {
@@ -486,13 +480,18 @@ function KelolaAkun() {
       link.click();
       URL.revokeObjectURL(blobUrl);
     } else {
-      const templateData = [
-        { Nama: '', NIP: '', Jabatan: 'Guru', NoHP: '', Password: '123456' }
-      ];
+      const templateData = [];
+      
+      for (let i = 1; i <= 30; i++) {
+        templateData.push({
+          No: i
+        });
+      }
 
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet('Template');
       worksheet.columns = [
+        { header: 'No', key: 'No', width: 6 },
         { header: 'Nama', key: 'Nama', width: 25 },
         { header: 'NIP', key: 'NIP', width: 18 },
         { header: 'Jabatan', key: 'Jabatan', width: 14 },
@@ -501,7 +500,7 @@ function KelolaAkun() {
       ];
       templateData.forEach(row => worksheet.addRow(row));
 
-      worksheet.dataValidations.add('C2:C1000', {
+      worksheet.dataValidations.add('D2:D1000', {
         type: 'list',
         allowBlank: false,
         formulae: [`"${JABATAN_OPTIONS.join(',')}"`],
@@ -509,6 +508,8 @@ function KelolaAkun() {
         errorTitle: 'Jabatan tidak valid',
         error: `Pilih salah satu: ${JABATAN_OPTIONS.join(', ')}`
       });
+
+      await styleImportTemplateSheet(worksheet);
 
       const buffer = await workbook.xlsx.writeBuffer();
       const blobUrl = URL.createObjectURL(new Blob([buffer], {
@@ -832,8 +833,8 @@ function KelolaAkun() {
                   )}
                   <td style={{ padding: '10px 12px', borderRight: '1px solid #e0e0e0', borderBottom: '1px solid #e0e0e0' }}>
                     <span style={{ 
-                      color: (user.ipc_total ?? 0) < 0 || isBelowMinIpc(user.ipc_total ?? 0, minIpc) ? '#dc2626' : 'inherit',
-                      fontWeight: (user.ipc_total ?? 0) < 0 || isBelowMinIpc(user.ipc_total ?? 0, minIpc) ? 'bold' : 'normal'
+                      color: (user.ipc_total ?? 0) < 0 || isBelowMinIpc(user.ipc_total ?? 0, minIpcFor(minIpc, user.kelas)) ? '#dc2626' : 'inherit',
+                      fontWeight: (user.ipc_total ?? 0) < 0 || isBelowMinIpc(user.ipc_total ?? 0, minIpcFor(minIpc, user.kelas)) ? 'bold' : 'normal'
                     }}>
                       {(user.ipc_total ?? 0) < 0 ? `${user.ipc_total ?? 0} (MINUS)` : (user.ipc_total ?? 0)}
                     </span>
@@ -1005,17 +1006,16 @@ function KelolaAkun() {
 
       {/* Create Account Modal */}
       {showCreateModal && (
-        <div style={{
+        <div className="app-modal-overlay" style={{
           position: 'fixed',
           top: 0,
-          left: 0,
           right: 0,
           bottom: 0,
           backgroundColor: 'rgba(0,0,0,0.5)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 1000
+          zIndex: 1500
         }}>
           <div className="card" style={{ width: 500, maxWidth: '90%', maxHeight: '90vh', overflowY: 'auto' }}>
             <h3>{createModalType === 'student' ? 'Buat Akun Siswa' : 'Buat Akun Guru'}</h3>
@@ -1195,17 +1195,16 @@ function KelolaAkun() {
 
       {/* Import Modal */}
       {showImportModal && (
-        <div style={{
+        <div className="app-modal-overlay" style={{
           position: 'fixed',
           top: 0,
-          left: 0,
           right: 0,
           bottom: 0,
           backgroundColor: 'rgba(0,0,0,0.5)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 1000
+          zIndex: 1500
         }}>
           <div className="card" style={{ width: 500, maxWidth: '90%', maxHeight: '90vh', overflowY: 'auto' }}>
             <h4>Import {importModalType === 'siswa' ? 'Siswa' : 'Guru'} dari Excel</h4>
@@ -1301,17 +1300,16 @@ function KelolaAkun() {
 
       {/* Edit Biodata Modal */}
       {showEditBiodataModal && (
-        <div style={{
+        <div className="app-modal-overlay" style={{
           position: 'fixed',
           top: 0,
-          left: 0,
           right: 0,
           bottom: 0,
           backgroundColor: 'rgba(0,0,0,0.5)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 1000
+          zIndex: 1500
         }}>
           <div className="card" style={{ width: 500, maxWidth: '90%', maxHeight: '90vh', overflowY: 'auto' }}>
             <h3>Edit Data {editStudent?.role === 'siswa' ? 'Siswa' : 'Guru'}</h3>

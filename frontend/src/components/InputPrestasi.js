@@ -10,7 +10,6 @@ function InputPrestasi() {
   const [formData, setFormData] = useState({
     nama: '',
     nis: '',
-    jenis: 'akademik',
     nama_lomba: '',
     kelas: '',
     pembina: '',
@@ -365,7 +364,6 @@ function InputPrestasi() {
       setFormData({
         nama: '',
         nis: '',
-        jenis: 'akademik',
         nama_lomba: '',
         kelas: '',
         pembina: '',
@@ -588,15 +586,6 @@ function InputPrestasi() {
           </select>
         </div>
 
-        <div className="form-group">
-          <label>Foto Bukti</label>
-          <input
-            type="file"
-            onChange={handleFileChange}
-            accept="image/*"
-          />
-        </div>
-
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <div className="form-group">
             <label>Juara</label>
@@ -632,6 +621,15 @@ function InputPrestasi() {
           }}>
             {calculatedPoint > 0 ? '+' : ''}{calculatedPoint}
           </span>
+        </div>
+        
+        <div className="form-group">
+          <label>Foto Bukti</label>
+          <input
+            type="file"
+            onChange={handleFileChange}
+            accept="image/*"
+          />
         </div>
 
         <button

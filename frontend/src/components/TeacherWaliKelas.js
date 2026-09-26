@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
-import { useMinIpc, isBelowMinIpc } from '../utils/minIpc';
+import { useMinIpcPerGrade, minIpcFor, isBelowMinIpc } from '../utils/minIpc';
 
 function getIpcDetailRows(points = {}) {
   return [
-    ['Prestasi', (Number(points.prestasi_akademik) || 0) + (Number(points.prestasi_nonakademik) || 0)],
+    ['Prestasi', Number(points.prestasi) || 0],
     ['Perilaku', ['tanggung_jawab', 'disiplin', 'kepedulian', 'kemandirian', 'spiritual', 'kejujuran', 'kepercayaan_diri']
       .reduce((sum, key) => sum + (Number(points[key]) || 0), 0)],
     ['Organisasi', Number(points.organisasi) || 0],
@@ -16,7 +16,7 @@ function getIpcDetailRows(points = {}) {
 }
 
 function TeacherWaliKelas() {
-  const minIpc = useMinIpc();
+  const minIpc = useMinIpcPerGrade();
   const [classData, setClassData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -302,7 +302,7 @@ function TeacherWaliKelas() {
                   </td>
                   <td style={{ padding: '12px', textAlign: 'center' }}>
                     <span style={{ 
-                      backgroundColor: isBelowMinIpc(student.ipc_total || 80, minIpc) ? '#dc3545' : getIpcColor(student.ipc_total),
+                      backgroundColor: isBelowMinIpc(student.ipc_total || 80, minIpcFor(minIpc, classData?.kelas)) ? '#dc3545' : getIpcColor(student.ipc_total),
                       color: 'white',
                       padding: '4px 8px',
                       borderRadius: '4px',
@@ -336,17 +336,16 @@ function TeacherWaliKelas() {
 
       {/* Student Detail Modal */}
       {showStudentDetail && selectedStudent && (
-        <div style={{
+        <div className="app-modal-overlay" style={{
           position: 'fixed',
           top: 0,
-          left: 0,
           right: 0,
           bottom: 0,
           backgroundColor: 'rgba(0,0,0,0.5)',
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
-          zIndex: 1000,
+          zIndex: 1500,
           padding: '20px'
         }}>
           <div style={{
@@ -514,7 +513,7 @@ function TeacherWaliKelas() {
                   </div>
                   <div style={{ 
                     padding: '15px', 
-                    backgroundColor: isBelowMinIpc(selectedStudent.ipc_total || 80, minIpc) ? '#dc3545' : getIpcColor(selectedStudent.ipc_total || 80), 
+                    backgroundColor: isBelowMinIpc(selectedStudent.ipc_total || 80, minIpcFor(minIpc, classData?.kelas)) ? '#dc3545' : getIpcColor(selectedStudent.ipc_total || 80), 
                     borderRadius: '8px',
                     textAlign: 'center',
                     color: 'white'

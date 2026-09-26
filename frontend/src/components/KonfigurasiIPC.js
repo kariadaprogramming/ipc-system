@@ -4,6 +4,7 @@ import { formatDisplayText } from '../utils/formatDisplayText';
 import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
 import { getRowField } from '../utils/excelImport';
+import { styleImportTemplateSheet } from '../utils/excelTemplate';
 
 function KonfigurasiIPC() {
   const [configs, setConfigs] = useState([]);
@@ -25,8 +26,11 @@ function KonfigurasiIPC() {
   const [excelFile, setExcelFile] = useState(null);
   const [importing, setImporting] = useState(false);
   const [importResults, setImportResults] = useState([]);
-  const [minIpcInput, setMinIpcInput] = useState('0');
+  const [minIpcValues, setMinIpcValues] = useState({ X: '0', XI: '0', XII: '0' });
   const [minIpcSaving, setMinIpcSaving] = useState(false);
+  const [ipcAwalValues, setIpcAwalValues] = useState({ X: '80', XI: '80', XII: '80' });
+  const [ipcAwalStudents, setIpcAwalStudents] = useState({ X: [], XI: [], XII: [] });
+  const [ipcAwalSaving, setIpcAwalSaving] = useState(false);
 
   const categories = [
     { key: 'prestasi', label: 'Prestasi', icon: '🏆' },
@@ -44,6 +48,7 @@ function KonfigurasiIPC() {
     fetchOrganisasiOptions();
     fetchPerilakuRatings();
     fetchMinIpcConfig();
+    fetchIpcAwalConfig();
   }, []);
 
   const fetchOrganisasiOptions = async () => {
@@ -123,29 +128,101 @@ function KonfigurasiIPC() {
 
   const fetchMinIpcConfig = async () => {
     try {
-      const response = await api.get('/ipc-config/min-ipc');
-      setMinIpcInput(String(response.data?.min_ipc ?? 0));
+      const response = await api.get('/ipc-config/min-ipc-per-grade');
+      const data = response.data || {};
+      setMinIpcValues({
+        X: String(data.X ?? 0),
+        XI: String(data.XI ?? 0),
+        XII: String(data.XII ?? 0)
+      });
     } catch (error) {
       console.error('Error fetching min IPC config:', error);
     }
   };
 
   const saveMinIpcConfig = async () => {
-    const trimmed = String(minIpcInput).trim();
-    const value = Number(trimmed);
-    if (trimmed === '' || !Number.isInteger(value) || value < 0) {
-      setMessage('Batas minimum harus bilangan bulat 0 atau lebih (0 = nonaktif)');
-      return;
+    const parsed = {};
+    for (const grade of ['X', 'XI', 'XII']) {
+      const trimmed = String(minIpcValues[grade]).trim();
+      const value = Number(trimmed);
+      if (trimmed === '' || !Number.isInteger(value) || value < 0) {
+        setMessage(`Batas minimum Kelas ${grade} harus bilangan bulat 0 atau lebih (0 = nonaktif)`);
+        return;
+      }
+      parsed[grade] = value;
     }
     try {
       setMinIpcSaving(true);
-      await api.put('/ipc-config/min-ipc', { min_ipc: value });
+      await api.put('/ipc-config/min-ipc-per-grade', parsed);
       setMessage('Batas minimum Total IPC berhasil disimpan!');
-      setMinIpcInput(String(value));
+      setMinIpcValues({ X: String(parsed.X), XI: String(parsed.XI), XII: String(parsed.XII) });
     } catch (error) {
       setMessage(error.response?.data?.message || 'Gagal menyimpan batas minimum IPC');
     } finally {
       setMinIpcSaving(false);
+    }
+  };
+
+  const fetchIpcAwalConfig = async () => {
+    try {
+      const [defaultsRes, usersRes] = await Promise.all([
+        api.get('/ipc-config/ipc-awal-per-grade'),
+        api.get('/users')
+      ]);
+      const defaults = defaultsRes.data || {};
+      setIpcAwalValues({
+        X: String(defaults.X ?? 80),
+        XI: String(defaults.XI ?? 80),
+        XII: String(defaults.XII ?? 80)
+      });
+      const users = Array.isArray(usersRes.data) ? usersRes.data : usersRes.data.users;
+      const byGrade = { X: [], XI: [], XII: [] };
+      (users || []).filter(u => u.role === 'siswa').forEach(s => {
+        const prefix = String(s.kelas || '').split(' ')[0].toUpperCase();
+        if (byGrade[prefix]) byGrade[prefix].push({ id: s.id, ipc_awal: s.ipc_awal });
+      });
+      setIpcAwalStudents(byGrade);
+    } catch (error) {
+      console.error('Error fetching IPC awal config:', error);
+    }
+  };
+
+  const saveIpcAwalConfig = async () => {
+    const parsed = {};
+    for (const grade of ['X', 'XI', 'XII']) {
+      const value = parseInt(ipcAwalValues[grade], 10);
+      if (Number.isNaN(value) || value < 0) {
+        setMessage(`IPC awal Kelas ${grade} harus angka valid (min 0)`);
+        return;
+      }
+      parsed[grade] = value;
+    }
+    try {
+      setIpcAwalSaving(true);
+      // 1. Store grade defaults (used for newly created students)
+      await api.put('/ipc-config/ipc-awal-per-grade', parsed);
+      // 2. Apply to current students, but only where the value actually changed
+      const applied = [];
+      for (const grade of ['X', 'XI', 'XII']) {
+        const changed = (ipcAwalStudents[grade] || []).filter(s => (s.ipc_awal ?? 0) !== parsed[grade]);
+        if (changed.length > 0) {
+          await api.post('/users/bulk-update-ipc-awal', {
+            userIds: changed.map(s => s.id),
+            ipcAwal: parsed[grade]
+          });
+          applied.push(`Kelas ${grade} (${changed.length} siswa)`);
+        }
+      }
+      setMessage(
+        applied.length > 0
+          ? `IPC awal berhasil disimpan dan diterapkan: ${applied.join(', ')}!`
+          : 'IPC awal berhasil disimpan! (tidak ada perubahan pada siswa saat ini)'
+      );
+      fetchIpcAwalConfig();
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Gagal menyimpan IPC awal');
+    } finally {
+      setIpcAwalSaving(false);
     }
   };
 
@@ -249,12 +326,13 @@ function KonfigurasiIPC() {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Template');
     worksheet.columns = [
+      { header: 'No', key: 'No', width: 6 },
       { header: 'Detail', key: 'Detail', width: 35 },
       { header: 'TingkatPelanggaran', key: 'TingkatPelanggaran', width: 22 }
     ];
 
     if (levelNames.length) {
-      worksheet.dataValidations.add('B2:B1000', {
+      worksheet.dataValidations.add('C2:C1000', {
         type: 'list',
         allowBlank: false,
         formulae: [`"${levelNames.join(',')}"`],
@@ -263,6 +341,8 @@ function KonfigurasiIPC() {
         error: `Pilih salah satu: ${levelNames.join(', ')}`
       });
     }
+
+    await styleImportTemplateSheet(worksheet);
 
     const buffer = await workbook.xlsx.writeBuffer();
     const blobUrl = URL.createObjectURL(new Blob([buffer], {
@@ -495,24 +575,63 @@ function KonfigurasiIPC() {
       <div className="card" style={{ marginBottom: 20 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
           <div style={{ flex: '1 1 320px' }}>
-            <h3 style={{ margin: '0 0 4px' }}>Batas Minimum Total IPC</h3>
+            <h3 style={{ margin: '0 0 4px' }}>Batas Minimum Total IPC per Tingkat</h3>
             <p style={{ margin: 0, color: '#6B7080', fontSize: 13 }}>
-              Total IPC siswa di bawah batas ini ditampilkan <strong style={{ color: '#dc2626' }}>merah</strong> pada
+              Total IPC siswa di bawah batas tingkatnya ditampilkan <strong style={{ color: '#dc2626' }}>merah</strong> pada
               cetakan Excel (laporan individual &amp; per kelas) dan halaman laporan. Isi <strong>0</strong> untuk
-              menonaktifkan.
+              menonaktifkan per tingkat.
             </p>
           </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <input
-              type="number"
-              min="0"
-              step="1"
-              value={minIpcInput}
-              onChange={(e) => setMinIpcInput(e.target.value)}
-              style={{ width: 130, padding: '9px 10px', borderRadius: 8, border: '1px solid #D7DBE4', fontSize: 14 }}
-            />
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            {['X', 'XI', 'XII'].map(grade => (
+              <div key={grade}>
+                <label style={{ display: 'block', marginBottom: 4, fontSize: 12, fontWeight: 600, color: '#6B7080' }}>
+                  Kelas {grade}
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={minIpcValues[grade]}
+                  onChange={(e) => setMinIpcValues(prev => ({ ...prev, [grade]: e.target.value }))}
+                  style={{ width: 110, padding: '9px 10px', borderRadius: 8, border: '1px solid #D7DBE4', fontSize: 14 }}
+                />
+              </div>
+            ))}
             <button className="btn btn-primary" onClick={saveMinIpcConfig} disabled={minIpcSaving}>
               {minIpcSaving ? 'Menyimpan...' : 'Simpan'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+          <div style={{ flex: '1 1 320px' }}>
+            <h3 style={{ margin: '0 0 4px' }}>IPC Awal per Tingkat</h3>
+            <p style={{ margin: 0, color: '#6B7080', fontSize: 13 }}>
+              Nilai awal IPC untuk siswa Kelas X, XI, dan XII. Menyimpan akan menerapkan nilai ke
+              siswa saat ini (hanya yang berubah) dan menyimpannya sebagai default untuk siswa baru.
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            {['X', 'XI', 'XII'].map(grade => (
+              <div key={grade}>
+                <label style={{ display: 'block', marginBottom: 4, fontSize: 12, fontWeight: 600, color: '#6B7080' }}>
+                  Kelas {grade} ({(ipcAwalStudents[grade] || []).length} siswa)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={ipcAwalValues[grade]}
+                  onChange={(e) => setIpcAwalValues(prev => ({ ...prev, [grade]: e.target.value }))}
+                  style={{ width: 110, padding: '9px 10px', borderRadius: 8, border: '1px solid #D7DBE4', fontSize: 14 }}
+                />
+              </div>
+            ))}
+            <button className="btn btn-primary" onClick={saveIpcAwalConfig} disabled={ipcAwalSaving}>
+              {ipcAwalSaving ? 'Menyimpan...' : 'Simpan'}
             </button>
           </div>
         </div>
@@ -771,17 +890,16 @@ function KonfigurasiIPC() {
 
       {/* Edit Modal */}
       {showEditModal && editingConfig && (
-        <div style={{
+        <div className="app-modal-overlay" style={{
           position: 'fixed',
           top: 0,
-          left: 0,
           right: 0,
           bottom: 0,
           backgroundColor: 'rgba(0,0,0,0.5)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 1000
+          zIndex: 1500
         }}>
           <div style={{
             background: '#FFFFFF',
@@ -925,17 +1043,16 @@ function KonfigurasiIPC() {
 
       {/* Add Modal */}
       {showAddModal && (
-        <div style={{
+        <div className="app-modal-overlay" style={{
           position: 'fixed',
           top: 0,
-          left: 0,
           right: 0,
           bottom: 0,
           backgroundColor: 'rgba(0,0,0,0.5)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 1000
+          zIndex: 1500
         }}>
           <div style={{
             background: '#FFFFFF',
@@ -1128,17 +1245,16 @@ function KonfigurasiIPC() {
 
       {/* Import Detail Pelanggaran dari Excel */}
       {showImportModal && (
-        <div style={{
+        <div className="app-modal-overlay" style={{
           position: 'fixed',
           top: 0,
-          left: 0,
           right: 0,
           bottom: 0,
           backgroundColor: 'rgba(0,0,0,0.5)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 1000
+          zIndex: 1500
         }}>
           <div className="card" style={{ width: 500, maxWidth: '90%', maxHeight: '90vh', overflowY: 'auto' }}>
             <h4>Import Detail Pelanggaran dari Excel</h4>

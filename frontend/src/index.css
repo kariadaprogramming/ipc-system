@@ -172,6 +172,16 @@ body {
   margin: 0 auto;
 }
 
+/* Modal overlays: center dialogs within the content area, leaving room
+   for the fixed sidebar (280px wide, 240px at <=1024px, in-flow below 769px) */
+.app-modal-overlay { left: 0; }
+@media (min-width: 769px) and (max-width: 1024px) {
+  .app-modal-overlay { left: 240px; }
+}
+@media (min-width: 1025px) {
+  .app-modal-overlay { left: 280px; }
+}
+
 @media (max-width: 768px) {
   .container {
     margin-top: 0;

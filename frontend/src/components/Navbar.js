@@ -107,7 +107,6 @@ function Navbar({ user, onLogout, isMobileMenuOpen, toggleMobileMenu }) {
     { path: '/input-perilaku', label: 'Perilaku', show: user?.role === 'superadmin' || (user?.role === 'guru' && permissions?.can_input_perilaku) },
     // Kelola Akun for superadmin
     { path: '/kelola-akun', label: 'Kelola Akun', show: user?.role === 'superadmin' },
-    { path: '/edit-ipc-awal', label: 'Edit IPC Awal', show: user?.role === 'superadmin' },
     { path: '/konfigurasi-ipc', label: 'Konfigurasi IPC', show: user?.role === 'superadmin' },
     { path: '/school-config', label: 'Konfigurasi Sekolah', show: user?.role === 'superadmin' },
     { path: '/izin-akun', label: 'Izin Akun', show: user?.role === 'superadmin' },

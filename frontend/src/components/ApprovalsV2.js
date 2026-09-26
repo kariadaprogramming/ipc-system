@@ -34,6 +34,9 @@ function ApprovalsV2() {
   const [selectedItem, setSelectedItem] = useState(null);
   const [notes, setNotes] = useState('');
   const [message, setMessage] = useState('');
+  // Enlarged photo popup (same pattern as DriveViewer: URL string or null)
+  const [previewImage, setPreviewImage] = useState(null);
+  const [previewError, setPreviewError] = useState(false);
 
   useEffect(() => {
     fetchApprovals();
@@ -356,21 +359,24 @@ function ApprovalsV2() {
                 }}>Foto</div>
                 <div style={{ fontSize: '13.5px' }}>
                   {getItemPhoto(item, type) ? (
-                    <a
-                      href={getItemPhoto(item, type)}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <button
+                      onClick={() => { setPreviewError(false); setPreviewImage(getItemPhoto(item, type)); }}
                       style={{
+                        background: 'none',
+                        border: 'none',
+                        padding: 0,
+                        cursor: 'pointer',
                         color: BLUE,
                         fontWeight: '600',
-                        textDecoration: 'none',
+                        fontSize: '13.5px',
+                        fontFamily: 'inherit',
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: '6px'
                       }}
                     >
                       📷 Foto Bukti
-                    </a>
+                    </button>
                   ) : (
                     <span style={{ color: MUTED }}>-</span>
                   )}
@@ -459,6 +465,15 @@ function ApprovalsV2() {
           @media (min-width: 881px) {
             .mobile-cards { display: none !important; }
             .desktop-table { display: table !important; }
+          }
+          /* Photo popup: leave room for the fixed sidebar on desktop
+             (280px wide, 240px at <=1024px, in-flow below 769px) */
+          .approval-photo-overlay { left: 0; }
+          @media (min-width: 769px) and (max-width: 1024px) {
+            .approval-photo-overlay { left: 240px; }
+          }
+          @media (min-width: 1025px) {
+            .approval-photo-overlay { left: 280px; }
           }
           @media (max-width: 480px) {
             .mobile-cards .req-fields {
@@ -747,7 +762,7 @@ function ApprovalsV2() {
                           src={getItemPhoto(item, type)}
                           alt="Foto Bukti"
                           style={{ width: '60px', height: '60px', objectFit: 'cover', borderRadius: '5px', cursor: 'pointer' }}
-                          onClick={() => window.open(getItemPhoto(item, type), '_blank')}
+                          onClick={() => { setPreviewError(false); setPreviewImage(getItemPhoto(item, type)); }}
                           onError={(e) => {
                             e.currentTarget.style.display = 'none';
                             e.currentTarget.insertAdjacentHTML('afterend', '<span style="color:#6b7280;font-size:12.5px">Foto tidak ditemukan</span>');
@@ -1073,17 +1088,16 @@ function ApprovalsV2() {
       </div>
 
       {selectedItem && (
-        <div style={{
+        <div className="app-modal-overlay" style={{
           position: 'fixed',
           top: 0,
-          left: 0,
           right: 0,
           bottom: 0,
           backgroundColor: 'rgba(0,0,0,0.5)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 1000,
+          zIndex: 1500,
           animation: 'fadeIn 0.2s ease'
         }}>
           <div style={{
@@ -1208,6 +1222,80 @@ function ApprovalsV2() {
                 Batal
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {previewImage && (
+        <div
+          className="approval-photo-overlay"
+          onClick={() => setPreviewImage(null)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.9)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1100,
+            cursor: 'pointer',
+            animation: 'fadeIn 0.2s ease'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: '90%',
+              maxHeight: '90%',
+              position: 'relative',
+              cursor: 'default'
+            }}
+          >
+            {!previewError ? (
+              <img
+                src={previewImage}
+                alt="Foto Bukti"
+                style={{
+                  maxWidth: '100%',
+                  maxHeight: '90vh',
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.5)'
+                }}
+                onError={() => setPreviewError(true)}
+              />
+            ) : (
+              <div style={{
+                background: CARD,
+                borderRadius: '8px',
+                padding: '24px 32px',
+                color: TEXT,
+                fontSize: '14px',
+                fontWeight: '600'
+              }}>
+                Foto tidak dapat dimuat
+              </div>
+            )}
+            <button
+              onClick={() => setPreviewImage(null)}
+              style={{
+                position: 'absolute',
+                top: '-40px',
+                right: 0,
+                background: 'white',
+                color: 'black',
+                border: 'none',
+                borderRadius: '50%',
+                width: '32px',
+                height: '32px',
+                fontSize: '20px',
+                lineHeight: '32px',
+                cursor: 'pointer',
+                fontWeight: 'bold'
+              }}
+            >
+              ×
+            </button>
           </div>
         </div>
       )}
