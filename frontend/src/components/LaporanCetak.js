@@ -616,7 +616,7 @@ function LaporanCetak({ user }) {
                   onChange={(e) => setSelectedStudentId(e.target.value)}
                   disabled={!selectedClass}
                 >
-                  <option value="">{selectedClass ? '— Pilih siswa —' : '— Pilih kelas dulu —'}</option>
+                  <option value="" disabled hidden>{selectedClass ? '— Pilih siswa —' : '— Pilih kelas dulu —'}</option>
                   {filteredStudents.map(s => (
                     <option key={s.id} value={s.id}>{s.nama} ({s.nis})</option>
                   ))}

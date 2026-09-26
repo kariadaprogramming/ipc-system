@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
+import { RefreshCw, ListChecks, User, Search } from 'lucide-react';
+import { CATEGORY_ICONS, CategoryIcon } from './icons';
 
 function IzinAkun() {
   const [users, setUsers] = useState([]);
@@ -19,23 +21,23 @@ function IzinAkun() {
   const [selectionRole, setSelectionRole] = useState(null);
 
   const jenisInputs = [
-    { key: 'prestasi', label: 'Prestasi', icon: '🏆' },
-    { key: 'organisasi', label: 'Organisasi', icon: '👥' },
-    { key: 'kepanitiaan', label: 'Kepanitiaan', icon: '🤝' },
-    { key: 'event', label: 'Event', icon: '📅' },
-    { key: 'pelanggaran', label: 'Pelanggaran', icon: '⚠️' },
-    { key: 'perilaku', label: 'Perilaku', icon: '✅' }
+    { key: 'prestasi', label: 'Prestasi', icon: CATEGORY_ICONS.prestasi },
+    { key: 'organisasi', label: 'Organisasi', icon: CATEGORY_ICONS.organisasi },
+    { key: 'kepanitiaan', label: 'Kepanitiaan', icon: CATEGORY_ICONS.kepanitiaan },
+    { key: 'event', label: 'Event', icon: CATEGORY_ICONS.event },
+    { key: 'pelanggaran', label: 'Pelanggaran', icon: CATEGORY_ICONS.pelanggaran },
+    { key: 'perilaku', label: 'Perilaku', icon: CATEGORY_ICONS.perilaku }
   ];
 
   // Pelanggaran & Perilaku are guru-only (students never receive these permissions)
   const GURU_ONLY_KEYS = ['pelanggaran', 'perilaku'];
 
   const kelasOptions = [
-    'X TKJ 1', 'X TKJ 2', 'X TO 1', 'X TO 2',
+    'X TKJ 1', 'X TKJ 2', 'X TKR 1', 'X TKR 2',
     'X DPIB 1', 'X DPIB 2',
-    'XI TKJ 1', 'XI TKJ 2', 'XI TO 1', 'XI TO 2',
+    'XI TKJ 1', 'XI TKJ 2', 'XI TKR 1', 'XI TKR 2',
     'XI DPIB 1', 'XI DPIB 2',
-    'XII TKJ 1', 'XII TKJ 2', 'XII TO 1', 'XII TO 2',
+    'XII TKJ 1', 'XII TKJ 2', 'XII TKR 1', 'XII TKR 2',
     'XII DPIB 1', 'XII DPIB 2'
   ];
 
@@ -134,7 +136,7 @@ function IzinAkun() {
 
   // Reset all permissions
   const handleResetAll = async () => {
-    if (!window.confirm('⚠️ PERINGATAN!\n\nIni akan menghapus SEMUA individual permissions dan mereset izin ke default (semua input aktif untuk semua user).\n\nYakin ingin melanjutkan?')) {
+    if (!window.confirm('PERINGATAN!\n\nIni akan menghapus SEMUA individual permissions dan mereset izin ke default (semua input aktif untuk semua user).\n\nYakin ingin melanjutkan?')) {
       return;
     }
     
@@ -252,27 +254,27 @@ function IzinAkun() {
   }
 
   return (
-    <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif', background: '#f5f5f5', padding: '20px', color: '#333', minHeight: '100vh' }}>
-      <div style={{ maxWidth: '1200px', margin: '0 auto', background: 'white', borderRadius: '8px', padding: '24px', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)' }}>
+    <div className="izin-scope" style={{ fontFamily: 'var(--font-sans)', background: 'transparent', padding: '4px 4px 40px', color: 'var(--text-primary)' }}>
+      <div style={{ maxWidth: '1200px', margin: '0 auto', background: 'var(--bg-primary)', border: '1px solid var(--border-color)', borderRadius: 'var(--card-radius)', padding: '24px', boxShadow: 'var(--shadow-card)' }}>
       <style>{`
-        :root{
-          --blue:#1e88e5;
-          --blue-dark:#1565c0;
-          --green:#43a047;
-          --green-dark:#388e3c;
-          --red:#e53935;
-          --red-dark:#c62828;
-          --gray-50:#f9f9f9;
-          --gray-100:#f5f5f5;
-          --gray-200:#e0e0e0;
-          --gray-400:#999;
-          --gray-500:#666;
-          --gray-700:#333;
-          --gray-900:#1a1a1a;
-          --radius:4px;
-          --radius-sm:4px;
-          --shadow:0 1px 3px rgba(0,0,0,0.08);
-          --shadow-hover:0 4px 8px rgba(0,0,0,0.12);
+        .izin-scope{
+          --blue:var(--blue);
+          --blue-dark:var(--blue-dark);
+          --green:var(--success-color);
+          --green-dark:#059669;
+          --red:var(--danger-color);
+          --red-dark:var(--danger-dark);
+          --gray-50:var(--bg-secondary);
+          --gray-100:var(--bg-tertiary);
+          --gray-200:var(--border-color);
+          --gray-400:var(--muted-light);
+          --gray-500:var(--slate);
+          --gray-700:var(--text-primary);
+          --gray-900:var(--ink);
+          --radius:var(--card-radius);
+          --radius-sm:var(--border-radius-sm);
+          --shadow:var(--shadow-card);
+          --shadow-hover:var(--shadow-md);
         }
         .btn-outline{background:#fff; border:1px solid var(--gray-200); color:var(--gray-700);}
         .btn-sm{padding:7px 12px; font-size:.78rem;}
@@ -314,7 +316,11 @@ function IzinAkun() {
           font-size:18px;
           color:var(--gray-900);
           line-height:1.3;
+          display:flex;
+          align-items:center;
+          gap:8px;
         }
+        .main-card-title svg,.bulk-panel-title svg,.search-box .ic svg,thead th .th-ic svg{display:block;flex-shrink:0;}
         .main-card-sub{
           margin:8px 0 0;
           font-size:13px;
@@ -480,12 +486,12 @@ function IzinAkun() {
         .toggle-cell:active{transform:scale(.95);}
         .toggle-cell.on{background:var(--green);}
         .toggle-cell.off{background:var(--red);}
-        @media (max-width: 900px){
+        @media (max-width: 1024px){
           .bulk-grid{grid-template-columns:1fr;}
           .filter-row{grid-template-columns:1fr 1fr; }
           .filter-row .field:last-of-type{grid-column:span 2;}
         }
-        @media (max-width: 600px){
+        @media (max-width: 480px){
           .bulk-panel{padding:14px;}
           .chip-flow{grid-template-columns:1fr 1fr; gap:8px;}
           .chip-btn{font-size:12px; padding:9px 8px; min-height:40px;}
@@ -508,13 +514,13 @@ function IzinAkun() {
           className="btn btn-danger"
           title="Hapus semua individual permissions dan kembali ke pengaturan default"
         >
-          🔄 Reset Izin
+          <RefreshCw size={14} /> Reset Izin
         </button>
       </div>
 
       {message && (
-        <div style={{ padding: '12px 16px', background: message.startsWith('✅') ? '#d4edda' : '#f8d7da', border: message.startsWith('✅') ? '1px solid #c3e6cb' : '1px solid #f5c6cb', borderRadius: '4px', color: message.startsWith('✅') ? '#155724' : '#721c24', fontSize: '13px', marginBottom: '20px' }}>
-          {message}
+        <div style={{ padding: '12px 16px', background: message.startsWith('✅') ? 'var(--green-bg)' : 'var(--danger-bg)', border: message.startsWith('✅') ? '1px solid var(--success-color)' : '1px solid var(--danger-color)', borderRadius: '4px', color: message.startsWith('✅') ? 'var(--green-text)' : 'var(--danger-dark)', fontSize: '13px', marginBottom: '20px' }}>
+          {message.replace(/^[✅❌⚠️]\s*/, '')}
         </div>
       )}
 
@@ -523,7 +529,7 @@ function IzinAkun() {
           <div className="main-card">
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <div className="main-card-title">
-                <span style={{ fontSize: '1.15rem' }}>👤</span>
+                <User size={18} />
                 Kontrol Individual
               </div>
               <p className="main-card-sub">
@@ -534,7 +540,7 @@ function IzinAkun() {
             {/* Unified bulk update - applies only to checked users */}
             <div className="bulk-grid">
               <div className="bulk-panel unified">
-                <div className="bulk-panel-title">📦 Bulk Update ({selectedUserIds.size} user dipilih)</div>
+                <div className="bulk-panel-title"><ListChecks size={16} style={{ verticalAlign: '-3px', marginRight: '6px' }} />Bulk Update ({selectedUserIds.size} user dipilih)</div>
                 <div className="chip-flow">
                   {jenisInputs.map(({ key, label }) => {
                     const baseDisabled = bulkUpdating || selectedUserIds.size === 0;
@@ -608,7 +614,7 @@ function IzinAkun() {
               <button className="btn btn-outline" onClick={resetFilters}>Reset</button>
             </div>
             <div className="search-box">
-              <span className="ic">🔍</span>
+              <span className="ic"><Search size={15} /></span>
               <input
                 type="text"
                 placeholder="Cari nama, NIS, atau NIP..."
@@ -667,12 +673,12 @@ function IzinAkun() {
                     </th>
                     <th>User</th>
                     <th>Role</th>
-                    <th className="col-prestasi"><span className="th-ic">🏆</span>Prestasi</th>
-                    <th className="col-organisasi"><span className="th-ic">👥</span>Organisasi</th>
-                    <th className="col-kepanitiaan"><span className="th-ic">📋</span>Kepanitiaan</th>
-                    <th className="col-event"><span className="th-ic">📅</span>Event</th>
-                    <th className="col-pelanggaran"><span className="th-ic">⚠️</span>Pelanggaran<br/><span style={{ fontWeight: 500 }}>(GURU ONLY)</span></th>
-                    <th className="col-perilaku"><span className="th-ic">✅</span>Perilaku<br/><span style={{ fontWeight: 500 }}>(GURU ONLY)</span></th>
+                    <th className="col-prestasi"><span className="th-ic"><CategoryIcon name="prestasi" size={14} /></span>Prestasi</th>
+                    <th className="col-organisasi"><span className="th-ic"><CategoryIcon name="organisasi" size={14} /></span>Organisasi</th>
+                    <th className="col-kepanitiaan"><span className="th-ic"><CategoryIcon name="kepanitiaan" size={14} /></span>Kepanitiaan</th>
+                    <th className="col-event"><span className="th-ic"><CategoryIcon name="event" size={14} /></span>Event</th>
+                    <th className="col-pelanggaran"><span className="th-ic"><CategoryIcon name="pelanggaran" size={14} /></span>Pelanggaran<br/><span style={{ fontWeight: 500 }}>(GURU ONLY)</span></th>
+                    <th className="col-perilaku"><span className="th-ic"><CategoryIcon name="perilaku" size={14} /></span>Perilaku<br/><span style={{ fontWeight: 500 }}>(GURU ONLY)</span></th>
                   </tr>
                 </thead>
                 <tbody>

@@ -5,6 +5,8 @@ import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
 import { getRowField } from '../utils/excelImport';
 import { styleImportTemplateSheet } from '../utils/excelTemplate';
+import { Plus, Download, Pencil, Trash2, TriangleAlert, CircleCheck, CircleX, Settings, RefreshCw } from 'lucide-react';
+import { CATEGORY_ICONS } from './icons';
 
 function KonfigurasiIPC() {
   const [configs, setConfigs] = useState([]);
@@ -33,12 +35,12 @@ function KonfigurasiIPC() {
   const [ipcAwalSaving, setIpcAwalSaving] = useState(false);
 
   const categories = [
-    { key: 'prestasi', label: 'Prestasi', icon: '🏆' },
-    { key: 'organisasi', label: 'Organisasi', icon: '👥' },
-    { key: 'kepanitiaan', label: 'Kepanitiaan', icon: '📋' },
-    { key: 'event', label: 'Event', icon: '🎪' },
-    { key: 'pelanggaran', label: 'Pelanggaran', icon: '⚠️' },
-    { key: 'perilaku', label: 'Perilaku', icon: '⭐' }
+    { key: 'prestasi', label: 'Prestasi', icon: CATEGORY_ICONS.prestasi },
+    { key: 'organisasi', label: 'Organisasi', icon: CATEGORY_ICONS.organisasi },
+    { key: 'kepanitiaan', label: 'Kepanitiaan', icon: CATEGORY_ICONS.kepanitiaan },
+    { key: 'event', label: 'Event', icon: CATEGORY_ICONS.event },
+    { key: 'pelanggaran', label: 'Pelanggaran', icon: CATEGORY_ICONS.pelanggaran },
+    { key: 'perilaku', label: 'Perilaku', icon: CATEGORY_ICONS.perilaku }
   ];
 
   useEffect(() => {
@@ -571,10 +573,10 @@ function KonfigurasiIPC() {
           style={{
             width: 40, height: 40, borderRadius: 10,
             background: '#EAF1FE', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 20
+            fontSize: 20, color: '#3B82F6'
           }}
         >
-          ⚙️
+          <Settings size={20} />
         </div>
         <div>
           <h2 style={{ margin: 0, fontSize: 24, fontWeight: 700 }}>Konfigurasi IPC</h2>
@@ -663,7 +665,7 @@ function KonfigurasiIPC() {
               className="btn btn-danger"
               style={{ display: 'flex', alignItems: 'center', gap: 6 }}
             >
-              🗑️ Hapus Semua
+              <Trash2 size={14} /> Hapus Semua
             </button>
             <button
               onClick={fetchConfigs}
@@ -671,7 +673,7 @@ function KonfigurasiIPC() {
               className="btn btn-info"
               style={{ display: 'flex', alignItems: 'center', gap: 6 }}
             >
-              🔄 Refresh
+              <RefreshCw size={14} /> Refresh
             </button>
           </div>
         </div>
@@ -685,7 +687,7 @@ function KonfigurasiIPC() {
                 padding: '10px 20px',
                 borderRadius: 8,
                 border: '1px solid #E7E8EE',
-                background: activeCategory === cat.key ? '#3B7CF6' : '#FFFFFF',
+                background: activeCategory === cat.key ? '#3B82F6' : '#FFFFFF',
                 color: activeCategory === cat.key ? '#FFFFFF' : '#1E2130',
                 fontSize: 14,
                 fontWeight: 600,
@@ -696,7 +698,7 @@ function KonfigurasiIPC() {
                 transition: 'all 0.2s'
               }}
             >
-              <span>{cat.icon}</span>
+              <span style={{ display: 'inline-flex' }}><cat.icon size={16} /></span>
               {cat.label}
             </button>
           ))}
@@ -715,7 +717,7 @@ function KonfigurasiIPC() {
                 className="btn btn-info"
                 style={{ display: 'flex', alignItems: 'center', gap: 6 }}
               >
-                📥 Import Excel
+                <Download size={14} /> Import Excel
               </button>
             )}
             <button
@@ -726,7 +728,7 @@ function KonfigurasiIPC() {
               className="btn btn-primary"
               style={{ display: 'flex', alignItems: 'center', gap: 6 }}
             >
-              ➕ Tambah Konfigurasi
+              <Plus size={14} /> Tambah Konfigurasi
             </button>
           </div>
         </div>
@@ -821,7 +823,7 @@ function KonfigurasiIPC() {
           <div className="loading"><div className="spinner"></div></div>
         ) : displayedConfigs.length === 0 ? (
           <div style={{ textAlign: 'center', padding: 40, color: '#6B7080' }}>
-            <div style={{ fontSize: 48, marginBottom: 16, color: '#94A3B8' }}>⚠️</div>
+            <div style={{ fontSize: 48, marginBottom: 16, color: '#94A3B8', display: 'flex', justifyContent: 'center' }}><TriangleAlert size={48} /></div>
             <p>Belum ada konfigurasi untuk kategori ini</p>
           </div>
         ) : (
@@ -884,16 +886,16 @@ function KonfigurasiIPC() {
                     <button
                       onClick={() => openEditModal(config)}
                       className="btn btn-info"
-                      style={{ padding: '4px 8px', fontSize: 12, marginRight: 4 }}
+                      style={{ padding: '4px 8px', fontSize: 12, marginRight: 4, display: 'inline-flex', alignItems: 'center' }}
                     >
-                      ✏️
+                      <Pencil size={13} />
                     </button>
                     <button
                       onClick={() => handleDeleteConfig(config.id)}
                       className="btn btn-danger"
-                      style={{ padding: '4px 8px', fontSize: 12 }}
+                      style={{ padding: '4px 8px', fontSize: 12, display: 'inline-flex', alignItems: 'center' }}
                     >
-                      🗑️
+                      <Trash2 size={13} />
                     </button>
                   </td>
                 </tr>
@@ -976,7 +978,7 @@ function KonfigurasiIPC() {
                         if (pointInput) pointInput.value = level?.point_value != null ? String(level.point_value) : '';
                       }}
                     >
-                      <option value="" disabled>Pilih Tingkat Pelanggaran</option>
+                      <option value="" disabled hidden>Pilih Tingkat Pelanggaran</option>
                       {editTingkatOptions.map(level => (
                         <option key={level.id} value={level.field1}>
                           {level.field1}{level.is_active ? '' : ' (non-aktif)'}
@@ -1112,7 +1114,7 @@ function KonfigurasiIPC() {
                 </label>
                 {activeCategory === 'prestasi' && (
                   <select name="field1" required className="form-control" style={{ fontSize: 14 }}>
-                    <option value="">Pilih Tingkat Lomba</option>
+                    <option value="" disabled hidden>Pilih Tingkat Lomba</option>
                     {FIXED_TINGKAT_OPTIONS.map(tingkat => (
                       <option key={tingkat} value={tingkat}>
                         {formatDisplayText(tingkat)}
@@ -1122,7 +1124,7 @@ function KonfigurasiIPC() {
                 )}
                 {activeCategory === 'perilaku' && (
                   <select name="field1" required className="form-control" style={{ fontSize: 14 }}>
-                    <option value="">Pilih Tingkat Penilaian</option>
+                    <option value="" disabled hidden>Pilih Tingkat Penilaian</option>
                     {perilakuRatings.filter(rating => rating.is_active).map(rating => (
                       <option key={rating.id} value={rating.name}>
                         {formatDisplayText(rating.name)}
@@ -1152,7 +1154,7 @@ function KonfigurasiIPC() {
                 )}
                 {activeCategory === 'kepanitiaan' && (
                   <select name="field1" required className="form-control" style={{ fontSize: 14 }}>
-                    <option value="">Pilih Jabatan</option>
+                    <option value="" disabled hidden>Pilih Jabatan</option>
                     <option value="ketua">Ketua</option>
                     <option value="wakil ketua">Wakil Ketua</option>
                     <option value="sekretaris">Sekretaris</option>
@@ -1163,7 +1165,7 @@ function KonfigurasiIPC() {
                 )}
                 {activeCategory === 'organisasi' && (
                   <select name="field1" required className="form-control" style={{ fontSize: 14 }}>
-                    <option value="">Pilih Organisasi</option>
+                    <option value="" disabled hidden>Pilih Organisasi</option>
                     {organisasiOptions.filter(option => option.is_active).map(option => (
                       <option key={option.id} value={option.name}>{option.name}</option>
                     ))}
@@ -1171,7 +1173,7 @@ function KonfigurasiIPC() {
                 )}
                 {activeCategory === 'event' && (
                   <select name="field1" required className="form-control" style={{ fontSize: 14 }}>
-                    <option value="">Pilih Tingkat Event</option>
+                    <option value="" disabled hidden>Pilih Tingkat Event</option>
                     {FIXED_TINGKAT_OPTIONS.map(tingkat => (
                       <option key={tingkat} value={tingkat}>
                         {formatDisplayText(tingkat)}
@@ -1187,7 +1189,7 @@ function KonfigurasiIPC() {
                   </label>
                   {activeCategory === 'prestasi' && (
                     <select name="field2" required className="form-control" style={{ fontSize: 14 }}>
-                      <option value="">Pilih Juara Lomba</option>
+                      <option value="" disabled hidden>Pilih Juara Lomba</option>
                       {FIXED_JUARA_LOMBA_OPTIONS.map(juara => (
                         <option key={juara} value={juara}>
                           {formatDisplayText(juara)}
@@ -1197,7 +1199,7 @@ function KonfigurasiIPC() {
                   )}
                   {activeCategory === 'pelanggaran' && pelanggaranAddType === 'detail' && (
                     <select name="field2" required className="form-control" style={{ fontSize: 14 }}>
-                      <option value="">Pilih Tingkat Pelanggaran</option>
+                      <option value="" disabled hidden>Pilih Tingkat Pelanggaran</option>
                     {configuredPelanggaranLevels.map(level => (
                       <option key={level.id} value={level.field1}>{level.field1}</option>
                     ))}
@@ -1205,7 +1207,7 @@ function KonfigurasiIPC() {
                   )}
                   {activeCategory === 'organisasi' && (
                     <select name="field2" required className="form-control" style={{ fontSize: 14 }}>
-                      <option value="">Pilih Jabatan</option>
+                      <option value="" disabled hidden>Pilih Jabatan</option>
                       <option value="ketua">Ketua</option>
                       <option value="wakil ketua">Wakil Ketua</option>
                       <option value="sekretaris">Sekretaris</option>
@@ -1279,9 +1281,9 @@ function KonfigurasiIPC() {
               <button
                 className="btn btn-secondary"
                 onClick={downloadDetailTemplate}
-                style={{ marginBottom: '10px' }}
+                style={{ marginBottom: '10px', display: 'inline-flex', alignItems: 'center', gap: 6 }}
               >
-                📥 Download Template Detail
+                <Download size={14} /> Download Template Detail
               </button>
               <input
                 type="file"
@@ -1293,7 +1295,7 @@ function KonfigurasiIPC() {
                 <strong>Format:</strong> Detail, TingkatPelanggaran
                 <br />
                 <small style={{ color: '#1976d2' }}>
-                  💡 Kolom TingkatPelanggaran harus sesuai daftar tingkat yang sudah dibuat
+                  Kolom TingkatPelanggaran harus sesuai daftar tingkat yang sudah dibuat
                   {configuredPelanggaranLevels.length > 0 && ` (contoh: ${configuredPelanggaranLevels.slice(0, 3).map(l => l.field1).join(', ')})`}.
                   Point diambil otomatis dari tingkatnya.
                 </small>
@@ -1322,7 +1324,7 @@ function KonfigurasiIPC() {
                     {importResults.map((result, index) => (
                       <tr key={index}>
                         <td style={{ padding: '5px' }}>
-                          {result.status === 'success' ? '✅' : '❌'} {result.name}
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>{result.status === 'success' ? <CircleCheck size={14} /> : <CircleX size={14} />} {result.name}</span>
                         </td>
                         <td style={{ padding: '5px' }}>{result.level || '-'}</td>
                         <td style={{ padding: '5px' }}>

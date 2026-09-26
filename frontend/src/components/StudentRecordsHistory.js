@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { getRecordPhotoUrl } from '../utils/recordPhoto';
 import { toTitleCase } from '../utils/perilaku';
 import { formatDisplayText } from '../utils/formatDisplayText';
+import { FileText } from 'lucide-react';
 
 const TABS = [
     { key: 'prestasi', label: 'Prestasi' },
@@ -26,9 +27,10 @@ function RecordThumbnail({ path, type, alt }) {
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontSize: 24,
-                flexShrink: 0
+                flexShrink: 0,
+                color: 'var(--slate, #64748b)'
             }}>
-                📄
+                <FileText size={28} />
             </div>
         );
     }

@@ -4,6 +4,7 @@ import API_BASE_URL from '../config';
 import { useMinIpcPerGrade, minIpcFor, isBelowMinIpc } from '../utils/minIpc';
 import { formatDisplayText } from '../utils/formatDisplayText';
 import StudentRecordsHistory from './StudentRecordsHistory';
+import { User } from 'lucide-react';
 
 function StudentDetail({ student, onClose }) {
     const minIpc = useMinIpcPerGrade();
@@ -110,7 +111,7 @@ function StudentDetail({ student, onClose }) {
                                     {avatarUrl ? (
                                         <img src={avatarUrl} alt={student.nama} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                     ) : (
-                                        <span style={{ fontSize: 32 }}>👤</span>
+                                        <span style={{ display: 'inline-flex', color: '#94a3b8' }}><User size={36} /></span>
                                     )}
                                 </div>
                                 <div>
@@ -123,7 +124,7 @@ function StudentDetail({ student, onClose }) {
                                         <strong>IPC:</strong>{' '}
                                         <span style={{ 
                                             fontSize: 20, 
-                                            color: (student.ipc_total ?? 0) < 0 || isBelowMinIpc(student.ipc_total ?? 0, minIpcFor(minIpc, student?.kelas)) ? '#dc2626' : '#3498db', 
+                                            color: (student.ipc_total ?? 0) < 0 || isBelowMinIpc(student.ipc_total ?? 0, minIpcFor(minIpc, student?.kelas)) ? '#dc2626' : 'var(--blue)', 
                                             fontWeight: 'bold' 
                                         }}>
                                             {(student.ipc_total ?? 0) < 0 ? `${student.ipc_total ?? 0} (MINUS)` : (student.ipc_total ?? 0)}

@@ -82,7 +82,7 @@ router.get('/stats', auth, async (req, res) => {
 
             // Siswa dengan IPC tertinggi
             db.query(`
-                SELECT id, nama, nis, kelas, grha, ipc_total
+                SELECT id, nama, nis, kelas, grha, foto, ipc_total
                 FROM users
                 WHERE role = 'siswa' AND is_graduated = 0 AND ipc_total IS NOT NULL
                 ORDER BY ipc_total DESC

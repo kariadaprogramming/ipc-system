@@ -24,6 +24,7 @@ import LaporanCetak from './components/LaporanCetak';
 import KonfigurasiIPC from './components/KonfigurasiIPC';
 import SchoolConfig from './components/SchoolConfig';
 import api from './utils/api';
+import { Menu, X } from 'lucide-react';
 
 function ProtectedRoute({ children, allowedRoles }) {
   const [loading, setLoading] = useState(true);
@@ -237,10 +238,10 @@ function MainLayout({ user, children }) {
   return (
     <div className="main-layout">
       <div className="mobile-header">
-        <button className="mobile-menu-toggle" onClick={toggleMobileMenu}>
-          {isMobileMenuOpen ? '✕' : '☰'}
+        <button className="mobile-menu-toggle" onClick={toggleMobileMenu} aria-label="Menu navigasi">
+          {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
-        <span className="mobile-header-title">Sistem IPC</span>
+        <span className="mobile-header-title">Website IPC Bali Mandara</span>
       </div>
       <Navbar user={user} onLogout={handleLogout} isMobileMenuOpen={isMobileMenuOpen} toggleMobileMenu={toggleMobileMenu} />
       <div className="content">

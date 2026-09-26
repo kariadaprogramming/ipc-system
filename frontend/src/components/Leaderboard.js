@@ -1,22 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
 import API_BASE_URL from '../config';
+import { Trophy, Users, Award, Clock, ClipboardList, RefreshCw } from 'lucide-react';
+import { CATEGORY_ICONS, MedalIcon } from './icons';
 
-const PAGE_BG = "#f8fafc";
-const INK = "#0f172a";
-const SLATE = "#64748b";
-
-const BLUE = { bg: "#eff6ff", text: "#2563eb", border: "#c6dafc", solid: "#2563eb", dark: "#1d4ed8" };
-
-const MEDALS = { 1: "🥇", 2: "🥈", 3: "🥉" };
+const SLATE = "var(--slate)";
 
 const CATEGORIES = [
-  { key: 'prestasi', label: 'Prestasi', icon: '🏆' },
-  { key: 'organisasi', label: 'Organisasi', icon: '👥' },
-  { key: 'kepanitiaan', label: 'Kepanitiaan', icon: '🤝' },
-  { key: 'event', label: 'Event', icon: '📅' },
-  { key: 'pelanggaran', label: 'Pelanggaran', icon: '⚠️' },
-  { key: 'perilaku', label: 'Perilaku', icon: '✅' }
+  { key: 'prestasi', label: 'Prestasi', icon: CATEGORY_ICONS.prestasi },
+  { key: 'organisasi', label: 'Organisasi', icon: CATEGORY_ICONS.organisasi },
+  { key: 'kepanitiaan', label: 'Kepanitiaan', icon: CATEGORY_ICONS.kepanitiaan },
+  { key: 'event', label: 'Event', icon: CATEGORY_ICONS.event },
+  { key: 'pelanggaran', label: 'Pelanggaran', icon: CATEGORY_ICONS.pelanggaran },
+  { key: 'perilaku', label: 'Perilaku', icon: CATEGORY_ICONS.perilaku }
 ];
 
 function Leaderboard() {
@@ -68,32 +64,30 @@ function Leaderboard() {
 
   if (loading) {
     return (
-      <div style={{
-        fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-        background: PAGE_BG,
-        minHeight: "100vh",
-        padding: "28px 32px 60px",
-        color: INK,
+      <div className="lb-scope" style={{
+        fontFamily: "var(--font-sans)",
+        background: "var(--bg-secondary)",
+        padding: "4px 4px 40px",
+        color: "var(--ink)",
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center'
       }}>
-        <div style={{ fontSize: '1.2rem', color: SLATE }}>Loading...</div>
+        <div className="inline-loading"><div className="spinner" style={{ margin: '0 auto 12px' }}></div>Memuat data...</div>
       </div>
     );
   }
 
   if (error && currentData.length === 0) {
     return (
-      <div style={{
-        fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-        background: PAGE_BG,
-        minHeight: "100vh",
-        padding: "28px 32px 60px",
-        color: INK,
+      <div className="lb-scope" style={{
+        fontFamily: "var(--font-sans)",
+        background: "var(--bg-secondary)",
+        padding: "4px 4px 40px",
+        color: "var(--ink)",
       }}>
-        <div style={{ padding: '12px 16px', background: '#fee2e2', color: '#dc2626', borderRadius: '10px', marginBottom: '16px', fontSize: '14px', fontWeight: 600 }}>{error}</div>
-        <button onClick={() => fetchCategory(activeCategory)} style={{ padding: '10px 16px', background: BLUE.solid, color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13.5px', fontWeight: 600, cursor: 'pointer' }}>
+        <div style={{ padding: '12px 16px', background: 'var(--danger-bg)', color: 'var(--danger-dark)', borderRadius: '10px', marginBottom: '16px', fontSize: '14px', fontWeight: 600 }}>{error}</div>
+        <button onClick={() => fetchCategory(activeCategory)} style={{ padding: '10px 16px', background: 'var(--blue)', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13.5px', fontWeight: 600, cursor: 'pointer' }}>
           Coba Lagi
         </button>
       </div>
@@ -102,37 +96,32 @@ function Leaderboard() {
 
   return (
     <div
+      className="lb-scope"
       style={{
-        fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-        background: PAGE_BG,
-        minHeight: "100vh",
-        padding: "clamp(16px, 3vw, 28px) clamp(12px, 2vw, 32px) clamp(40px, 6vw, 60px)",
+        fontFamily: "var(--font-sans)",
+        background: "var(--bg-secondary)",
+        padding: "4px 4px 40px",
         maxWidth: '100%',
         margin: '0 auto',
-        color: INK,
+        color: "var(--ink)",
       }}
     >
       <style>{`
-        :root{
-          --blue:#2563eb;
-          --blue-dark:#1d4ed8;
-          --blue-light:#eff6ff;
-          --green-bg:#dcfce7;
-          --green-text:#16a34a;
-          --amber-bg:#fef3c7;
-          --amber-text:#b45309;
-          --amber-border:#fde68a;
-          --gray-50:#f8fafc;
-          --gray-100:#f1f5f9;
-          --gray-200:#e2e8f0;
-          --gray-400:#94a3b8;
-          --gray-500:#64748b;
-          --gray-700:#334155;
-          --gray-900:#0f172a;
-          --white:#fff;
-          --radius:14px;
+        /* Shared tokens from index.css — only alias DIFFERENT names here.
+           NOTE: never self-map like --blue:var(--blue), it is cyclic and
+           invalid, kills the blue bg and leaves white-on-white text. */
+        .lb-scope{
+          --gray-50:var(--bg-secondary);
+          --gray-100:var(--bg-tertiary);
+          --gray-200:var(--border-color);
+          --gray-400:var(--muted-light);
+          --gray-500:var(--slate);
+          --gray-700:var(--text-primary);
+          --gray-900:var(--ink);
+          --white:var(--bg-primary);
+          --radius:var(--card-radius);
           --radius-sm:10px;
-          --shadow:0 1px 2px rgba(0,0,0,0.04), 0 1px 8px rgba(0,0,0,0.04);
+          --shadow:var(--shadow-card);
         }
         .header-row{
           display:flex;
@@ -172,7 +161,7 @@ function Leaderboard() {
           justify-content:space-between;
           margin-bottom:20px;
         }
-        @media (max-width: 640px){
+        @media (max-width: 768px){
           .controls{
             flex-direction:column;
             align-items:stretch;
@@ -202,6 +191,7 @@ function Leaderboard() {
           color:var(--gray-700);
         }
         .chip:disabled{opacity:.6;cursor:wait;}
+        .chip.active:disabled{opacity:1;cursor:wait;}
         .chip-icon{font-size:clamp(14px, 3vw, 16px);line-height:1;}
         .chip-text{display:flex;flex-direction:column;align-items:flex-start;line-height:1.25;}
         .chip-text strong{font-size:clamp(12px, 2.5vw, 13.5px);font-weight:700;}
@@ -209,14 +199,20 @@ function Leaderboard() {
         .chip.active{
           background:var(--blue);
           border-color:var(--blue);
-          color:var(--white);
+          color:#fff;
         }
+        .chip.active .chip-text strong,
+        .chip.active .chip-text span{
+          color:#fff;
+          opacity:1;
+        }
+        .chip.active .chip-text span{opacity:.92;}
         .refresh-btn{
           display:inline-flex;
           align-items:center;
           gap:8px;
           background:var(--blue);
-          color:var(--white);
+          color:#fff;
           border:none;
           padding:10px 16px;
           border-radius:10px;
@@ -228,7 +224,7 @@ function Leaderboard() {
           transition:background .15s ease, transform .1s ease;
           white-space:nowrap;
         }
-        @media (max-width: 640px){
+        @media (max-width: 768px){
           .refresh-btn{justify-content:center;width:100%;}
         }
         .refresh-btn:hover{background:var(--blue-dark);}
@@ -238,6 +234,7 @@ function Leaderboard() {
           transition:transform .5s ease;
         }
         .refresh-btn.spinning svg{transform:rotate(360deg);}
+        .chip-icon svg,.header-icon svg,.podium-medal svg,.points-pill svg,.stat-value svg,.card-head h2 svg,.m-total svg{display:block;flex-shrink:0;}
         .card{
           background:var(--white);
           border-radius:var(--radius);
@@ -554,7 +551,7 @@ function Leaderboard() {
           .table-wrap{display:none;}
           .mobile-list{display:block;}
         }
-        @media (max-width: 560px){
+        @media (max-width: 480px){
           .stats-strip{grid-template-columns:1fr;gap:0;}
           .stat-item{
             flex-direction:row;
@@ -570,7 +567,7 @@ function Leaderboard() {
 
       {/* Header */}
       <div className="header-row">
-        <div className="header-icon">🏆</div>
+        <div className="header-icon"><Trophy size={20} /></div>
         <div className="header-text">
           <h1>Peringkat Top 20</h1>
           <p>Peringkat siswa berdasarkan poin IPC per kategori</p>
@@ -587,7 +584,7 @@ function Leaderboard() {
               onClick={() => handleSelectCategory(cat.key)}
               disabled={!!loadingMap[cat.key]}
             >
-              <span className="chip-icon">{cat.icon}</span>
+              <span className="chip-icon"><cat.icon size={16} /></span>
               <span className="chip-text">
                 <strong>{cat.label}</strong>
                 {dataByCategory[cat.key] && <span>{dataByCategory[cat.key].length} siswa</span>}
@@ -600,11 +597,7 @@ function Leaderboard() {
           className="refresh-btn"
           onClick={() => fetchCategory(activeCategory)}
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '15px', height: '15px' }}>
-            <polyline points="23 4 23 10 17 10"></polyline>
-            <polyline points="1 20 1 14 7 14"></polyline>
-            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-          </svg>
+          <RefreshCw size={15} />
           Refresh data
         </button>
       </div>
@@ -617,19 +610,19 @@ function Leaderboard() {
           {top3.length > 0 ? (
             <div className="card podium-card" style={{ marginBottom: '12px' }}>
               <div className="card-head">
-                <h2>🏆 Podium Top 3</h2>
+                <h2><Trophy size={16} /> Podium Top 3</h2>
                 <p>{title} — siswa dengan poin tertinggi</p>
               </div>
               <div className="podium">
                 {[
-                  { student: top3.find((s) => s.rank === 2), cls: 'second', medal: MEDALS[2] },
-                  { student: top3.find((s) => s.rank === 1), cls: 'first', medal: MEDALS[1] },
-                  { student: top3.find((s) => s.rank === 3), cls: 'third', medal: MEDALS[3] },
+                  { student: top3.find((s) => s.rank === 2), cls: 'second', rank: 2 },
+                  { student: top3.find((s) => s.rank === 1), cls: 'first', rank: 1 },
+                  { student: top3.find((s) => s.rank === 3), cls: 'third', rank: 3 },
                 ].filter((slot) => slot.student).map((slot) => {
                   const s = slot.student;
                   return (
                     <div key={s.id} className={`podium-slot ${slot.cls}`}>
-                      <div className="podium-medal">{slot.medal}</div>
+                      <div className="podium-medal"><MedalIcon rank={slot.rank} /></div>
                       <div className="podium-avatar">
                         {s.foto ? (
                           <img
@@ -643,7 +636,7 @@ function Leaderboard() {
                       </div>
                       <div className="podium-name" title={s.nama}>{s.nama}</div>
                       <div className="podium-meta">{s.kelas} · {s.grha || '-'}</div>
-                      <div className="podium-total">🏅 {s.total_point} poin</div>
+                      <div className="podium-total"><Award size={13} /> {s.total_point} poin</div>
                       <div className="podium-step">{s.rank}</div>
                     </div>
                   );
@@ -657,15 +650,15 @@ function Leaderboard() {
           {/* Stats strip */}
           <div className="stats-strip">
             <div className="stat-item">
-              <div className="stat-value">👥 {currentData.length}</div>
+              <div className="stat-value"><Users size={20} /> {currentData.length}</div>
               <div className="stat-label">Siswa dalam peringkat</div>
             </div>
             <div className="stat-item">
-              <div className="stat-value">🏅 {totalPoints}</div>
+              <div className="stat-value"><Award size={20} /> {totalPoints}</div>
               <div className="stat-label">Total poin {activeLabel}</div>
             </div>
             <div className="stat-item">
-              <div className="stat-value">🕒 {lastUpdated ? lastUpdated.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-'}</div>
+              <div className="stat-value"><Clock size={20} /> {lastUpdated ? lastUpdated.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-'}</div>
               <div className="stat-label">Terakhir diperbarui</div>
             </div>
           </div>
@@ -673,7 +666,7 @@ function Leaderboard() {
           {/* Ranking card */}
           <div className="card">
             <div className="card-head">
-              <h2 id="cardTitle">📋 {title}</h2>
+              <h2 id="cardTitle"><ClipboardList size={16} /> {title}</h2>
               <p id="cardSub">Top 20 siswa dengan poin {activeLabel} tertinggi yang telah disetujui</p>
             </div>
 
@@ -720,7 +713,7 @@ function Leaderboard() {
                           </td>
                           <td><span className="pill kelas">{s.kelas}</span></td>
                           <td><span className="pill grha">{s.grha || '-'}</span></td>
-                          <td><span className="points-pill">🏅 {s.total_point} poin</span></td>
+                          <td><span className="points-pill"><Award size={13} /> {s.total_point} poin</span></td>
                         </tr>
                       );
                     })
@@ -761,7 +754,7 @@ function Leaderboard() {
                         <span className="pill kelas">{s.kelas}</span>
                         <span className="pill grha">{s.grha || '-'}</span>
                       </div>
-                      <div className="m-total">📋 Total poin: <span className="points-pill">🏅 {s.total_point} poin</span></div>
+                      <div className="m-total"><ClipboardList size={13} /> Total poin: <span className="points-pill"><Award size={13} /> {s.total_point} poin</span></div>
                     </div>
                   );
                 })

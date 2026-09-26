@@ -4,6 +4,8 @@ import EditModal from './EditModal';
 import useEditModal from '../hooks/useEditModal';
 import API_BASE_URL from '../config';
 import Select from 'react-select';
+import { StatusIcon } from './icons';
+import { ClipboardList } from 'lucide-react';
 
 function InputPelanggaran() {
   const [formData, setFormData] = useState({
@@ -380,7 +382,7 @@ function InputPelanggaran() {
       {/* Index Display for Superadmin */}
       {(userRole === 'superadmin' && !showForm) && (
         <div style={{ marginBottom: '30px' }}>
-          <h3 style={{ marginBottom: '15px', fontSize: '18px' }}>📋 Index Pelanggaran</h3>
+          <h3 style={{ marginBottom: '15px', fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}><ClipboardList size={18} /> Index Pelanggaran</h3>
           {loadingIndex ? (
             <div className="loading"><div className="spinner"></div></div>
           ) : (
@@ -522,7 +524,7 @@ function InputPelanggaran() {
           <div className="form-group">
             <label>Grha</label>
             <select name="grha" value={formData.grha} disabled required onChange={handleChange}>
-              <option value="">Data diisi otomatis</option>
+              <option value="" disabled hidden>Data diisi otomatis</option>
               {grhaOptions.map(grha => (
                 <option key={grha} value={grha}>{grha}</option>
               ))}
@@ -648,7 +650,7 @@ function InputPelanggaran() {
               value={editModal.editFormData.grha || ''} 
               onChange={(e) => editModal.setEditFormData({ ...editModal.editFormData, grha: e.target.value })}
             >
-              <option value="">Pilih Grha</option>
+              <option value="" disabled hidden>Pilih Grha</option>
               {grhaOptions.map(grha => (
                 <option key={grha} value={grha}>{grha}</option>
               ))}
@@ -696,7 +698,7 @@ function InputPelanggaran() {
       {/* Submission History - Hidden for Superadmin */}
       {JSON.parse(localStorage.getItem('user') || '{}').role !== 'superadmin' && (
         <div style={{ marginTop: '30px' }}>
-          <h3 style={{ marginBottom: '15px', fontSize: '18px' }}>📋 Riwayat Pengajuan Pelanggaran</h3>
+          <h3 style={{ marginBottom: '15px', fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}><ClipboardList size={18} /> Riwayat Pengajuan Pelanggaran</h3>
           {submissions.length === 0 ? (
             <p className="text-muted">Belum ada pengajuan</p>
           ) : (
@@ -739,9 +741,9 @@ function InputPelanggaran() {
 
 function getStatusBadge(status) {
   const styles = {
-    pending: { background: '#ffc107', color: '#333', padding: '4px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: '500' },
-    approved: { background: '#28a745', color: 'white', padding: '4px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: '500' },
-    rejected: { background: '#dc3545', color: 'white', padding: '4px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: '500' }
+    pending: { background: 'var(--warning-color)', color: 'white', padding: '4px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: '500', display: 'inline-flex', alignItems: 'center', gap: '6px' },
+    approved: { background: 'var(--success-color)', color: 'white', padding: '4px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: '500', display: 'inline-flex', alignItems: 'center', gap: '6px' },
+    rejected: { background: 'var(--danger-color)', color: 'white', padding: '4px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: '500', display: 'inline-flex', alignItems: 'center', gap: '6px' }
   };
 
   const labels = {
@@ -753,7 +755,7 @@ function getStatusBadge(status) {
   const style = styles[status] || styles.pending;
   const label = labels[status] || 'Menunggu';
 
-  return <span style={style}>{label}</span>;
+  return <span style={style}><StatusIcon status={status} /> {label}</span>;
 }
 
 export default InputPelanggaran;

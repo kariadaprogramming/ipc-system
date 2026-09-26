@@ -1,4 +1,4 @@
-# IPC School System
+# Website IPC Bali Mandara
 
 Sistem Individual Point Card untuk sekolah dengan fitur lengkap untuk mengelola prestasi, organisasi, event, pelanggaran, dan perilaku siswa.
 
@@ -440,4 +440,9 @@ Fitur yang dapat ditambahkan:
 
 ## License
 
-Project ini dibuat untuk keperluan sekolah.
+Proprietary — Copyright (C) 2026 Dean Putra & Agus Kariada. All rights reserved.
+
+Penggunaan perangkat lunak ini terbatas untuk SMK Negeri Bali Mandara.
+Dilarang menyalin, menyebarluaskan, atau menggunakan kembali perangkat lunak ini
+untuk sekolah atau pihak lain tanpa izin tertulis dari pemegang hak cipta.
+Lihat file `LICENSE` untuk ketentuan lengkap.

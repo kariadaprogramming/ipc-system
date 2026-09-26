@@ -3,22 +3,24 @@ import api from '../utils/api';
 import API_BASE_URL from '../config';
 import { toTitleCase } from '../utils/perilaku';
 import { formatDisplayText } from '../utils/formatDisplayText';
+import { StatusIcon } from './icons';
+import { Camera, Inbox } from 'lucide-react';
 
 function ApprovalsV2() {
-  const PAGE_BG = '#f3f5f9';
-  const CARD = '#ffffff';
-  const BORDER = '#e7eaf0';
-  const TEXT = '#1f2430';
-  const MUTED = '#6b7280';
-  const BLUE = '#2f5fe8';
-  const BLUE_DARK = '#234bc4';
-  const AMBER = '#f5a524';
-  const AMBER_BG = '#fdf1de';
-  const GREEN = '#16a875';
-  const GREEN_DARK = '#0f8a61';
-  const RED = '#e34848';
-  const RED_DARK = '#cc3b3b';
-  const RADIUS = '12px';
+  const PAGE_BG = 'var(--bg-secondary)';
+  const CARD = 'var(--bg-primary)';
+  const BORDER = 'var(--border-color)';
+  const TEXT = 'var(--ink)';
+  const MUTED = 'var(--slate)';
+  const BLUE = 'var(--blue)';
+  const BLUE_DARK = 'var(--blue-dark)';
+  const AMBER = 'var(--warning-color)';
+  const AMBER_BG = 'var(--amber-bg)';
+  const GREEN = 'var(--success-color)';
+  const GREEN_DARK = '#059669';
+  const RED = 'var(--danger-color)';
+  const RED_DARK = 'var(--danger-dark)';
+  const RADIUS = 'var(--card-radius)';
   const [activeTab, setActiveTab] = useState('prestasi');
   const [approvals, setApprovals] = useState({
     prestasi: [],
@@ -149,7 +151,7 @@ function ApprovalsV2() {
           textAlign: "center",
           color: MUTED
         }}>
-          <span style={{ fontSize: "34px", display: "block", marginBottom: "10px" }}>🗂️</span>
+          <span style={{ display: 'inline-flex', color: 'var(--muted-light)' }}><Inbox size={34} /></span>
           <strong style={{ color: TEXT, display: "block", marginBottom: "4px", fontSize: "15px" }}>Belum ada pengajuan {type}</strong>
           Pengajuan baru akan muncul di sini untuk ditinjau.
         </div>
@@ -311,7 +313,7 @@ function ApprovalsV2() {
                 whiteSpace: 'nowrap',
                 background: '#e5f7ee',
                 color: GREEN_DARK
-              }}>✅ DISETUJUI</span>
+              }}><StatusIcon status="approved" /> DISETUJUI</span>
             ) : (
               <span style={{
                 display: 'inline-flex',
@@ -324,7 +326,7 @@ function ApprovalsV2() {
                 whiteSpace: 'nowrap',
                 background: '#fdeaea',
                 color: RED_DARK
-              }}>❌ DITOLAK</span>
+              }}><StatusIcon status="rejected" /> DITOLAK</span>
             )}
           </div>
 
@@ -375,7 +377,7 @@ function ApprovalsV2() {
                         gap: '6px'
                       }}
                     >
-                      📷 Foto Bukti
+                      <Camera size={14} /> Foto Bukti
                     </button>
                   ) : (
                     <span style={{ color: MUTED }}>-</span>
@@ -412,7 +414,7 @@ function ApprovalsV2() {
                   }}
                   onClick={() => setSelectedItem({ ...item, type })}
                 >
-                  ✅ Setuju
+                  <StatusIcon status="approved" /> Setuju
                 </button>
                 <button 
                   style={{
@@ -432,7 +434,7 @@ function ApprovalsV2() {
                   }}
                   onClick={() => setSelectedItem({ ...item, type, action: 'reject' })}
                 >
-                  ❌ Tolak
+                  <StatusIcon status="rejected" /> Tolak
                 </button>
               </div>
             ) : (
@@ -450,7 +452,7 @@ function ApprovalsV2() {
             from { opacity: 0; transform: translateY(6px); }
             to { opacity: 1; transform: translateY(0); }
           }
-          @keyframes fadeIn {
+          @keyframes approvalFade {
             from { opacity: 0; }
             to { opacity: 1; }
           }
@@ -458,11 +460,11 @@ function ApprovalsV2() {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.25; }
           }
-          @media (max-width: 880px) {
+          @media (max-width: 768px) {
             .desktop-table { display: none !important; }
             .mobile-cards { display: block !important; }
           }
-          @media (min-width: 881px) {
+          @media (min-width: 769px) {
             .mobile-cards { display: none !important; }
             .desktop-table { display: table !important; }
           }
@@ -673,7 +675,7 @@ function ApprovalsV2() {
                           whiteSpace: 'nowrap',
                           background: '#e5f7ee',
                           color: GREEN_DARK
-                        }}>✅ DISETUJUI</span>
+                        }}><StatusIcon status="approved" /> DISETUJUI</span>
                       ) : (
                         <span style={{
                           display: 'inline-flex',
@@ -686,7 +688,7 @@ function ApprovalsV2() {
                           whiteSpace: 'nowrap',
                           background: '#fdeaea',
                           color: RED_DARK
-                        }}>❌ DITOLAK</span>
+                        }}><StatusIcon status="rejected" /> DITOLAK</span>
                       )}
                     </td>
                   </>
@@ -732,7 +734,7 @@ function ApprovalsV2() {
                           whiteSpace: 'nowrap',
                           background: '#e5f7ee',
                           color: GREEN_DARK
-                        }}>✅ DISETUJUI</span>
+                        }}><StatusIcon status="approved" /> DISETUJUI</span>
                       ) : (
                         <span style={{
                           display: 'inline-flex',
@@ -745,7 +747,7 @@ function ApprovalsV2() {
                           whiteSpace: 'nowrap',
                           background: '#fdeaea',
                           color: RED_DARK
-                        }}>❌ DITOLAK</span>
+                        }}><StatusIcon status="rejected" /> DITOLAK</span>
                       )}
                     </td>
                   </>
@@ -815,7 +817,7 @@ function ApprovalsV2() {
                         whiteSpace: 'nowrap',
                         background: '#e5f7ee',
                         color: GREEN_DARK
-                      }}>✅ DISETUJUI</span>
+                      }}><StatusIcon status="approved" /> DISETUJUI</span>
                     ) : (
                       <span style={{
                         display: 'inline-flex',
@@ -828,7 +830,7 @@ function ApprovalsV2() {
                         whiteSpace: 'nowrap',
                         background: '#fdeaea',
                         color: RED_DARK
-                      }}>❌ DITOLAK</span>
+                      }}><StatusIcon status="rejected" /> DITOLAK</span>
                     )}
                   </td>
                 )}
@@ -866,7 +868,7 @@ function ApprovalsV2() {
                           onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}
                           onClick={() => setSelectedItem({ ...item, type, id: item.id })} 
                         >
-                          ✅ Setuju
+                          <StatusIcon status="approved" /> Setuju
                         </button>
                         <button 
                           style={{
@@ -890,7 +892,7 @@ function ApprovalsV2() {
                           onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}
                           onClick={() => setSelectedItem({ ...item, type, id: item.id, action: 'reject' })} 
                         >
-                          ❌ Tolak
+                          <StatusIcon status="rejected" /> Tolak
                         </button>
                       </div>
                     )
@@ -922,7 +924,7 @@ function ApprovalsV2() {
                         onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}
                         onClick={() => setSelectedItem({ ...item, type })} 
                       >
-                        ✅ Setuju
+                        <StatusIcon status="approved" /> Setuju
                       </button>
                       <button 
                         style={{
@@ -946,7 +948,7 @@ function ApprovalsV2() {
                         onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}
                         onClick={() => setSelectedItem({ ...item, type, action: 'reject' })} 
                       >
-                        ❌ Tolak
+                        <StatusIcon status="rejected" /> Tolak
                       </button>
                     </div>
                   )}
@@ -966,22 +968,11 @@ function ApprovalsV2() {
   if (loading) {
     return (
       <div style={{
-        fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+        fontFamily: "var(--font-sans)",
         background: PAGE_BG,
-        minHeight: "100vh",
-        padding: "28px 20px 60px"
+        padding: "4px 4px 40px"
       }}>
-        <div style={{
-          background: CARD,
-          border: `1px solid ${BORDER}`,
-          borderRadius: RADIUS,
-          padding: "60px 20px",
-          textAlign: "center",
-          color: MUTED
-        }}>
-          <div style={{ fontSize: "34px", marginBottom: "10px" }}>⏳</div>
-          <strong style={{ color: TEXT, fontSize: "15px" }}>Memuat data...</strong>
-        </div>
+        <div className="inline-loading"><div className="spinner" style={{ margin: '0 auto 12px' }}></div><strong>Memuat data...</strong></div>
       </div>
     );
   }
@@ -997,10 +988,9 @@ function ApprovalsV2() {
 
   return (
     <div style={{
-      fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+      fontFamily: "var(--font-sans)",
       background: PAGE_BG,
-      minHeight: "100vh",
-      padding: "28px 20px 60px"
+      padding: "4px 4px 40px"
     }}>
       <h1 style={{
         fontSize: "26px",
@@ -1098,7 +1088,7 @@ function ApprovalsV2() {
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 1500,
-          animation: 'fadeIn 0.2s ease'
+          animation: 'approvalFade 0.2s ease'
         }}>
           <div style={{
             background: CARD,
@@ -1170,7 +1160,7 @@ function ApprovalsV2() {
                   onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}
                   onClick={() => handleReject(selectedItem.type, selectedItem.id)}
                 >
-                  ❌ Tolak
+                  <StatusIcon status="rejected" /> Tolak
                 </button>
               ) : (
                 <button 
@@ -1195,7 +1185,7 @@ function ApprovalsV2() {
                   onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}
                   onClick={() => handleApprove(selectedItem.type, selectedItem.id)}
                 >
-                  ✅ Setuju
+                  <StatusIcon status="approved" /> Setuju
                 </button>
               )}
               <button 
@@ -1240,7 +1230,7 @@ function ApprovalsV2() {
             justifyContent: 'center',
             zIndex: 1100,
             cursor: 'pointer',
-            animation: 'fadeIn 0.2s ease'
+            animation: 'approvalFade 0.2s ease'
           }}
         >
           <div
