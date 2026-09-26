@@ -533,6 +533,22 @@ function KonfigurasiIPC() {
   const showEditField2 = ['prestasi', 'organisasi'].includes(activeCategory) ||
     (activeCategory === 'pelanggaran' && Boolean(editingConfig?.field2));
 
+  // Display formatting for enum-style config values.
+  // Only applied to fixed-vocabulary columns (prestasi tingkat/juara, event tingkat);
+  // free-text columns (organisasi names, pelanggaran details, descriptions) stay raw
+  // so values like "OSIS" are never mangled.
+  const formatConfigField = (config, key) => {
+    const value = config[key];
+    if (!value) return 'Tidak ada';
+    if (activeCategory === 'prestasi' && (key === 'field1' || key === 'field2')) {
+      return formatDisplayText(value);
+    }
+    if (activeCategory === 'event' && key === 'field1') {
+      return formatDisplayText(value);
+    }
+    return value;
+  };
+
   const tableFields = [
     { key: 'field1', label: activeCategory === 'pelanggaran' ? (pelanggaranSection === 'severity' ? 'Tingkat Pelanggaran' : 'Detail Pelanggaran') : getHeaderLabel1(activeCategory) },
     { key: 'field2', label: showTableField2 ? (activeCategory === 'pelanggaran' && pelanggaranSection === 'detail' ? 'Tingkat Pelanggaran' : getHeaderLabel2(activeCategory)) : '' }
@@ -825,7 +841,7 @@ function KonfigurasiIPC() {
                 <tr key={config.id}>
                   {tableFields.map((field, index) => (
                     <td key={field.key} style={index === 0 ? { fontWeight: 600 } : undefined}>
-                      {config[field.key] || 'Tidak ada'}
+                      {formatConfigField(config, field.key)}
                     </td>
                   ))}
                   <td>
@@ -938,7 +954,7 @@ function KonfigurasiIPC() {
                 <input
                   type="text"
                   name="field1"
-                  defaultValue={editingConfig.field1 || '-'}
+                  defaultValue={editingConfig.field1 ? formatConfigField(editingConfig, 'field1') : '-'}
                   disabled
                   className="form-control"
                   style={{ background: '#F7F8FB', color: '#6B7080' }}
@@ -971,7 +987,7 @@ function KonfigurasiIPC() {
                     <input
                       type="text"
                       name="field2"
-                      defaultValue={editingConfig.field2 || '-'}
+                      defaultValue={editingConfig.field2 ? formatConfigField(editingConfig, 'field2') : '-'}
                       disabled
                       className="form-control"
                       style={{ background: '#F7F8FB', color: '#6B7080' }}

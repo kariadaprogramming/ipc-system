@@ -143,9 +143,17 @@ const sanitizeInput = (req, res, next) => {
   next();
 };
 
-// Security headers configuration
+// Security headers configuration.
+// NOTE: `useDefaults: false` is critical while serving plain HTTP — otherwise
+// Helmet merges in `upgrade-insecure-requests`, which makes browsers rewrite
+// every subresource (JS/CSS/favicon/API) from http:// to https:// and the
+// whole app fails to load on an HTTP-only origin. Re-enable the defaults
+// (or just that directive) once HTTPS terminates in front of the app.
+// COOP + Origin-Agent-Cluster are likewise disabled: browsers ignore them on
+// untrustworthy (plain-HTTP) origins and only log warnings about them.
 const securityHeaders = helmet({
   contentSecurityPolicy: {
+    useDefaults: false,
     directives: {
       defaultSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
@@ -164,6 +172,8 @@ const securityHeaders = helmet({
     },
   },
   crossOriginEmbedderPolicy: false,
+  crossOriginOpenerPolicy: false,
+  originAgentCluster: false,
   hsts: {
     maxAge: 31536000,
     includeSubDomains: true,
